@@ -1,0 +1,5908 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    MPS_DUT.sgcanvas
+#//  Created: Fri Apr  3 09:48:11 2009
+#//  By: Fast Models  System Canvas 0.0.077  (Mar 19 2009)
+#//
+# *  Do NOT modify this file. It is for internal use by System Canvas only.
+#//
+#//  Copyright (c) 2004-2008 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "DMC"
+        (
+            x = 970;
+            y = 160;
+            width = 131;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "SMC"
+        (
+            x = 970;
+            y = 250;
+            width = 131;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "can"
+        (
+            x = 320;
+            y = 770;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 250;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "clk100Hz"
+        (
+            x = 220;
+            y = -360;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = -20;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clk13p"
+        (
+            x = 220;
+            y = -140;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clk1Hz"
+        (
+            x = 220;
+            y = -210;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clk1MHz"
+        (
+            x = 220;
+            y = -280;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clk1p"
+        (
+            x = 220;
+            y = 70;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 190;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clk25MHz"
+        (
+            x = 220;
+            y = -70;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clk4p"
+        (
+            x = 220;
+            y = 0;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "dut_characterlcd"
+        (
+            x = -30;
+            y = 370;
+            width = 171;
+            height = 121;
+            sheight = 61;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clock"
+                (
+                x = 180;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "display"
+                (
+                x = -10;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 160;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 180;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "dut_sysregs"
+        (
+            x = -30;
+            y = 170;
+            width = 171;
+            height = 151;
+            sheight = 30;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in_25mhz"
+                (
+                x = 180;
+                y = 3;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clk_in_100hz"
+                (
+                x = 250;
+                y = 23;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "leds"
+                (
+                x = 10;
+                y = 73;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "leds_7seg"
+                (
+                x = 0;
+                y = 103;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "percfg"
+                (
+                x = 0;
+                y = 3;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 260;
+                y = 43;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "user_switches"
+                (
+                x = 0;
+                y = 33;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "ethernet"
+        (
+            x = 320;
+            y = 620;
+            width = 171;
+            height = 71;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 200;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "flexray"
+        (
+            x = 320;
+            y = 840;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 180;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "i2c_ADCDAC"
+        (
+            x = 320;
+            y = 910;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 190;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "lin"
+        (
+            x = 320;
+            y = 700;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 230;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "mmc"
+        (
+            x = 960;
+            y = 520;
+            width = 111;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = -10;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "mmc"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "mpbinterruptforwarder"
+        (
+            x = 970;
+            y = -230;
+            width = 131;
+            height = 72;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "int_in"
+                (
+                x = 30;
+                y = 36;
+                side = 32;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "int_in[0]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[1]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[2]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[3]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[4]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[5]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[6]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[7]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[8]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[9]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[10]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[11]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[12]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[13]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[14]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[15]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[16]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[17]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[18]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[19]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[20]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[21]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[22]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[23]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[24]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[25]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[26]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[27]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[28]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[29]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[30]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[31]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[32]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[33]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[34]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[35]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[36]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[37]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[38]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[39]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[40]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[41]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[42]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[43]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[44]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[45]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[46]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[47]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[48]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[49]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[50]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[51]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[52]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[53]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[54]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[55]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[56]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[57]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[58]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[59]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[60]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[61]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[62]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[63]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[64]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[65]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[66]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[67]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[68]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[69]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[70]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[71]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[72]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[73]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[74]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[75]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[76]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[77]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[78]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[79]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[80]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[81]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[82]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[83]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[84]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[85]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[86]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[87]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[88]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[89]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[90]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[91]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[92]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[93]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[94]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[95]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[96]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[97]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[98]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[99]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[100]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[101]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[102]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[103]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[104]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[105]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[106]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[107]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[108]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[109]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[110]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[111]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[112]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[113]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[114]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[115]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[116]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[117]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[118]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[119]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[120]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[121]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[122]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[123]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[124]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[125]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[126]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[127]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[128]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[129]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[130]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[131]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[132]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[133]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[134]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[135]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[136]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[137]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[138]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[139]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[140]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[141]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[142]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[143]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[144]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[145]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[146]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[147]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[148]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[149]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[150]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[151]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[152]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[153]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[154]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[155]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[156]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[157]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[158]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[159]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[160]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[161]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[162]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[163]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[164]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[165]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[166]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[167]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[168]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[169]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[170]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[171]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[172]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[173]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[174]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[175]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[176]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[177]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[178]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[179]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[180]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[181]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[182]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[183]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[184]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[185]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[186]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[187]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[188]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[189]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[190]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[191]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[192]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[193]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[194]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[195]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[196]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[197]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[198]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[199]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[200]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[201]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[202]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[203]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[204]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[205]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[206]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[207]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[208]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[209]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[210]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[211]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[212]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[213]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[214]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[215]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[216]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[217]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[218]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[219]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[220]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[221]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[222]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[223]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[224]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[225]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[226]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[227]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[228]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[229]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[230]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[231]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[232]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[233]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[234]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[235]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[236]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[237]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_in[238]"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "int_num"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_out"
+                (
+                x = 170;
+                y = 32;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl031_rtc"
+        (
+            x = 730;
+            y = -90;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clock"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl041"
+        (
+            x = 730;
+            y = 150;
+            width = 151;
+            height = 79;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "audio"
+                (
+                x = -20;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clk_in_ref"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "dma_rx"
+                (
+                x = 0;
+                y = 3;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "dma_tx"
+                (
+                x = 0;
+                y = 23;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq"
+                (
+                x = 0;
+                y = 43;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl111_clcd"
+        (
+            x = 320;
+            y = 360;
+            width = 161;
+            height = 81;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 170;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "control"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "display"
+                (
+                x = -20;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 170;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 200;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_m"
+                (
+                x = -20;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl180_mci"
+        (
+            x = 960;
+            y = 370;
+            width = 111;
+            height = 131;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "MCIINTR"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "MCIINTR[0]"
+                (
+                x = -20;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "MCIINTR[1]"
+                (
+                x = -20;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "mmc_m"
+                (
+                x = 0;
+                y = 82;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "pvbusdecoder"
+        (
+            x = 970;
+            y = 10;
+            width = 131;
+            height = 111;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m_range"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 140;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "sp804_0"
+        (
+            x = 730;
+            y = -280;
+            width = 171;
+            height = 71;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clock"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_out0"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_out1"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "timer_en"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "timer_en[0]"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "timer_en[1]"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+            )
+        )
+        instance "sp804_1"
+        (
+            x = 730;
+            y = -190;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clock"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_out0"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_out1"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "timer_en"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "timer_en[0]"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "timer_en[1]"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+            )
+        )
+        instance "sp805"
+        (
+            x = 730;
+            y = -20;
+            width = 171;
+            height = 88;
+            sheight = 30;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 3;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "irq_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_in"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_out"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "uart0"
+        (
+            x = 730;
+            y = 280;
+            width = 141;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in_ref"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "serial_out"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "uart1"
+        (
+            x = 730;
+            y = 350;
+            width = 141;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in_ref"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "serial_out"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "uart2"
+        (
+            x = 730;
+            y = 420;
+            width = 141;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in_ref"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "serial_out"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "usb"
+        (
+            x = 320;
+            y = 550;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 180;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+    )
+    ports
+    (
+        define "aaci_audio_out"
+        (
+            x = 550;
+            y = 210;
+            width = 101;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "clk_in_master"
+        (
+            x = 310;
+            y = -410;
+            width = 81;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "display"
+        (
+            x = 240;
+            y = 420;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "display_char_lcd"
+        (
+            x = -190;
+            y = 430;
+            width = 101;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "int_num"
+        (
+            x = 1150;
+            y = -210;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "int_out"
+        (
+            x = 1150;
+            y = -180;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "leds"
+        (
+            x = -190;
+            y = 270;
+            width = 101;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "leds_7seg"
+        (
+            x = -190;
+            y = 300;
+            width = 101;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "percfg"
+        (
+            x = -190;
+            y = 200;
+            width = 101;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "pvbus_s"
+        (
+            x = 1140;
+            y = 30;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "terminal"
+        (
+            x = 740;
+            y = 640;
+            width = 111;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "user_switches"
+        (
+            x = -190;
+            y = 230;
+            width = 101;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+    )
+    connections
+    (
+        define "clk100Hz.clk_out=>dut_sysregs.clk_in_100hz"
+        (
+            point
+            (
+                x = 500;
+                y = -330;
+                automatic = false;
+            )
+            point
+            (
+                x = 500;
+                y = 230;
+                automatic = false;
+            )
+        )
+        define "clk13p.clk_out=>pl041.clk_in_ref"
+        (
+            point
+            (
+                x = 430;
+                y = -110;
+                automatic = false;
+            )
+            point
+            (
+                x = 430;
+                y = 60;
+                automatic = false;
+            )
+            point
+            (
+                x = 700;
+                y = 60;
+                automatic = false;
+            )
+            point
+            (
+                x = 700;
+                y = 180;
+                automatic = false;
+            )
+        )
+        define "clk1Hz.clk_out=>pl031_rtc.clock"
+        (
+            point
+            (
+                x = 450;
+                y = -180;
+                automatic = false;
+            )
+            point
+            (
+                x = 450;
+                y = 20;
+                automatic = false;
+            )
+            point
+            (
+                x = 700;
+                y = 20;
+                automatic = false;
+            )
+            point
+            (
+                x = 700;
+                y = -60;
+                automatic = true;
+            )
+        )
+        define "clk1Hz.clk_out=>sp805.clk_in"
+        (
+            point
+            (
+                x = 450;
+                y = -180;
+                automatic = false;
+            )
+            point
+            (
+                x = 450;
+                y = 20;
+                automatic = false;
+            )
+            point
+            (
+                x = 680;
+                y = 20;
+                automatic = false;
+            )
+        )
+        define "clk1MHz.clk_out=>sp804_0.clock"
+        (
+            point
+            (
+                x = 690;
+                y = -250;
+                automatic = false;
+            )
+        )
+        define "clk1MHz.clk_out=>sp804_1.clock"
+        (
+            point
+            (
+                x = 700;
+                y = -250;
+                automatic = false;
+            )
+            point
+            (
+                x = 700;
+                y = -160;
+                automatic = false;
+            )
+        )
+        define "clk1p.clk_out=>dut_characterlcd.clock"
+        (
+            point
+            (
+                x = 400;
+                y = 110;
+                automatic = true;
+            )
+            point
+            (
+                x = 400;
+                y = 160;
+                automatic = false;
+            )
+            point
+            (
+                x = 160;
+                y = 160;
+                automatic = false;
+            )
+            point
+            (
+                x = 160;
+                y = 440;
+                automatic = false;
+            )
+        )
+        define "clk25MHz.clk_out=>dut_sysregs.clk_in_25mhz"
+        (
+            point
+            (
+                x = 410;
+                y = -40;
+                automatic = false;
+            )
+            point
+            (
+                x = 410;
+                y = 210;
+                automatic = false;
+            )
+        )
+        define "clk25MHz.clk_out=>mmc.clk_in"
+        (
+            point
+            (
+                x = 410;
+                y = -40;
+                automatic = false;
+            )
+            point
+            (
+                x = 410;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = 690;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = 690;
+                y = 570;
+                automatic = false;
+            )
+        )
+        define "clk25MHz.clk_out=>uart0.clk_in_ref"
+        (
+            point
+            (
+                x = 410;
+                y = -40;
+                automatic = true;
+            )
+            point
+            (
+                x = 410;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = 690;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = 690;
+                y = 310;
+                automatic = false;
+            )
+        )
+        define "clk25MHz.clk_out=>uart1.clk_in_ref"
+        (
+            point
+            (
+                x = 410;
+                y = -40;
+                automatic = true;
+            )
+            point
+            (
+                x = 410;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = 690;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = 690;
+                y = 380;
+                automatic = false;
+            )
+        )
+        define "clk25MHz.clk_out=>uart2.clk_in_ref"
+        (
+            point
+            (
+                x = 410;
+                y = -40;
+                automatic = true;
+            )
+            point
+            (
+                x = 410;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = 690;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = 690;
+                y = 450;
+                automatic = false;
+            )
+        )
+        define "clk4p.clk_out=>pl111_clcd.clk_in"
+        (
+            point
+            (
+                x = 400;
+                y = 30;
+                automatic = true;
+            )
+            point
+            (
+                x = 400;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 490;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 490;
+                y = 380;
+                automatic = false;
+            )
+            point
+            (
+                x = 490;
+                y = 390;
+                automatic = true;
+            )
+        )
+        define "dut_characterlcd.intr=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 540;
+                y = 480;
+                automatic = true;
+            )
+            point
+            (
+                x = 540;
+                y = 481;
+                automatic = true;
+            )
+            point
+            (
+                x = 930;
+                y = 481;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -200;
+                automatic = false;
+            )
+        )
+        define "dut_characterlcd.intr=>mpbinterruptforwarder.int_in[15]"
+        (
+            point
+            (
+                x = 150;
+                y = 480;
+                automatic = true;
+            )
+            point
+            (
+                x = 150;
+                y = -142;
+                automatic = true;
+            )
+            point
+            (
+                x = 720;
+                y = -142;
+                automatic = true;
+            )
+            point
+            (
+                x = 720;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "pl031_rtc.intr=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = -60;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -190;
+                automatic = false;
+            )
+        )
+        define "pl031_rtc.intr=>mpbinterruptforwarder.int_in[1]"
+        (
+            point
+            (
+                x = 902;
+                y = -60;
+                automatic = true;
+            )
+            point
+            (
+                x = 902;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "pl041.irq=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = 221;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -190;
+                automatic = false;
+            )
+        )
+        define "pl041.irq=>mpbinterruptforwarder.int_in[10]"
+        (
+            point
+            (
+                x = 885;
+                y = 221;
+                automatic = true;
+            )
+            point
+            (
+                x = 885;
+                y = 68;
+                automatic = true;
+            )
+            point
+            (
+                x = 965;
+                y = 68;
+                automatic = true;
+            )
+            point
+            (
+                x = 965;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "pl111_clcd.intr=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 700;
+                y = 410;
+                automatic = true;
+            )
+            point
+            (
+                x = 700;
+                y = 411;
+                automatic = true;
+            )
+            point
+            (
+                x = 930;
+                y = 411;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -200;
+                automatic = false;
+            )
+        )
+        define "pl111_clcd.intr=>mpbinterruptforwarder.int_in[11]"
+        (
+            point
+            (
+                x = 485;
+                y = 410;
+                automatic = true;
+            )
+            point
+            (
+                x = 485;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "pl111_clcd.pvbus_m=>pvbusdecoder.pvbus_s"
+        (
+            point
+            (
+                x = 310;
+                y = 390;
+                automatic = true;
+            )
+            point
+            (
+                x = 310;
+                y = 140;
+                automatic = false;
+            )
+            point
+            (
+                x = 1110;
+                y = 140;
+                automatic = false;
+            )
+            point
+            (
+                x = 1110;
+                y = 40;
+                automatic = true;
+            )
+        )
+        define "pl180_mci.MCIINTR=>mpbinterruptforwarder.int_in"
+        (
+        )
+        define "pl180_mci.MCIINTR=>mpbinterruptforwarder.int_in[4]"
+        (
+            point
+            (
+                x = 1072;
+                y = 400;
+                automatic = true;
+            )
+            point
+            (
+                x = 1072;
+                y = 312;
+                automatic = true;
+            )
+            point
+            (
+                x = 968;
+                y = 312;
+                automatic = true;
+            )
+            point
+            (
+                x = 968;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "pl180_mci.MCIINTR=>mpbinterruptforwarder.int_in[5]"
+        (
+            point
+            (
+                x = 1072;
+                y = 400;
+                automatic = true;
+            )
+            point
+            (
+                x = 1072;
+                y = 312;
+                automatic = true;
+            )
+            point
+            (
+                x = 968;
+                y = 312;
+                automatic = true;
+            )
+            point
+            (
+                x = 968;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "pl180_mci.MCIINTR[0]=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = 420;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -200;
+                automatic = false;
+            )
+        )
+        define "pl180_mci.MCIINTR[0]=>mpbinterruptforwarder.int_in[4]"
+        (
+            point
+            (
+                x = 950;
+                y = 420;
+                automatic = true;
+            )
+            point
+            (
+                x = 950;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "pl180_mci.MCIINTR[1]=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = 440;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -200;
+                automatic = false;
+            )
+        )
+        define "pl180_mci.MCIINTR[1]=>mpbinterruptforwarder.int_in[5]"
+        (
+            point
+            (
+                x = 955;
+                y = 440;
+                automatic = true;
+            )
+            point
+            (
+                x = 955;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "pl180_mci.mmc_m=>mmc.mmc"
+        (
+            point
+            (
+                x = 950;
+                y = 480;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = 550;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>DMC.pvbus"
+        (
+            point
+            (
+                x = 940;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 940;
+                y = 190;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>SMC.pvbus"
+        (
+            point
+            (
+                x = 940;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 940;
+                y = 280;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>can.pvbus"
+        (
+            point
+            (
+                x = 510;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 510;
+                y = 810;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>dut_characterlcd.pvbus"
+        (
+            point
+            (
+                x = 720;
+                y = 100;
+                automatic = true;
+            )
+            point
+            (
+                x = 720;
+                y = 470;
+                automatic = true;
+            )
+            point
+            (
+                x = 510;
+                y = 470;
+                automatic = false;
+            )
+            point
+            (
+                x = 510;
+                y = 250;
+                automatic = false;
+            )
+            point
+            (
+                x = 170;
+                y = 250;
+                automatic = false;
+            )
+            point
+            (
+                x = 170;
+                y = 460;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>dut_sysregs.pvbus"
+        (
+            point
+            (
+                x = 510;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 510;
+                y = 250;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>ethernet.pvbus"
+        (
+            point
+            (
+                x = 510;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 510;
+                y = 660;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>flexray.pvbus"
+        (
+            point
+            (
+                x = 510;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 510;
+                y = 880;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>i2c_ADCDAC.pvbus"
+        (
+            point
+            (
+                x = 510;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 510;
+                y = 950;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>lin.pvbus"
+        (
+            point
+            (
+                x = 510;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 510;
+                y = 740;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>pl031_rtc.pvbus"
+        (
+            point
+            (
+                x = 710;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 710;
+                y = -40;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>pl041.pvbus"
+        (
+            point
+            (
+                x = 710;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 710;
+                y = 200;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>pl111_clcd.pvbus"
+        (
+            point
+            (
+                x = 510;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 510;
+                y = 430;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>pl180_mci.pvbus"
+        (
+            point
+            (
+                x = 940;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 940;
+                y = 400;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>sp804_0.pvbus"
+        (
+            point
+            (
+                x = 710;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 710;
+                y = -230;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>sp804_1.pvbus"
+        (
+            point
+            (
+                x = 710;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 710;
+                y = -140;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>sp805.pvbus_s"
+        (
+            point
+            (
+                x = 710;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 710;
+                y = 39;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>uart0.pvbus"
+        (
+            point
+            (
+                x = 710;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 710;
+                y = 330;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>uart1.pvbus"
+        (
+            point
+            (
+                x = 710;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 710;
+                y = 400;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>uart2.pvbus"
+        (
+            point
+            (
+                x = 710;
+                y = 100;
+                automatic = false;
+            )
+            point
+            (
+                x = 710;
+                y = 470;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>usb.pvbus"
+        (
+            point
+            (
+                x = 720;
+                y = 100;
+                automatic = true;
+            )
+            point
+            (
+                x = 720;
+                y = 660;
+                automatic = true;
+            )
+            point
+            (
+                x = 510;
+                y = 660;
+                automatic = false;
+            )
+            point
+            (
+                x = 510;
+                y = 590;
+                automatic = true;
+            )
+        )
+        define "sp804_0.irq_out0=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = -250;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -190;
+                automatic = false;
+            )
+        )
+        define "sp804_0.irq_out0=>mpbinterruptforwarder.int_in[2]"
+        (
+            point
+            (
+                x = 910;
+                y = -250;
+                automatic = true;
+            )
+            point
+            (
+                x = 910;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "sp804_0.irq_out1=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = -230;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -190;
+                automatic = false;
+            )
+        )
+        define "sp804_0.irq_out1=>mpbinterruptforwarder.int_in[2]"
+        (
+            point
+            (
+                x = 910;
+                y = -230;
+                automatic = true;
+            )
+            point
+            (
+                x = 910;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "sp804_1.irq_out0=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = -160;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -200;
+                automatic = false;
+            )
+        )
+        define "sp804_1.irq_out0=>mpbinterruptforwarder.int_in[3]"
+        (
+            point
+            (
+                x = 905;
+                y = -160;
+                automatic = true;
+            )
+            point
+            (
+                x = 905;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "sp804_1.irq_out1=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = -140;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -200;
+                automatic = false;
+            )
+        )
+        define "sp804_1.irq_out1=>mpbinterruptforwarder.int_in[3]"
+        (
+            point
+            (
+                x = 905;
+                y = -140;
+                automatic = true;
+            )
+            point
+            (
+                x = 905;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "uart0.intr=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = 310;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -190;
+                automatic = false;
+            )
+        )
+        define "uart0.intr=>mpbinterruptforwarder.int_in[6]"
+        (
+            point
+            (
+                x = 880;
+                y = 310;
+                automatic = true;
+            )
+            point
+            (
+                x = 880;
+                y = 229;
+                automatic = true;
+            )
+            point
+            (
+                x = 960;
+                y = 229;
+                automatic = true;
+            )
+            point
+            (
+                x = 960;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "uart1.intr=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = 380;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -190;
+                automatic = false;
+            )
+        )
+        define "uart1.intr=>mpbinterruptforwarder.int_in[7]"
+        (
+            point
+            (
+                x = 880;
+                y = 380;
+                automatic = true;
+            )
+            point
+            (
+                x = 880;
+                y = 229;
+                automatic = true;
+            )
+            point
+            (
+                x = 960;
+                y = 229;
+                automatic = true;
+            )
+            point
+            (
+                x = 960;
+                y = -200;
+                automatic = true;
+            )
+        )
+        define "uart2.intr=>mpbinterruptforwarder.int_in"
+        (
+            point
+            (
+                x = 930;
+                y = 450;
+                automatic = false;
+            )
+            point
+            (
+                x = 930;
+                y = -200;
+                automatic = false;
+            )
+        )
+        define "uart2.intr=>mpbinterruptforwarder.int_in[8]"
+        (
+            point
+            (
+                x = 880;
+                y = 450;
+                automatic = true;
+            )
+            point
+            (
+                x = 880;
+                y = 229;
+                automatic = true;
+            )
+            point
+            (
+                x = 960;
+                y = 229;
+                automatic = true;
+            )
+            point
+            (
+                x = 960;
+                y = -200;
+                automatic = true;
+            )
+        )
+    )
+    portmaps
+    (
+        define "dut_characterlcd.display=>self.display_char_lcd"
+        (
+        )
+        define "dut_sysregs.leds=>self.leds"
+        (
+        )
+        define "dut_sysregs.leds_7seg=>self.leds_7seg"
+        (
+        )
+        define "dut_sysregs.percfg=>self.percfg"
+        (
+        )
+        define "dut_sysregs.user_switches=>self.user_switches"
+        (
+        )
+        define "mpbinterruptforwarder.int_num=>self.int_num"
+        (
+        )
+        define "mpbinterruptforwarder.int_out=>self.int_out"
+        (
+        )
+        define "pl041.audio=>self.aaci_audio_out"
+        (
+        )
+        define "pl111_clcd.display=>self.display"
+        (
+        )
+        define "self.clk_in_master=>clk100Hz.clk_in"
+        (
+            point
+            (
+                x = 200;
+                y = -400;
+                automatic = false;
+            )
+            point
+            (
+                x = 200;
+                y = -330;
+                automatic = false;
+            )
+        )
+        define "self.clk_in_master=>clk13p.clk_in"
+        (
+            point
+            (
+                x = 200;
+                y = -400;
+                automatic = false;
+            )
+            point
+            (
+                x = 200;
+                y = -110;
+                automatic = false;
+            )
+        )
+        define "self.clk_in_master=>clk1Hz.clk_in"
+        (
+            point
+            (
+                x = 200;
+                y = -400;
+                automatic = false;
+            )
+            point
+            (
+                x = 200;
+                y = -180;
+                automatic = false;
+            )
+        )
+        define "self.clk_in_master=>clk1MHz.clk_in"
+        (
+            point
+            (
+                x = 200;
+                y = -400;
+                automatic = false;
+            )
+            point
+            (
+                x = 200;
+                y = -250;
+                automatic = false;
+            )
+        )
+        define "self.clk_in_master=>clk1p.clk_in"
+        (
+            point
+            (
+                x = 200;
+                y = -400;
+                automatic = false;
+            )
+            point
+            (
+                x = 200;
+                y = 100;
+                automatic = false;
+            )
+        )
+        define "self.clk_in_master=>clk25MHz.clk_in"
+        (
+            point
+            (
+                x = 200;
+                y = -400;
+                automatic = false;
+            )
+            point
+            (
+                x = 200;
+                y = -40;
+                automatic = false;
+            )
+        )
+        define "self.clk_in_master=>clk4p.clk_in"
+        (
+            point
+            (
+                x = 200;
+                y = -400;
+                automatic = false;
+            )
+            point
+            (
+                x = 200;
+                y = 30;
+                automatic = false;
+            )
+        )
+        define "self.pvbus_s=>pvbusdecoder.pvbus_s"
+        (
+        )
+        define "uart0.serial_out=>self.terminal"
+        (
+            point
+            (
+                x = 880;
+                y = 330;
+                automatic = false;
+            )
+            point
+            (
+                x = 880;
+                y = 650;
+                automatic = false;
+            )
+        )
+        define "uart1.serial_out=>self.terminal"
+        (
+            point
+            (
+                x = 880;
+                y = 400;
+                automatic = false;
+            )
+            point
+            (
+                x = 880;
+                y = 650;
+                automatic = false;
+            )
+        )
+        define "uart2.serial_out=>self.terminal"
+        (
+            point
+            (
+                x = 880;
+                y = 470;
+                automatic = false;
+            )
+            point
+            (
+                x = 880;
+                y = 650;
+                automatic = false;
+            )
+        )
+    )
+    labels
+    (
+        instance "Copy_0_of_Label 0"
+        (
+            text  = "UART";
+            x = 720;
+            y = 240;
+            width = 91;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = false;
+        )
+        instance "Copy_1_of_Label 0"
+        (
+            text  = "MMC";
+            x = 950;
+            y = 330;
+            width = 61;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Copy_2_of_Label 0"
+        (
+            text  = "";
+            x = 950;
+            y = 0;
+            width = 171;
+            height = 141;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Copy_3_of_Label 0"
+        (
+            text  = "System Control";
+            x = -40;
+            y = 130;
+            width = 101;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Copy_4_of_Label 0"
+        (
+            text  = "";
+            x = 80;
+            y = -380;
+            width = 401;
+            height = 521;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Copy_5_of_Label 0"
+        (
+            text  = "";
+            x = 720;
+            y = -290;
+            width = 191;
+            height = 371;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Copy_6_of_Label 0"
+        (
+            text  = "";
+            x = -40;
+            y = 150;
+            width = 191;
+            height = 191;
+            font_family  = "Helvetica [Adobe]";
+            font_size = 12;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Copy_7_of_Label 0"
+        (
+            text  = "Audio";
+            x = 720;
+            y = 120;
+            width = 111;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Copy_8_of_Label 0"
+        (
+            text  = "MPS DUT\10\10This subsystem is included by MPS top-level systems\10";
+            x = -120;
+            y = 530;
+            width = 391;
+            height = 111;
+            font_family  = "Helvetica";
+            font_size = 12;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -5254664;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 4;
+            draw_below = false;
+        )
+        instance "Copy_9_of_Label 0"
+        (
+            text  = "";
+            x = 310;
+            y = 320;
+            width = 191;
+            height = 141;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 0"
+        (
+            text  = "Timer & Counter";
+            x = 720;
+            y = -310;
+            width = 121;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 1"
+        (
+            text  = "Display";
+            x = 310;
+            y = 300;
+            width = 61;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 2"
+        (
+            text  = "";
+            x = -130;
+            y = 520;
+            width = 421;
+            height = 131;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 3"
+        (
+            text  = "Baseboard Bus Decoder";
+            x = 950;
+            y = -20;
+            width = 171;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 4"
+        (
+            text  = "";
+            x = 940;
+            y = 350;
+            width = 141;
+            height = 261;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 5"
+        (
+            text  = "";
+            x = 720;
+            y = 140;
+            width = 171;
+            height = 91;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 6"
+        (
+            text  = "";
+            x = 310;
+            y = 530;
+            width = 191;
+            height = 451;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 7"
+        (
+            text  = "Dummy Components";
+            x = 310;
+            y = 510;
+            width = 141;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 8"
+        (
+            text  = "";
+            x = 720;
+            y = 260;
+            width = 171;
+            height = 351;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 9"
+        (
+            text  = "Clocking";
+            x = 80;
+            y = -400;
+            width = 71;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+    )
+)

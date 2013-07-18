@@ -1,0 +1,92 @@
+/*
+ * Copyright 2012 ARM Limited. All rights reserved.
+ */
+
+component bigLITTLE
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Top level component of the Cortex A15x4 A7x4 Versatile Express inspired model";
+    }
+
+    composition
+    {
+        coretilebusbridge : PVBus2AMBAPV();
+        cpubusbridge : AMBAPV2PVBus();
+        coretile      : DualCluster_Cortex_A15x4_A7x4();
+        motherboard   : VEMotherBoard(proc_id0.default=0x14000000,"daughter_led_count"=8,"daughter_user_switch_count"=8);
+        daughterboard : VEDaughterBoard();
+    }
+
+    connection
+    {
+
+        // Motherboard <-> Daughterboard connections
+        motherboard.masterclk  => daughterboard.clk_in;
+        motherboard.interrupts => daughterboard.interrupts;
+        motherboard.clcd_pvbus => daughterboard.clcd_pvbus;
+        motherboard.CB[0]      => daughterboard.CB;
+        daughterboard.smb_cs   => motherboard.smb_cs;
+        daughterboard.mmb      => motherboard.mmb_db1;
+
+        // Daughterboard <-> coretile connections
+        daughterboard.cpu_clk  => coretile.clk_in;
+        daughterboard.cpu_irqs => coretile.irqs;
+        coretile.pvbus_m => coretilebusbridge.pvbus_s;
+        cpubusbridge.pvbus_m => daughterboard.cpu_pvbus;
+        coretilebusbridge.amba_pv_m => self.coretile_m;
+        self.cpu_s => cpubusbridge.amba_pv_s;
+
+        // Motherboard <-> coretile connections
+        coretile.cluster0_ticks => motherboard.cluster0_ticks;
+        coretile.cluster1_ticks => motherboard.cluster1_ticks;
+        coretile.leds           => motherboard.daughter_leds;
+        coretile.user_switches  => motherboard.daughter_switches;
+
+        // Coretile <-> AMBA-PV ACE ports
+        self.amba_pv_ace_s0 => coretile.amba_pv_ace_s0;
+        coretile.amba_pv_ace_m0 => self.amba_pv_ace_m0;
+        self.amba_pv_ace_s1 => coretile.amba_pv_ace_s1;
+        coretile.amba_pv_ace_m1 => self.amba_pv_ace_m1;
+
+        // Counter loop out
+        self.amba_pv_getCounterValue_s => coretile.amba_pv_getCounterValue_s;
+        self.amba_pv_requestSignalUpdate_s => coretile.amba_pv_requestSignalUpdate_s;
+        coretile.amba_pv_signalUpdate_m => self.amba_pv_signalUpdate_m;
+        coretile.amba_pv_setEnabled_m => self.amba_pv_setEnabled_m;
+        self.amba_pv_requestEventUpdate_s => coretile.amba_pv_requestEventUpdate_s;
+        coretile.amba_pv_eventUpdate_m => self.amba_pv_eventUpdate_m;
+ 
+        // Counter loop in
+        coretile.amba_pv_getCounterValue_m => self.amba_pv_getCounterValue_m;
+        coretile.amba_pv_requestSignalUpdate_m => self.amba_pv_requestSignalUpdate_m;
+        self.amba_pv_signalUpdate_s => coretile.amba_pv_signalUpdate_s;
+        self.amba_pv_setEnabled_s => coretile.amba_pv_setEnabled_s;
+        coretile.amba_pv_requestEventUpdate_m => self.amba_pv_requestEventUpdate_m;
+        self.amba_pv_eventUpdate_s => coretile.amba_pv_eventUpdate_s;       
+    }
+    master port<AMBAPVACE> amba_pv_ace_m0;
+    slave port<AMBAPVACE> amba_pv_ace_s0;
+    master port<AMBAPVACE> amba_pv_ace_m1;
+    slave port<AMBAPVACE> amba_pv_ace_s1;
+    slave port<AMBAPV> cpu_s;
+    master port<AMBAPV> coretile_m;
+
+    // Loop out for Counter to SystemC
+    slave port<AMBAPVValueState64>  amba_pv_getCounterValue_s;
+    slave port<AMBAPVValue64>       amba_pv_requestSignalUpdate_s;
+    master port<AMBAPVValue>        amba_pv_signalUpdate_m;
+    master port<AMBAPVValue>        amba_pv_setEnabled_m;
+    slave port<AMBAPVValue64>       amba_pv_requestEventUpdate_s;
+    master port<AMBAPVValue>        amba_pv_eventUpdate_m;
+
+    // Loop in for Counter to Systemc
+    master port<AMBAPVValueState64> amba_pv_getCounterValue_m;
+    master port<AMBAPVValue64>      amba_pv_requestSignalUpdate_m;
+    slave port<AMBAPVValue>         amba_pv_signalUpdate_s;
+    slave port<AMBAPVValue>         amba_pv_setEnabled_s;
+    master port<AMBAPVValue64>      amba_pv_requestEventUpdate_m;
+    slave port<AMBAPVValue>         amba_pv_eventUpdate_s;
+}

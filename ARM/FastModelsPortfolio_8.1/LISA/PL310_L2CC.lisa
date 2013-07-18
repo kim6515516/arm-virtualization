@@ -1,0 +1,3324 @@
+/*
+ * Copyright 2008-2009 ARM Limited. All rights reserved. 
+ */
+
+// LISA Implementation of PL310 Level 2 Cache Controller
+//
+// For details on this PrimeCell, see ARM DDI 0246C
+
+component PL310_L2CC
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell Level 2 Cache Controller (PL310)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes 
+    {
+        #include "pv/PVBusCache.h"
+
+        #define PL310_TRACE if (!0) ; else printf
+        #define PL310_ERROR if (!0) ; else printf
+        #define PL310_DBG   if (!0) ; else printf
+
+        #define PL310_WAYS        (16)
+        #define PL310_PART_NUMBER (0x3)
+        #define PL310_RTL_RELEASE (0x4) // r2p0
+        #define PL310_INTERRUPTS_MASK (0x1ff)
+        #define PL310_WAYS_MASK   ((1 << PL310_WAYS) -1)
+
+        typedef enum {
+            PL310_L2_SLVERR, PL310_L2_DECERR, PL310_L2_COMPLETE
+        } pl310_txr_t;
+
+        #define PL310_CACHE_LINE_NOT_FOUND (-1)
+
+
+        #define PL310_UF_IS_L1_EVICTION_SHIFT  (8)
+        #define PL310_UF_IS_L1_EVICTION(uf)  (((uf) & (1 << 8)) != 0)
+        #define PL310_UF_IS_L1_DIRTY_EVICTION(uf) ((((uf) >> 8) & 3) == 0x1)
+        #define PL310_UF_IS_L1_CLEAN_EVICTION(uf) ((((uf) >> 8) & 3) == 0x3)
+
+        // Constants for extra tx.user_flags used by validation harness
+        #define PL310VAL_UF_FIXED_SHIFT  (25)
+        #define PL310VAL_UF_FIXED_MASK   (1 << 25)
+
+        #define PL310VAL_UF_SPLIT_SHIFT     (26)
+        #define PL310VAL_UF_SPLIT_MASK      (3 << 26)
+        #define PL310VAL_UF_SPLIT_NLAST_MASK (1 << 26)
+
+        #define PL310VAL_UF_FLAG28          (28)
+
+        #define PL310VAL_UF_DECERR_SHIFT    (30)
+        #define PL310VAL_UF_DECERR_MASK     (1 << 30)
+
+        #define PL310VAL_UF_OVERALL_DECERR_SHIFT    (24)
+        #define PL310VAL_UF_OVERALL_DECERR_MASK     (1 << 24)
+        
+        #define PL310VAL_UF_EXOKAY_SHIFT    (31)
+        #define PL310VAL_UF_EXOKAY_MASK     (1 << 31)
+    }
+
+    composition
+    {
+        cache_handler : PVBusCache (line_size = 32, line_count = 524288 /*0x80000*/);
+    }
+
+    connection
+    {
+        self.pvbus_s => cache_handler.bus_in[0];
+        cache_handler.bus_out[0] => self.pvbus_m;
+
+        cache_handler.device => self.cache_device;
+        self.cache_control => cache_handler.control;
+    }
+
+    resources 
+    {
+        // Register 0: Cache ID and Cache Type
+        REGISTER { description("r0 Cache ID"), reg_number(0x000),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)              } CacheID;
+        REGISTER { description("r0 Cache Type"), reg_number(0x004),
+                   read_function(debug_read), write_function(debug_write), 
+                display_format("hex"), bitwidth(32)                 } CacheType; 
+
+        // Register 1: Control
+        REGISTER { description("r1 Control"), reg_number(0x100),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } Ctrl;
+        REGISTER { description("r1 Auxiliary Control"), reg_number(0x104),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } AuxCtrl;
+        REGISTER { description("r1 Tag RAM Latency Control"), reg_number(0x108),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } TagLatencyCtrl;
+        REGISTER { description("r1 Data RAM Latency Control"), reg_number(0x10C),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } DataLatencyCtrl;
+
+        // Register 2: Interrupt/Counter Control Registers
+        REGISTER { description("r2 Event Counter Control"), reg_number(0x200),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } EventCounterCtrl;
+        REGISTER { description("r2 Event Counter1 Configuration"), reg_number(0x204),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } EventCounter1Cfg;
+        REGISTER { description("r2 Event Counter0 Configuration"), reg_number(0x208),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } EventCounter0Cfg;
+        REGISTER { description("r2 Event Counter1 Value"), reg_number(0x20C),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } EventCounter1;
+        REGISTER { description("r2 Event Counter0 Value"), reg_number(0x210),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } EventCounter0;
+        REGISTER { description("r2 Interrupt Mask"), reg_number(0x214),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } InterruptMask;
+        REGISTER { description("r2 Masked Interrupt Status"), reg_number(0x218),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } MaskedInterruptStatus;
+        REGISTER { description("r2 Raw Interrupt Status"), reg_number(0x21C),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } RawInterruptStatus;
+        REGISTER { description("r2 Interrupt Clear"), reg_number(0x220),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } InterruptClear;
+
+        // Register 7: Cache Maintenance Operations
+        REGISTER { description("r7 Cache Sync"), reg_number(0x730),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } CacheSync;
+        REGISTER { description("r7 Invalidate Line By PA"), reg_number(0x770),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } InvalidateByPA;
+        REGISTER { description("r7 Invalidate By Way"), reg_number(0x77C),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } InvalidateByWay;
+        REGISTER { description("r7 Clean Line By PA"), reg_number(0x7B0),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } CleanByPA;
+        REGISTER { description("r7 Clean Line By Index/Way"), reg_number(0x7B8),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } CleanByIdxWay;
+        REGISTER { description("r7 Clean By Way"), reg_number(0x7BC),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } CleanByWay;
+        REGISTER { description("r7 Clean and Invalidate Line By PA"), reg_number(0x7F0),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } CleanInvalByPA;
+        REGISTER { description("r7 Clean and Invalidate Line By Index/Way"), reg_number(0x7F8),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } CleanInvalByIdxWay;
+        REGISTER { description("r7 Clean and Invalidate By Way"), reg_number(0x7FC),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } CleanInvalByWay;
+
+        // Register 9: Cache Lockdown
+
+        REGISTER { description("r9 Data Lockdown %u By Way"), name("DataLockdown%u"),
+                   reg_number(0x900), reg_number_increment(0x8),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } DataLockdown[8];
+        REGISTER { description("r9 Instruction Lockdown %u By Way"), name("InstructionLockdown%u"),
+                   reg_number(0x904), reg_number_increment(0x8),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } InstructionLockdown[8];
+        
+        REGISTER { description("r9 Lockdown by Line Enable"), reg_number(0x950),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } LockdownByLineEnable;
+        REGISTER { description("r9 Unlock All Lines by Way"), reg_number(0x954),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } UnlockAll;
+        
+        // Register 12: Address Filtering
+        REGISTER { description("r12 Address Filtering Start"), reg_number(0xc00),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } AFilterStart;
+        REGISTER { description("r12 Address Filtering End"), reg_number(0xc04),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } AFilterEnd;
+
+        // Register 15: Debug and Prefetch
+        REGISTER { description("r15 Debug Control Register"), reg_number(0xf40),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } DebugControl;
+        REGISTER { description("r15 Prefetch Offset Register"), reg_number(0xf60),
+                   read_function(debug_read), write_function(debug_write), 
+                   display_format("hex"), bitwidth(32)             } PrefetchOffset;
+
+        PARAMETER { description("Specifies whether real cache state is modelled (vs. register model)"),
+                        default(false),
+                        type(bool),
+                        name("cache-state_modelled")               } cache_state_modelled;
+
+        // These parameters replace signals
+        // Parameters values are as per DDI 0246B, table A-2, except for 
+        // REGFILEBASE, which should contain the full, 32-bit base address.
+        PARAMETER { description("Associativity for Auxiliary Control Register"), type(uint32_t), 
+                        default(0), min(0), max(1)                 } ASSOCIATIVITY; // 0= 8-way, 1= 16-way
+        PARAMETER { description("Cache controller cache ID"), type(uint32_t), 
+                        default(0), min(0), max(63)                } CACHEID;       // 6 bits
+
+        // FUTURE
+        // PARAMETER { description("Address filtering Enable out of reset"), type(uint32_t),
+        //                 default(0)                                 } CFGADDRFILTEN;
+        // PARAMETER { description("Address filtering End Address out of reset"), type(uint32_t),
+        //                 default(0), min(0), max(4095)              } CFGADDRFILTEND; // 12 bits
+        // PARAMETER { description("Address filtering Start Address out of reset"), type(uint32_t),
+        //                 default(0), min(0), max(4095)              } CFGADDRFILTSTART;
+
+        PARAMETER { description("Base address for accessing configuration registers"), type(uint32_t),
+                        default(0x1f002000)                        } REGFILEBASE; // Base address of peripheral regs
+        PARAMETER { description("Size of ways for Auxiliary Control Register"), type(uint32_t),
+                        default(1), min(0), max(7)                 } WAYSIZE;     // 3 bits
+
+
+
+
+        PARAMETER { description("Big-endian mode for accessing configuration registers out of reset"), type(uint32_t),
+                        default(0), min(0), max(1)                 } CFGBIGEND;
+
+        PARAMETER { description("Lockdown by master - value is reflected in CacheType register Bit 26, but the feature is not switched off when the parameter is 0"), type(uint32_t),
+                        default(0), min(0), max(1)                 } LOCKDOWN_BY_MASTER;
+        PARAMETER { description("Lockdown by line - value is reflected in CacheType register Bit 25, but the feature is not switched off when the parameter is 0"), type(uint32_t),
+                        default(0), min(0), max(1)                 } LOCKDOWN_BY_LINE;
+
+
+        // Internal state
+
+        // Register 1 - Control Register
+
+
+        // Auxiliary control register bits
+        uint32_t ac_full_line_of_zero;
+        uint32_t ac_reserved_9_1;
+        uint32_t ac_high_prio;
+        uint32_t ac_reserved_11;
+        uint32_t ac_exclusive;
+        uint32_t ac_shared_inv;
+        uint32_t ac_reserved_15_14;
+        uint32_t ac_associativity;
+        uint32_t ac_waysize;
+        uint32_t ac_event_bus;
+        uint32_t ac_parity;
+        uint32_t ac_shared_ov;
+        uint32_t ac_force_wa;
+        uint32_t ac_reserved_25;
+        uint32_t ac_ns_lockdown;
+        uint32_t ac_ns_interrupt;
+        uint32_t ac_dataprefetch;
+        uint32_t ac_instprefetch;
+        uint32_t ac_early_bresp;
+        uint32_t ac_reserved_31;
+
+
+        static const unsigned int NUM_LOCKDOWN_REGS_PER_TYPE = 8;
+        static const unsigned int BYTES_PER_LINE = 32;             // fixed value in PL310
+        static const unsigned int LineSize = 32;
+
+        static const unsigned int LineOffsetMask = (LineSize - 1);
+        static const unsigned int LineBaseMask = ~LineOffsetMask;
+
+        // ------------------------------------------------------------
+        // Cache Line Info
+        // ------------------------------------------------------------
+
+        struct CacheLineInfo
+        {
+            struct {
+                pv::bus_addr_t addr;    // physical address
+                bool ns;                // non-secure flag
+            } tag;
+            bool            valid : 1;
+            bool            dirty : 1;
+            bool            lock  : 1;  // for lockdown by line
+            bool            preferred_for_next_eviction : 1;
+
+            CacheLineInfo() : valid(false), dirty(false), lock(false), preferred_for_next_eviction(false)
+            {
+                tag.addr = 0;
+                tag.ns   = false;
+            }
+        };
+
+        struct RefillBuffer
+        {
+            pv::Tx_Result               tx_result[LineSize/8]; // each single read reads 64 bits == 8 Bytes
+            pv::TransactionGenerator*   tx_gen;
+            pv::MemoryAttributes*       tx_memattr;
+        };
+
+        struct EvictionBuffer
+        {
+            pv::Tx_Result               tx_result; // each single read reads 64 bits == 8 Bytes
+            pv::TransactionGenerator*   tx_gen;
+            pv::MemoryAttributes*       tx_memattr;
+        };
+
+        // FUTURE: Make background operations non-PV-atomic
+        struct CacheMaintenanceDelayCounter
+        {
+            int invalidateByWay;
+            int unlockAll;
+
+            void reset()
+            {
+                invalidateByWay = 0;
+                unlockAll       = 0;
+            }
+        };
+
+        // --------------------------------------------------------
+        // Cache events
+        // --------------------------------------------------------
+        // Signal  Description
+        // --------------------------------------------------------
+        // CO      Eviction (CastOut) of a line from the L2 cache
+        // DRHIT   Data read hit
+        // DRREQ   Data read request
+        // DWHIT   Data write hit
+        // DWREQ   Data write request
+        // DWTREQ  Data write request with write-through attribute
+        // IRHIT   Instruction read hit
+        // IRREQ   Instruction read request
+        // PF      Prefetch linefill sent to L3
+        // WA      Write allocate
+        // --------------------------------------------------------
+
+
+        struct EventCounter
+        {
+            bool         isEnabled;
+            unsigned int co;
+            unsigned int drhit;
+            unsigned int drreq;
+            unsigned int dwhit;
+            unsigned int dwreq;
+            unsigned int dwtreq;
+            unsigned int irhit;
+            unsigned int irreq;
+            unsigned int pf;
+            unsigned int wa;
+#if 0
+            // FUTURE enhancements
+            void reset() { co = drhit = drreq = dwhit = dwreq = dwtreq = irhit = irreq = pf = wa = 0; }
+            void Event_CO()     { if (isEnabled) co++;     }
+            void Event_DWHIT()  { if (isEnabled) dwhit++;  }
+            void Event_DWREQ()  { if (isEnabled) dwreq++;  }
+            void Event_DWTREQ() { if (isEnabled) dwtreq++; }
+            void Event_PF()     { if (isEnabled) pf++;     }
+            void Event_WA()     { if (isEnabled) wa++;     }
+            void Event_XRHIT(const pv::Transaction& tx)
+            {
+                if (isEnabled)
+                {
+                    if (tx.isInstruction())
+                        irhit++;
+                    else
+                        drhit++;
+                }
+            }
+            void Event_XRREQ(const pv::Transaction& tx)
+            {
+                if (isEnabled)
+                {
+                    if (tx.isInstruction())
+                        irreq++;
+                    else
+                        drreq++;
+                }
+            }
+#else // ! 0
+            // Currently don't count
+            void reset() { co = drhit = drreq = dwhit = dwreq = dwtreq = irhit = irreq = pf = wa = 0; }
+            void Event_CO()                             {}
+            void Event_DWHIT()                          {}
+            void Event_DWREQ()                          {}
+            void Event_DWTREQ()                         {}
+            void Event_PF()                             {}
+            void Event_WA()                             {}
+            void Event_XRHIT(const pv::Transaction& tx) {}
+            void Event_XRREQ(const pv::Transaction& tx) {}
+#endif // 0
+        };
+
+        EventCounter eventCounter;
+
+
+
+        enum InterruptBitSelect
+        {
+            DECERR_LSB = 8,
+            SLVERR_LSB = 7
+        };
+
+
+        unsigned int numWays;   // number of ways in a cache set
+        unsigned int numSets;   // number of cache sets/indexes
+        unsigned int indexMask; // number of sets - 1
+
+        uint32_t addrToSetMaskLsb;
+        uint32_t addrToSetMask;
+        uint32_t addrToTagAddrMask;
+
+        uint32_t wayOfLastVictim; // determines where to start with search for new victim
+
+
+
+        /*! State representation for cache lines. */
+        CacheLineInfo *lines;
+
+
+        RefillBuffer    refillBuffer;
+        EvictionBuffer  evictionBuffer;
+
+        CacheMaintenanceDelayCounter cacheMaintenanceDelayCounter;
+
+    } // end resources
+
+
+    /********************
+    * External ports
+    ********************/
+
+    // Check the resources section for parameters used to replace
+    // signals in the model
+       
+    // The following input signals are NOT modelled:
+    //  - clocks: CLK, DATACLKEN, INCLKENM0, INCLKENM1, INCLKENS0, INCLKENS1,
+    //            OUTCLKENM0, OUTCLKENM1, OUTCLKENS0, OUTCLKENS1, TAGCLKEN
+    //  - nRESET
+    //  - SE (DFT test enable)
+    //
+    // The current model is fixed to a single slave / single master
+    //
+    // TAG and DATA RAM are assumed modelled internally
+    //
+    // Cache event monitoring is not modelled, including the following
+    // input signals: CO, DRHIT, DRREQ, DWHIT, DWREQ, DWTREQ, IRHIT, ITREQ, PF, SPNIDEN
+    // output signal: WA
+    //
+    // The MBIST interface is not modelled
+
+    master port<Signal>     DECERRINTR;  // decode error received on master port from L3
+    master port<Signal>     ECNTRINTR;   // Event Counter Overflow / Increment
+    master port<Signal>     ERRRDINTR;   // Error on L2 data RAM read
+    master port<Signal>     ERRRTINTR;   // Error on L2 tag RAM read
+    master port<Signal>     ERRWDINTR;   // Error on L2 data RAM write
+    master port<Signal>     ERRWTINTR;   // Error on L2 tag RAM write
+    master port<Signal>     L2CCINTR;    // Combined interrupt output
+    master port<Signal>     PARRDINTR;   // Parity error on L2 data RAM read
+    master port<Signal>     PARRTINTR;   // Parity error on L2 tag RAM read
+    master port<Signal>     SLVERRINTR;  // Slave error on master port from L3
+
+    slave  port<PVBus> pvbus_s;
+    master port<PVBus> pvbus_m;
+
+    internal master port<PVBusCacheControl> cache_control;
+
+    internal slave port <PVBusCacheDevice> cache_device
+    {
+        // Handle a read request to the cache
+        //--------------------------------------------------------------------------------
+        behaviour cacheRead(unsigned in_port, pv::ReadTransaction tx) : pv::Tx_Result
+        //--------------------------------------------------------------------------------
+        {
+            if (tx.hasSideEffect())
+            {
+            PL310_DBG("--------------------------------------------------------------------------------\n"
+                   "%s: cache_device::RD(0x%08X) bitWidth=%2d, burst:Length=%2d,seq=%2d,%s,%s, %s%s%s%s%s, outer: %s%s%s%s%s, inner: %s%s%s%s%s, user[9:8]=%d, id=0x%02X, sideEffect=%s\n",
+                        getInstanceName().c_str(),
+                        uint32_t(tx.getAddress()),
+                        tx.getAccessBitWidth(),
+                        tx.getBurstLength(),
+                        tx.getPayload()->burst_sequence,
+                        (tx.getMemoryAttributes() && (tx.getMemoryAttributes()->getUserFlags() & PL310VAL_UF_FIXED_MASK)) ? "FIXED" : "INCR ",
+                        (tx.getMemoryAttributes() && (tx.getMemoryAttributes()->getUserFlags() & PL310VAL_UF_SPLIT_MASK)) ?
+                        ((tx.getMemoryAttributes() && (tx.getMemoryAttributes()->getUserFlags() & PL310VAL_UF_SPLIT_NLAST_MASK)) ? "split-last" : "split     ") :
+                        "          ",
+
+                        tx.isPrivileged()  ? "P"    : "p",
+                        tx.isInstruction() ? "I"    : "D",
+                        tx.isNonSecure()   ? "_NS_" : "_S__",
+                        tx.isLocked()      ? "L"    : "l",
+                        tx.isExclusive()   ? "E"    : "e",
+
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterWriteAllocatable() ? "WA": "- ",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterReadAllocatable()  ? "RA": "- ",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterCacheable()        ? "C" : "-",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterBufferable()       ? "B" : "-",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterShareable()        ? "S" : "-",
+
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isInnerWriteAllocatable() ? "WA": "- ",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isInnerReadAllocatable()  ? "RA": "- ",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isInnerCacheable()        ? "C" : "-",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isInnerBufferable()       ? "B" : "-",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isInnerShareable()        ? "S" : "-",
+
+                      tx.getMemoryAttributes() ? ((tx.getMemoryAttributes()->getUserFlags() >> PL310_UF_IS_L1_EVICTION_SHIFT) & 0x3) : 0,
+
+                        tx.getMasterID(),
+                        tx.hasSideEffect() ? "Y"    : "N"//,
+                        //tx.getData64()
+                );
+            }
+            else
+            {
+            PL310_DBG("%s: cache_device::DbgRd(0x%08X) bitWidth=%2d, %s%s%s%s%s, id=0x%08X, sideEffect=%s\n",
+                        getInstanceName().c_str(),
+                        uint32_t(tx.getAddress()),
+                        tx.getAccessBitWidth(),
+
+                        tx.isPrivileged()  ? "P"    : "-",
+                        tx.isInstruction() ? "I"    : "D",
+                        tx.isNonSecure()   ? "_NS_" : "_S__",
+                        tx.isLocked()      ? "L"    : "-",
+                        tx.isExclusive()   ? "E"    : "-",
+
+                        tx.getMasterID(),
+                        tx.hasSideEffect() ? "Y"    : "N"//,
+                        //tx.getData64()
+                );
+            }
+
+            pv::Tx_Result result;
+
+            uint32_t regbase = REGFILEBASE & (~0xfff); // Align to a 4k boundary
+            if ((tx.getAddress() & ~0x0FFF) == regbase)
+            {
+                if (Config_ShouldAbortRegisterAccess(tx))
+                {
+                    result = tx.generateAbort();
+                }
+                else
+                {
+                    pl310_txr_t pl310_result = PL310_L2_COMPLETE;
+                    uint32_t data32 = self.registerRead(tx.getAddress() & 0x0FFF, tx.isNonSecure(), pl310_result);
+                    if (CFGBIGEND)
+                    {
+                        // bigendian mode
+                        data32 = ((data32 & 0xFF) << 24) | ((data32 & 0xFF00) << 8) | ((data32 & 0xFF0000) >> 8) | ((data32 & 0xFF000000) >> 24);
+                    }
+                    result = tx.setReturnData32(data32);
+
+                    switch (pl310_result)
+                    {
+                    case PL310_L2_DECERR:
+#ifdef PL310_VALIDATION
+                        const_cast<pv::MemoryAttributes *>(tx.getMemoryAttributes())->setUserFlags(tx.getMemoryAttributes()->getUserFlags() | PL310VAL_UF_DECERR_MASK);
+#endif
+                        result = tx.generateDecodeAbort();
+                        break;
+                    case PL310_L2_SLVERR:
+                        result = tx.generateSlaveAbort();
+                        break;
+                    default:
+                        result = tx.readComplete();
+                    }
+                }
+                PL310_DBG("%s: cache_device::RD result=%d - data=0x%016llX\n",
+                          getInstanceName().c_str(),
+                          static_cast<int>(result._priv),
+                          *static_cast<unsigned long long *>(tx.getPayload()->referenceDataValue()));
+
+                return result;
+            }
+            // else no register access
+
+            if (tx.hasSideEffect())
+            {
+                result = self.cache_read(tx);
+            }
+            else
+            {
+                result = self.cache_debug_read(tx);
+            }
+
+            if (tx.hasSideEffect())
+            {
+                PL310_DBG("%s: cache_device::RD result=%d - data=0x%016llX\n",
+                          getInstanceName().c_str(),
+                          static_cast<int>(result._priv),
+                          *static_cast<unsigned long long *>(tx.getPayload()->referenceDataValue()));
+            }
+            return result;
+        }
+
+        // Handle a write request to the cache
+        //--------------------------------------------------------------------------------
+        behaviour cacheWrite(unsigned in_port, pv::WriteTransaction tx) : pv::Tx_Result
+        //--------------------------------------------------------------------------------
+        {
+            if (tx.hasSideEffect())
+            {
+            PL310_DBG("--------------------------------------------------------------------------------\n"
+                   "%s: cache_device::WR(0x%08X) bitWidth=%2d, burst:Length=%2d,seq=%2d,%s,%s, %s%s%s%s%s, outer: %s%s%s%s%s, inner: %s%s%s%s%s, user[9:8]=%d, id=0x%02X, sideEffect=%s, data=0x%016llX\n",
+                        getInstanceName().c_str(),
+                        uint32_t(tx.getAddress()),
+                        tx.getAccessBitWidth(),
+                        tx.getBurstLength(),
+                        tx.getPayload()->burst_sequence,
+                        (tx.getMemoryAttributes() && (tx.getMemoryAttributes()->getUserFlags() & PL310VAL_UF_FIXED_MASK)) ? "FIXED" : "INCR ",
+                        (tx.getMemoryAttributes() && (tx.getMemoryAttributes()->getUserFlags() & PL310VAL_UF_SPLIT_MASK)) ?
+                        ((tx.getMemoryAttributes() && (tx.getMemoryAttributes()->getUserFlags() & PL310VAL_UF_SPLIT_NLAST_MASK)) ? "split-last" : "split     ") :
+                        "          ",
+
+                        tx.isPrivileged()  ? "P"    : "p",
+                        tx.isInstruction() ? "I"    : "D",
+                        tx.isNonSecure()   ? "_NS_" : "_S__",
+                        tx.isLocked()      ? "L"    : "l",
+                        tx.isExclusive()   ? "E"    : "e",
+
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterWriteAllocatable() ? "WA": "- ",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterReadAllocatable()  ? "RA": "- ",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterCacheable()        ? "C" : "-",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterBufferable()       ? "B" : "-",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterShareable()        ? "S" : "-",
+
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isInnerWriteAllocatable() ? "WA": "- ",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isInnerReadAllocatable()  ? "RA": "- ",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isInnerCacheable()        ? "C" : "-",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isInnerBufferable()       ? "B" : "-",
+                      tx.getMemoryAttributes() && tx.getMemoryAttributes()->isInnerShareable()        ? "S" : "-",
+
+                      tx.getMemoryAttributes() ? ((tx.getMemoryAttributes()->getUserFlags() >> PL310_UF_IS_L1_EVICTION_SHIFT) & 0x3) : 0,
+
+                        tx.getMasterID(),
+                        tx.hasSideEffect() ? "Y"    : "N",
+                        (unsigned long long)tx.getData64());
+            }
+            else
+            {
+            PL310_DBG("%s: cache_device::DbgWr(0x%08X) bitWidth=%2d, %s%s%s%s%s, id=0x%08X, sideEffect=%s, data=0x%016llX\n",
+                        getInstanceName().c_str(),
+                        uint32_t(tx.getAddress()),
+                        tx.getAccessBitWidth(),
+
+                        tx.isPrivileged()  ? "P"    : "-",
+                        tx.isInstruction() ? "I"    : "D",
+                        tx.isNonSecure()   ? "_NS_" : "_S__",
+                        tx.isLocked()      ? "L"    : "-",
+                        tx.isExclusive()   ? "E"    : "-",
+
+                        tx.getMasterID(),
+                        tx.hasSideEffect() ? "Y"    : "N",
+                        (unsigned long long)tx.getData64());
+            }
+
+            pv::Tx_Result result;
+
+            uint32_t regbase = REGFILEBASE & (~0xfff); // Align to a 4k boundary
+            if ((tx.getAddress() & ~0x0FFF) == regbase)
+            {
+                if (Config_ShouldDecodeAbortRegisterAccess(tx))
+                {
+#ifdef PL310_VALIDATION
+                    const_cast<pv::MemoryAttributes *>(tx.getMemoryAttributes())->setUserFlags(tx.getMemoryAttributes()->getUserFlags() | PL310VAL_UF_DECERR_MASK);
+#endif
+                    result = tx.generateDecodeAbort();
+                }
+                else if (Config_ShouldAbortRegisterAccess(tx))
+                {
+                    result = tx.generateAbort();
+                }
+                else
+                {
+                    uint32_t data32 = tx.getData32();
+                    if (CFGBIGEND)
+                    {
+                        // bigendian mode
+                        data32 = ((data32 & 0xFF) << 24) | ((data32 & 0xFF00) << 8) | ((data32 & 0xFF0000) >> 8) | ((data32 & 0xFF000000) >> 24);
+                    }
+                    switch (self.registerWrite(tx.getAddress() & 0x0FFF, data32, tx.isNonSecure()))
+                    {
+                    case PL310_L2_DECERR:
+#ifdef PL310_VALIDATION
+                        const_cast<pv::MemoryAttributes *>(tx.getMemoryAttributes())->setUserFlags(tx.getMemoryAttributes()->getUserFlags() | PL310VAL_UF_DECERR_MASK);
+#endif
+                        result = tx.generateDecodeAbort();
+                        break;
+                    case PL310_L2_SLVERR:
+                        result = tx.generateSlaveAbort();
+                        break;
+                    default:
+                        result = tx.writeComplete();
+                    }
+                }
+                PL310_DBG("%s: cache_device::WR result=%d\n",
+                          getInstanceName().c_str(), static_cast<int>(result._priv));
+
+                return result;
+            }
+            // else no register access
+
+            if (tx.hasSideEffect())
+            {
+                result = self.cache_write(tx);
+            }
+            else
+            {
+                result = self.cache_debug_write(tx);
+            }
+
+            if (tx.hasSideEffect())
+            {
+            PL310_DBG("%s: cache_device::WR result=%d\n",
+                      getInstanceName().c_str(), static_cast<int>(result._priv));
+            }
+            return result;
+        }
+
+        //--------------------------------------------------------------------------------
+        behaviour routeTransaction(unsigned in_port, pv::Transaction tx) : pv::CacheRoutingDecision
+        //--------------------------------------------------------------------------------
+        {
+            if (tx.hasSideEffect())
+            {
+            PL310_DBG("--------------------------------------------------------------------------------\n"
+                   "%s: cache_device::Route(0x%08X) bitWidth=%2d, %s%s%s%s%s, id=0x%08X, sideEffect=%s\n",
+                        getInstanceName().c_str(),
+                        uint32_t(tx.getAddress()),
+                        tx.getAccessBitWidth(),
+
+                        tx.isPrivileged()  ? "P"    : "-",
+                        tx.isInstruction() ? "I"    : "D",
+                        tx.isNonSecure()   ? "_NS_" : "_S__",
+                        tx.isLocked()      ? "L"    : "-",
+                        tx.isExclusive()   ? "E"    : "-",
+
+                        tx.getMasterID(),
+                        tx.hasSideEffect() ? "Y"    : "N");
+            }
+
+            pv::CacheRoutingDecision out_port = pv::HANDLE_IN_CACHE; // default: handle in cache
+
+            uint32_t regbase = REGFILEBASE & (~0xfff); // Align to a 4k boundary
+            if ((tx.getAddress() & ~0x0FFF) == regbase)
+            {
+                out_port = pv::HANDLE_IN_CACHE;
+            }
+            else if (!cache_state_modelled)
+            {
+                // It's a register model, so everything except for the register address region
+                // needs to bypass the cache.
+
+                // FUTURE: 2 ports
+
+                out_port = pv::ROUTE_TO_BUS_OUT_0; // currently only one port
+
+                PL310_DBG("%s: cache_device::Route: cache_state_modelled=false\n", getInstanceName().c_str());
+            }
+            else
+            // Check whether this access can be cached at all
+            if (!Config_IsCacheEnbled()) // cache is not enabled
+            {
+                // not handled by the cache
+                // FUTURE: Decide which port to route to
+#if 0 //def PL310_VALIDATION
+                out_port = pv::HANDLE_IN_CACHE; // just to see the log
+#else
+                out_port = pv::ROUTE_TO_BUS_OUT_0; // currently only one port
+#endif
+            }
+
+            // else handled in cache
+
+            if (tx.hasSideEffect())
+            {
+            PL310_DBG("%s: cache_device::Route out_port=%d\n", getInstanceName().c_str(), static_cast<int>(out_port));
+            }
+
+            return out_port;
+        }
+
+
+    }
+
+
+
+
+    /********************
+    * Behavior Section
+    ********************/
+    behavior init()
+    {
+        composition.init();
+
+        unsigned int max_num_ways = 16;
+
+
+        // [19:17] Way-size[2]
+        // 
+        // 000 = Reserved, internally mapped to 16KB.
+        // 001 = 16KB.
+        // 010 = 32KB.
+        // 011 = 64KB.
+        // 100 = 128KB.
+        // 101 = 256KB.
+        // 110 = 512KB.
+        // 111 = Reserved, internally mapped to 512 KB.
+
+        int max_waysize = 6;
+        unsigned int max_num_sets = ((16 * 1024) / BYTES_PER_LINE) << max_waysize;
+
+
+        addrToSetMaskLsb  = BYTES_PER_LINE;
+        addrToSetMask     = (numSets - 1) << addrToSetMaskLsb;
+        addrToTagAddrMask = (BYTES_PER_LINE * numSets) - 1;
+
+
+
+
+
+        unsigned int size = max_num_ways * max_num_sets;
+        lines = new CacheLineInfo[size];
+
+        refillBuffer.tx_gen   = cache_control.createTransactionGenerator(0/*FUTURE: bus id*/);
+        refillBuffer.tx_memattr = new pv::MemoryAttributes();
+
+        // fixed settings (for all refill transactions)
+        refillBuffer.tx_gen->setMasterID(0);
+        refillBuffer.tx_memattr->setMasterID(0);
+        // refillBuffer.tx_gen->setPrivileged(true) depends
+        // refillBuffer.tx_gen->setInstruction(false) depends
+        // refillBuffer.tx_gen->setNonSecure() depends
+        refillBuffer.tx_gen->setLocked(false);
+        refillBuffer.tx_gen->setExclusive(false);
+        // Cache bits : depend
+        // User bits
+        refillBuffer.tx_memattr->setUserFlags(0);
+        refillBuffer.tx_gen->setMemoryAttributes(refillBuffer.tx_memattr);
+
+
+        evictionBuffer.tx_gen = cache_control.createTransactionGenerator(0/*FUTURE: bus id*/);
+        evictionBuffer.tx_memattr = new pv::MemoryAttributes();
+
+        // fixed settings (for all eviction transactions)
+        evictionBuffer.tx_gen->setMasterID(3);
+        evictionBuffer.tx_memattr->setMasterID(3);
+        evictionBuffer.tx_gen->setPrivileged(true);
+        evictionBuffer.tx_gen->setInstruction(false);
+        // setNonSecure() depends on ns bit of cache line
+        evictionBuffer.tx_gen->setLocked(false);
+        evictionBuffer.tx_gen->setExclusive(false);
+        // Cache bits (1111)
+        evictionBuffer.tx_memattr->setOuterBufferable(true);
+        evictionBuffer.tx_memattr->setOuterCacheable(true);
+        evictionBuffer.tx_memattr->setOuterReadAllocatable(true);
+        evictionBuffer.tx_memattr->setOuterWriteAllocatable(true);
+        // User bits
+        evictionBuffer.tx_memattr->setUserFlags(0);
+        evictionBuffer.tx_gen->setMemoryAttributes(evictionBuffer.tx_memattr);
+
+        common_reset();
+
+        setbuf(stdout, 0);
+    }
+    
+    behavior terminate()
+    {
+        delete[] lines;
+
+        delete refillBuffer.tx_memattr;
+        delete evictionBuffer.tx_memattr;
+
+        delete refillBuffer.tx_gen;
+        delete evictionBuffer.tx_gen;
+
+        composition.terminate();
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        common_reset();
+    }
+    
+
+    behaviour common_reset()
+    {
+
+        // reset registers
+        AuxCtrl          = reset_AuxCtrl();  // needs to be built first (CacheType dependency)
+
+        CacheID          = (0x41<<24) | (CACHEID<< 10) | (PL310_PART_NUMBER<< 6) | PL310_RTL_RELEASE;
+        CacheType        = build_CacheType();
+        Ctrl             = 0; // disabled by default
+
+        TagLatencyCtrl   = build_latencies(7, 7, 7);
+        DataLatencyCtrl  = build_latencies(7, 7, 7);
+        EventCounterCtrl = 0;
+        EventCounter1Cfg = 0;
+        EventCounter0Cfg = 0;
+        EventCounter1 = 0;
+        EventCounter0 = 0;
+        InterruptMask = 0;
+        MaskedInterruptStatus = 0;
+        RawInterruptStatus = 0;
+        InterruptClear = 0;
+        CacheSync = 0;
+        InvalidateByPA = 0;
+        InvalidateByWay = 0;
+        CleanByPA = 0;
+        CleanByIdxWay = 0;
+        CleanByWay = 0;
+        CleanInvalByPA = 0; 
+        CleanInvalByIdxWay = 0;
+        CleanInvalByWay = 0;
+
+        for (unsigned int i = 0; i < NUM_LOCKDOWN_REGS_PER_TYPE; i++)
+        {
+            DataLockdown[i] = 0;
+            InstructionLockdown[i] = 0; 
+        }
+
+        LockdownByLineEnable = 0;
+        UnlockAll = 0;
+        AFilterStart = 0;
+        AFilterEnd = 0;
+        DebugControl = 0;
+        PrefetchOffset = 0;
+
+        eventCounter.reset();
+        eventCounter.isEnabled = false;    // FUTURE
+
+        cacheMaintenanceDelayCounter.reset();
+
+        wayOfLastVictim = 0;
+
+        if (cache_state_modelled)
+        {
+            PL310_DBG("Call revokeRoutingDecisions()\n");
+            cache_control.revokeRoutingDecisions();
+        }
+
+    }
+
+    behavior build_latencies(int write_l, int read_l, int setup_l) : uint32_t
+    {
+        return ((write_l & 7) << 8) | ((read_l & 7) << 4) | (setup_l & 7);
+    }
+
+    behavior build_latencies(uint32_t data) : uint32_t
+    {
+        return(data & 0x777);
+    }
+
+    behavior build_AuxCtrl : uint32_t
+    {
+        return ( (ac_reserved_31  << 31) | (ac_early_bresp  << 30) |
+                 (ac_instprefetch << 29) | (ac_dataprefetch << 28) |
+                 (ac_ns_interrupt << 27) | (ac_ns_lockdown  << 26) |
+                 (ac_reserved_25  << 25) |
+                 (ac_force_wa     << 23) | (ac_shared_ov    << 22) |
+                 (ac_parity       << 21) | (ac_event_bus    << 20) |
+                 (ac_waysize      << 17) | (ac_associativity<< 16) |
+                 (ac_reserved_15_14 << 14) |
+                 (ac_shared_inv   << 13) | (ac_exclusive    << 12) |
+                 (ac_reserved_11  << 11) | (ac_high_prio    << 10) |
+                 (ac_reserved_9_1 <<  1) | (ac_full_line_of_zero << 0) );
+    }
+
+    behavior reset_AuxCtrl : uint32_t
+    {
+        ac_full_line_of_zero = 0;
+        ac_reserved_9_1  = 0;
+        ac_high_prio     = 0;
+        ac_reserved_11   = 0; // fixed bit
+        ac_exclusive     = 0;
+        ac_shared_inv    = 0;
+        ac_reserved_15_14 = 0; // fixed bits
+        ac_associativity = ASSOCIATIVITY;
+        ac_waysize       = WAYSIZE;
+        ac_event_bus     = 0;
+        ac_parity        = 0;
+        ac_shared_ov     = 0;
+        ac_force_wa      = 0;
+        ac_reserved_25   = 1; // fixed bit
+        ac_ns_lockdown   = 0;
+        ac_ns_interrupt  = 0;
+        ac_dataprefetch  = 0;
+        ac_instprefetch  = 0;
+        ac_early_bresp   = 0;
+        ac_reserved_31   = 0;
+
+        numWays = (ac_associativity == 1) ? 16 : 8;
+
+        // [19:17] Way-size[2]
+        // 
+        // 000 = Reserved, internally mapped to 16KB.
+        // 001 = 16KB.
+        // 010 = 32KB.
+        // 011 = 64KB.
+        // 100 = 128KB.
+        // 101 = 256KB.
+        // 110 = 512KB.
+        // 111 = Reserved, internally mapped to 512 KB.
+
+        int corrected_waysize = ac_waysize;
+        if (corrected_waysize < 1)
+        {
+            corrected_waysize = 1;
+        }
+        else if (corrected_waysize > 6)
+        {
+            corrected_waysize = 6;
+        }
+        numSets = ((16 * 1024) / BYTES_PER_LINE) << corrected_waysize;
+        indexMask = numSets - 1;
+        
+        return build_AuxCtrl();
+    }
+
+    behaviour write_AuxCtrl(uint32_t data)
+    {
+        // ignores SBZ bits
+
+        // Since none of these currently have much effect, just modify internal state
+        // (might otherwise optimize & affect state that's changed)
+        ac_reserved_31  = (data >> 31) & 1;
+        ac_early_bresp  = (data >> 30) & 1;
+        ac_instprefetch = (data >> 29) & 1;
+        ac_dataprefetch = (data >> 28) & 1;
+        ac_ns_interrupt = (data >> 27) & 1;
+        ac_ns_lockdown  = (data >> 26) & 1;
+        // fixed bit... ac_reserved_25  = (data >> 25) & 1;
+        ac_force_wa     = (data >> 23) & 3;
+        ac_shared_ov    = (data >> 22) & 1;
+        ac_parity       = (data >> 21) & 1;
+        ac_event_bus    = (data >> 20) & 1;
+        ac_waysize      = (data >> 17) & 7;
+        ac_associativity= (data >> 16) & 1;
+        // fixed bits... ac_reserved_15_14=(data >> 14) & 3;
+        ac_shared_inv   = (data >> 13) & 1;
+        ac_exclusive    = (data >> 12) & 1;
+        // fixed bit... ac_reserved_11  = (data >> 11) & 1;
+        ac_high_prio    = (data >> 10) & 1;
+        ac_reserved_9_1 = (data >>  1) & 0x1FF /*& ~(1<<(7-1))*/;
+        ac_full_line_of_zero = (data >> 0) & 1;
+
+        numWays = (ac_associativity == 1) ? 16 : 8;
+
+        // [19:17] Way-size[2]
+        // 
+        // 000 = Reserved, internally mapped to 16KB.
+        // 001 = 16KB.
+        // 010 = 32KB.
+        // 011 = 64KB.
+        // 100 = 128KB.
+        // 101 = 256KB.
+        // 110 = 512KB.
+        // 111 = Reserved, internally mapped to 512 KB.
+
+        int corrected_waysize = ac_waysize;
+        if (corrected_waysize < 1)
+        {
+            corrected_waysize = 1;
+        }
+        else if (corrected_waysize > 6)
+        {
+            corrected_waysize = 6;
+        }
+        numSets = ((16 * 1024) / BYTES_PER_LINE) << corrected_waysize;
+
+
+        AuxCtrl = build_AuxCtrl();
+        CacheType = build_CacheType(); // CacheType is dependent on AuxCtrl
+    }
+
+    // AuxCtrl must have been initialized before calling this routine!
+    behavior build_CacheType : uint32_t
+    {
+        uint32_t ret = 0;
+        uint32_t size;
+
+        // ctype 11xy
+        // x=1 if pl310_LOCKDOWN_BY_MASTER is defined, otherwise 0
+        // y=1 if pl310_LOCKDOWN_BY_LINE is defined, otherwise 0
+        ret |= (3 << 27);
+        if (LOCKDOWN_BY_MASTER)
+        {
+          ret |= (1 << 26);
+        }
+        if (LOCKDOWN_BY_LINE)
+        {
+          ret |= (1 << 25);
+        }
+
+        size  = ((AuxCtrl >> 17) & 7) << 8;  // size = 0:AuxCtrl[19:17]:0
+        size |= ((AuxCtrl >> 16) & 1) << 6;  // L2 associativity
+        // [1:0] = L2 cache line length. 00 = 32 bytes
+
+        ret |= size | (size << 12);          // dsize:isize        
+        return ret;
+    }
+
+    behavior Config_IsCacheEnbled : bool
+    {
+        return (Ctrl != 0);
+    }
+    
+    // Given an EventCounterCfg register, tell me if the counter is disabled
+    behavior isEventCounterDisabled(uint32_t ctrl) : bool
+    {
+        ctrl = ((ctrl >> 2) & 0xf);
+        if ((ctrl == 0) || (ctrl > 10))
+        {
+            return true;
+        }
+        return false;
+    }
+
+    /**************************************************
+    * pvbus access
+    * ************************************************/
+    behavior registerRead(uint32_t addr, bool is_nonsecure, pl310_txr_t& result) : uint32_t
+    {
+        uint32_t data = 0;
+        
+        switch(addr)
+        {
+            case 0x000: // CacheID
+                data = CacheID;
+                break;
+            case 0x004: // CacheType
+                data = CacheType;
+                break;
+            // Register 1: Control
+            case 0x100: // Ctrl
+                data = Ctrl;
+                break;
+            case 0x104: // AuxCtrl
+                AuxCtrl = build_AuxCtrl();
+                data = AuxCtrl;
+                break;
+            case 0x108: // TagLatencyCtrl
+                data = TagLatencyCtrl;
+                break;
+            case 0x10C: // DataLatencyCtrl
+                data = DataLatencyCtrl;
+                break;
+
+            // Register 2: Interrupt/Counter Control Registers
+            case 0x200: // EventCounterCtrl
+                // bottom bit (enable) is the only one that doesn't RAZ
+                data = EventCounterCtrl & 1; 
+                break;
+            case 0x204: // EventCounter1Cfg
+                data = EventCounter1Cfg;
+                break;
+            case 0x208: // EventCounter0Cfg
+                data = EventCounter0Cfg;
+                break;
+            case 0x20C: // EventCounter1
+                data = EventCounter1;
+                break;
+            case 0x210: // EventCounter0
+                data = EventCounter0;
+                break;
+            case 0x214: // InterruptMask
+                data = InterruptMask;
+                break;
+            case 0x218: // MaskedInterruptStatus
+                data = MaskedInterruptStatus;
+                break;
+            case 0x21C: // RawInterruptStatus
+                data = RawInterruptStatus;
+                break;
+            case 0x220: // InterruptClear is a write-only register
+                data = 0;
+                break;
+
+            // Register 7: Cache Maintenance Operations
+            case 0x730: // CacheSync
+                data = CacheSync;
+                break;
+            case 0x770: // InvalidateByPA
+                data = InvalidateByPA;
+                break;
+            case 0x77C: // InvalidateByWay
+                if (cacheMaintenanceDelayCounter.invalidateByWay > 0)
+                {
+                    cacheMaintenanceDelayCounter.invalidateByWay--;
+                }
+                else
+                {
+                    InvalidateByWay = 0;
+                }
+                data = InvalidateByWay;
+                break;
+            case 0x7B0: // CleanByPA
+                data = CleanByPA;
+                break;
+            case 0x7B8: // CleanByIdxWay
+                data = CleanByIdxWay;
+                break;
+            case 0x7BC: // CleanByWay
+                data = CleanByWay;
+                break;
+            case 0x7F0: // CleanInvalByPA
+                data = CleanInvalByPA;
+                break;
+            case 0x7F8: // CleanInvalByIdxWay
+                data = CleanInvalByIdxWay;
+                break;
+            case 0x7FC: // CleanInvalByWay
+                data = CleanInvalByWay;
+                break;
+
+            // Register 9: Cache Lockdown
+            case 0x900: // DataLockdown0
+            case 0x908: // DataLockdown1
+            case 0x910: // DataLockdown2
+            case 0x918: // DataLockdown3
+            case 0x920: // DataLockdown4
+            case 0x928: // DataLockdown5
+            case 0x930: // DataLockdown6
+            case 0x938: // DataLockdown7
+                data = DataLockdown[(addr >> 3) & 0x7];
+                break;
+            case 0x904: // InstructionLockdown0
+            case 0x90C: // InstructionLockdown1
+            case 0x914: // InstructionLockdown2
+            case 0x91C: // InstructionLockdown3
+            case 0x924: // InstructionLockdown4
+            case 0x92C: // InstructionLockdown5
+            case 0x934: // InstructionLockdown6
+            case 0x93C: // InstructionLockdown7
+                data = InstructionLockdown[(addr >> 3) & 0x7];
+                break;
+
+            case 0x950: // LockdownByLineEnable
+                data = LockdownByLineEnable;
+                break;
+            case 0x954: // UnlockAll
+                if (cacheMaintenanceDelayCounter.unlockAll > 0)
+                {
+                    cacheMaintenanceDelayCounter.unlockAll--;
+                }
+                else
+                {
+                    UnlockAll = 0;
+                }
+                data = UnlockAll;
+                break;
+
+            // Register 12: Address Filtering
+            case 0xc00: // AFilterStart
+                data = AFilterStart;
+                break;
+            case 0xc04: // AFilterEnd
+                data = AFilterEnd;
+                break;
+
+            // Register 15: Debug and Prefetch
+            case 0xf40: // DebugControl
+                data = DebugControl;
+                break;
+            case 0xf60: // PrefetchOffset
+                data = PrefetchOffset;
+                break;
+
+            default: 
+                // no: result = PL310_L2_DECERR;
+                PL310_ERROR("%s: Read register: Invalid address 0x%x\n", 
+                            getInstanceName().c_str(), addr);
+                return 0;
+        } // end switch
+
+        PL310_TRACE("%s: r 0x%08x <- %s[%03x]\n", 
+                    getInstanceName().c_str(), data, register_name(addr), addr);
+
+        return data;
+
+    } // end registerRead
+
+    behavior registerWrite(uint32_t addr, uint32_t data, bool is_nonsecure) :  pl310_txr_t
+    {
+        bool readonly = false;
+
+        PL310_TRACE("%s w 0x%08x -> %s[%03x]\n", 
+                    getInstanceName().c_str(), data, register_name(addr), addr);
+
+        PL310_DBG("registerWrite() - addr=0x%08X, data=0x%08X, is_nonsecure=%d\n",
+                  addr, data, is_nonsecure ? 1 : 0);
+
+        switch(addr)
+        {
+            case 0x000: // CacheID
+            case 0x004: // CacheType
+                readonly = true;
+                break;
+
+            // Register 1: Control
+            case 0x100: // Ctrl
+                if (is_nonsecure) 
+                {
+                    return PL310_L2_DECERR;
+                } else {
+                    uint32_t old_enabled = Ctrl & 0x1;
+                    Ctrl = data & 1;
+                    uint32_t new_enabled = Ctrl & 0x1;
+                    if (new_enabled != old_enabled)
+                    {
+                        if (cache_state_modelled)
+                        {
+                            // state change with respect to routing
+                            PL310_DBG("Call revokeRoutingDecisions()\n");
+                            cache_control.revokeRoutingDecisions();
+                        }
+                    }
+                    if ((old_enabled == 0) && (new_enabled == 1))
+                    {
+                        PL310_TRACE("%s L2CC has been enabled\n", getInstanceName().c_str());
+
+                        PL310_DBG("Enabling PL310 - cache_state_modelled = %d\n"
+                                  "                 ASSOCIATIVITY        = %d\n"
+                                  "                 CACHEID              = %d\n"
+                                  // FUTURE - "                 CFGADDRFILTEN        = %d\n"
+                                  // FUTURE - "                 CFGADDRFILTEND       = 0x%08x\n"
+                                  // FUTURE - "                 CFGADDRFILTSTART     = 0x%08x\n"
+                                  "                 REGFILEBASE          = 0x%08x\n"
+                                  "                 WAYSIZE              = %d\n"
+                                  "                 CFGBIGEND            = %d\n"
+                                  "                 LOCKDOWN_BY_MASTER   = %d\n"
+                                  "                 LOCKDOWN_BY_LINE     = %d\n",
+                                  cache_state_modelled ? 1 : 0,
+                                  ASSOCIATIVITY,     // 0= 8-way, 1= 16-way
+                                  CACHEID,           // 6 bits
+                                  // FUTURE - CFGADDRFILTEN,
+                                  // FUTURE - CFGADDRFILTEND,    // 12 bits
+                                  // FUTURE - CFGADDRFILTSTART,
+                                  REGFILEBASE,       // Base address of peripheral regs
+                                  WAYSIZE,          // 3 bits
+                                  CFGBIGEND,
+                                  LOCKDOWN_BY_MASTER,
+                                  LOCKDOWN_BY_LINE);
+
+                        PL310_DBG("                 ac_full_line_of_zero = %d\n"
+                                  "                 ac_high_prio     = %d\n"
+                                  "                 ac_exclusive     = %d\n"
+                                  "                 ac_shared_inv    = %d\n"
+                                  "                 ac_associativity = %d\n"
+                                  "                 ac_waysize       = %d\n"
+                                  "                 ac_event_bus     = %d\n"
+                                  "                 ac_parity        = %d\n"
+                                  "                 ac_shared_ov     = %d\n"
+                                  "                 ac_force_wa      = %d\n"
+                                  "                 ac_ns_lockdown   = %d\n"
+                                  "                 ac_ns_interrupt  = %d\n"
+                                  "                 ac_dataprefetch  = %d\n"
+                                  "                 ac_instprefetch  = %d\n"
+                                  "                 ac_early_bresp   = %d\n",
+                                  ac_full_line_of_zero,
+                                  ac_high_prio     ,
+                                  ac_exclusive     ,
+                                  ac_shared_inv    ,
+                                  ac_associativity ,
+                                  ac_waysize       ,
+                                  ac_event_bus     ,
+                                  ac_parity        ,
+                                  ac_shared_ov     ,
+                                  ac_force_wa      ,
+                                  ac_ns_lockdown   ,
+                                  ac_ns_interrupt  ,
+                                  ac_dataprefetch  ,
+                                  ac_instprefetch  ,
+                                  ac_early_bresp   );
+
+                    }
+                }
+                break;
+
+            case 0x104: // AuxCtrl
+                if (is_nonsecure)
+                {
+                    return PL310_L2_DECERR;
+                } else {
+                    if (Config_IsCacheEnbled())
+                    {
+                        return PL310_L2_SLVERR;
+                    } else {
+                        write_AuxCtrl(data);
+                    }
+                }
+                break;
+
+            case 0x108: // TagLatencyCtrl
+                if (is_nonsecure)
+                {
+                    return PL310_L2_DECERR;
+                } else {
+                    if (Config_IsCacheEnbled())
+                    {
+                        return PL310_L2_SLVERR;
+                    } else {
+                        TagLatencyCtrl = build_latencies(data);
+                    }
+                }
+                break;
+            case 0x10C: // DataLatencyCtrl;
+                if (is_nonsecure)
+                {
+                    return PL310_L2_DECERR;
+                } else {
+                    if (Config_IsCacheEnbled())
+                    {
+                        return PL310_L2_SLVERR;
+                    }
+
+                    DataLatencyCtrl = build_latencies(data);
+                }
+                break;
+
+            // Register 2: Interrupt/Counter Control Registers
+            case 0x200: // EventCounterCtrl;
+                if (data & (1<<2)) // reset EventCounter1
+                {
+                    EventCounter1 = 0;
+                }
+                if (data & (1<<1)) // reset EventCounter0
+                {
+                    EventCounter0 = 0;
+                }
+                EventCounterCtrl = data & 1;   // Enable / disable
+                break;
+            case 0x204: // EventCounter1Cfg;
+                EventCounter1Cfg = data & 0x3f; // bits 0-5
+                // Counters aren't implemented, so just accept the write
+                break;
+            case 0x208: // EventCounter0Cfg;
+                EventCounter0Cfg = data & 0x3f; // bits 0-5
+                // Counters aren't implemented, so just accept the write
+                break;
+            case 0x20C: // EventCounter1;
+                if (isEventCounterDisabled(EventCounter1Cfg))
+                {
+                    EventCounter1 = data;
+                }
+                break;
+            case 0x210: // EventCounter0;
+                if (isEventCounterDisabled(EventCounter0Cfg))
+                {
+                    EventCounter0 = data;
+                }
+                break;
+            case 0x214: // InterruptMask;
+                if (!is_nonsecure || ac_ns_interrupt)
+                {
+                    InterruptMask = data & PL310_INTERRUPTS_MASK;
+                }
+                else
+                {
+                    return PL310_L2_DECERR;
+                }
+                break;
+            case 0x218: // MaskedInterruptStatus;
+            case 0x21C: // RawInterruptStatus;
+                readonly = true;
+                break;
+
+            case 0x220: // InterruptClear;
+                if (!is_nonsecure || ac_ns_interrupt)
+                {
+                    PL310_DBG("Write InterruptClear Register - data=0x%08X\n", data);
+                    PL310_DBG("    RawInterruptStatus .......... 0x%08X\n", RawInterruptStatus);
+                    PL310_DBG("    MaskedInterruptStatus ....... 0x%08X\n", MaskedInterruptStatus);
+                    uint32_t interrupts_to_be_cleared = RawInterruptStatus & data;
+                    PL310_DBG("    interrupts_to_be_cleared .... 0x%08X\n", interrupts_to_be_cleared);
+                    if ((interrupts_to_be_cleared >> SLVERR_LSB) & 0x1)
+                    {
+                        self.SLVERRINTR.setValue(sg::Signal::Clear);
+                    }
+                    if ((interrupts_to_be_cleared >> DECERR_LSB) & 0x1)
+                    {
+                        self.DECERRINTR.setValue(sg::Signal::Clear);
+                    }
+                    RawInterruptStatus &= ~data;
+
+                    // also change MaskedInterruptStatus accordingly
+                    uint32_t old_MaskedInterruptStatus = MaskedInterruptStatus;
+                    MaskedInterruptStatus = RawInterruptStatus & InterruptMask;
+                    if ((MaskedInterruptStatus != old_MaskedInterruptStatus) && !MaskedInterruptStatus)
+                    {
+                        self.L2CCINTR.setValue(sg::Signal::Clear);
+                    }
+
+                    PL310_DBG("    new RawInterruptStatus ...... 0x%08X\n", RawInterruptStatus);
+                    PL310_DBG("    new MaskedInterruptStatus ... 0x%08X\n", MaskedInterruptStatus);
+                    // No write to the InterruptClear register variable, always read as '0'
+                }
+                else
+                {
+                    return PL310_L2_DECERR;
+                }
+                break;
+
+            // Register 7: Cache Maintenance Operations
+            case 0x730: // CacheSync;
+                CacheMaintenance_CacheSync(); // this behaviour is doing nothing
+                break;
+            case 0x770: // InvalidateByPA 
+                // (just ensure the C bit 0 is clear)
+                InvalidateByPA = data & (~0x1f);
+                InvalidateByPA |= 0x1;    // maintenance operation starts
+                CacheMaintenance_InvalidateLineByPA(data, is_nonsecure);
+                InvalidateByPA &= ~0x1;    // maintenance operation ended
+                break;
+            case 0x77C: // InvalidateByWay
+                // signal atomic completion
+                CacheMaintenance_InvalidateByWay(data & 0xFFFF, is_nonsecure);
+                InvalidateByWay = 0; // Completely atomic with PV model
+                cacheMaintenanceDelayCounter.invalidateByWay = 0;
+                break;
+            case 0x7B0: // CleanByPA;
+                // (just ensure the C bit 0 is clear)
+                CleanByPA = data & (~0x1f);
+                CleanByPA |= 0x1;    // maintenance operation starts
+                CacheMaintenance_CleanLineByPA(data, is_nonsecure);
+                CleanByPA &= ~0x1;    // maintenance operation ended
+                break;
+            case 0x7B8: // CleanByIdxWay;
+                // (just ensure the C bit 0 is clear)
+                CleanByIdxWay = data & ((0xf << 28) | (indexMask << 5));
+                CacheMaintenance_CleanLineByIndexWay((CleanByIdxWay >> 5) & indexMask /*set index*/,
+                                                     (CleanByIdxWay >> 28) & 0xF /*way bits*/,
+                                                     is_nonsecure);
+                break;
+            case 0x7BC: // CleanByWay;
+                // signal atomic completion
+                CacheMaintenance_CleanByWay(data & 0xFFFF, is_nonsecure);
+                CleanByWay = 0;
+                break;                
+            case 0x7F0: // CleanInvalByPA;
+                // (just ensure the C bit 0 is clear)
+                CleanInvalByPA = data & (~0x1f);
+                CleanInvalByPA |= 0x1;    // maintenance operation starts
+                CacheMaintenance_CleanAndInvalidateLineByPA(data, is_nonsecure);
+                CleanInvalByPA &= ~0x1;    // maintenance operation ended //
+                break;
+            case 0x7F8: // CleanInvalByIdxWay;
+                // (just ensure the C bit 0 is clear)
+                CleanInvalByIdxWay = data & ((0xf << 28) | (indexMask << 5));
+                CacheMaintenance_CleanAndInvalidateLineByIndexWay((CleanInvalByIdxWay >> 5) & indexMask /*set index*/,
+                                                                  (CleanInvalByIdxWay >> 28) & 0xF /*way bits*/,
+                                                                  is_nonsecure);
+                break;
+            case 0x7FC: // CleanInvalByWay;
+                // signal atomic completion
+                CacheMaintenance_CleanAndInvalidateByWay(data & 0xFFFF, is_nonsecure);
+                CleanInvalByWay = 0;
+                break;                
+
+
+            // Register 9: Cache Lockdown
+            case 0x900: // DataLockdown0
+            case 0x908: // DataLockdown1
+            case 0x910: // DataLockdown2
+            case 0x918: // DataLockdown3
+            case 0x920: // DataLockdown4
+            case 0x928: // DataLockdown5
+            case 0x930: // DataLockdown6
+            case 0x938: // DataLockdown7
+                if (!is_nonsecure || ac_ns_lockdown)
+                {
+                    DataLockdown[(addr >> 3) & 0x7] = data & PL310_WAYS_MASK;
+                } else {
+                    return PL310_L2_DECERR;
+                }
+                break;
+            case 0x904: // InstructionLockdown0
+            case 0x90C: // InstructionLockdown1
+            case 0x914: // InstructionLockdown2
+            case 0x91C: // InstructionLockdown3
+            case 0x924: // InstructionLockdown4
+            case 0x92C: // InstructionLockdown5
+            case 0x934: // InstructionLockdown6
+            case 0x93C: // InstructionLockdown7
+                if (!is_nonsecure || ac_ns_lockdown)
+                {
+                    InstructionLockdown[(addr >> 3) & 0x7] = data & PL310_WAYS_MASK;
+                } else {
+                    return PL310_L2_DECERR;
+                }
+                break;
+
+            case 0x950: // LockdownByLineEnable;
+                if (!is_nonsecure || ac_ns_lockdown)
+                {
+                    LockdownByLineEnable = data & 1;
+                } else {
+                    return PL310_L2_DECERR;
+                }
+                break;
+            case 0x954: // UnlockAll;
+                if (!is_nonsecure || ac_ns_lockdown)
+                {
+                    // 'atomically' unlock them all
+                    UnlockAll = data;
+                    cacheMaintenanceDelayCounter.unlockAll = 0;
+                    CacheMaintenance_UnlockAllByWay(data & 0xFFFF, is_nonsecure);
+                } else {
+                    return PL310_L2_DECERR;
+                }
+                break;
+
+            // Register 12: Address Filtering
+            // Address filtering is not enabled - we have just a single master port
+            case 0xc00: // AFilterStart;
+                if (!is_nonsecure) {
+                    AFilterStart = data & 0xfff00001;
+                } else {
+                    return PL310_L2_DECERR;
+                }
+                break;
+            case 0xc04: // AFilterEnd;
+                if (!is_nonsecure) {
+                    AFilterEnd = data & 0xfff00000;
+                } else {
+                    return PL310_L2_DECERR;
+                }
+                break;
+
+            // Register 15: Debug and Prefetch
+            case 0xf40: // DebugControl;
+                if (!is_nonsecure) {
+                    DebugControl = data & 0x3;
+                } else {
+                    return PL310_L2_DECERR;
+                }                
+                break;
+            case 0xf60: // PrefetchOffset
+                if (!is_nonsecure) {
+                    PrefetchOffset = data & 0x1F;
+                } else {
+                    return PL310_L2_DECERR;
+                }                
+                break;
+        default: 
+            PL310_ERROR("%s Write register: Invalid address 0x%x\n", 
+                        getInstanceName().c_str(), addr);
+            if (is_nonsecure)
+            {
+                if (((addr & 0xF00) == 0x100) ||
+                    (((addr & 0xF00) == 0x900) && is_nonsecure && !ac_ns_lockdown) ||
+                    ((addr & 0xF00) == 0xC00) ||
+                    ((addr & 0xF00) == 0xF00))
+                {
+                    return PL310_L2_DECERR;
+                }
+            }
+            else
+            {
+                if ((addr >= 0x110) && (addr < 0x200))
+                {
+                    return PL310_L2_SLVERR;
+                }
+            }
+            break;
+        } // end switch
+
+        if (readonly)
+        {
+            PL310_ERROR("%s Write to read only register, address 0x%x.\n", getInstanceName().c_str(), addr);
+            // Writes on read-only registers receive an OKAY
+        }
+
+        return PL310_L2_COMPLETE;
+        
+    } // end registerWrite
+
+    // debugger support
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        pl310_txr_t result = PL310_L2_COMPLETE;
+        *datap = registerRead(reg_id, false, result);          // all debug accesses are secure (for now)
+        return ACCESS_FUNC_OK;
+    }
+    
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap, false);  // all debug accesses are secure (for now)
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour register_name(uint32_t off) : const char *
+    {
+        static char lcstr[32];  // Holds "Unknown[xxx]"
+        switch (off) {
+            case 0x000: return("CacheID");
+            case 0x004: return("CacheType");
+                        // Register 1: Control
+            case 0x100: return("Ctrl");
+            case 0x104: return("AuxCtrl");
+            case 0x108: return("TagLatencyCtrl");
+            case 0x10C: return("DataLatencyCtrl");
+                        // Register 2: Interrupt/Counter Control Registers
+            case 0x200: return("EventCounterCtrl");
+            case 0x204: return("EventCounter1Cfg");
+            case 0x208: return("EventCounter0Cfg");
+            case 0x20C: return("EventCounter1");
+            case 0x210: return("EventCounter0");
+            case 0x214: return("InterruptMask");
+            case 0x218: return("MaskedInterruptStatus");
+            case 0x21C: return("RawInterruptStatus");
+            case 0x220: return("InterruptClear");
+                        // Register 7: Cache Maintenance Operations
+            case 0x730: return("CacheSync");
+            case 0x770: return("InvalidateByPA");
+            case 0x77C: return("InvalidateByWay");
+            case 0x7B0: return("CleanByPA");
+            case 0x7B8: return("CleanByIdxWay");
+            case 0x7BC: return("CleanByWay");
+            case 0x7F0: return("CleanInvalByPA");
+            case 0x7F8: return("CleanInvalByIdxWay");
+            case 0x7FC: return("CleanInvalByWay");
+                        // Register 9: Cache Lockdown
+            case 0x900: return("DataLockdown0");
+            case 0x904: return("InstructionLockdown0");
+            case 0x908: return("DataLockdown1");
+            case 0x90C: return("InstructionLockdown1");
+            case 0x910: return("DataLockdown2");
+            case 0x914: return("InstructionLockdown2");
+            case 0x918: return("DataLockdown3");
+            case 0x91C: return("InstructionLockdown3");
+            case 0x920: return("DataLockdown4");
+            case 0x924: return("InstructionLockdown4");
+            case 0x928: return("DataLockdown5");
+            case 0x92C: return("InstructionLockdown5");
+            case 0x930: return("DataLockdown6");
+            case 0x934: return("InstructionLockdown6");
+            case 0x938: return("DataLockdown7");
+            case 0x93C: return("InstructionLockdown7");
+            case 0x950: return("LockdownByLineEnable");
+            case 0x954: return("UnlockAll");
+                        // Register 12: Address Filtering
+            case 0xc00: return("AFilterStart");
+            case 0xc04: return("AFilterEnd");
+                        // Register 15: Debug and Prefetch
+            case 0xf40: return("DebugControl");
+            case 0xf60: return("PrefetchOffset");
+            default:    sprintf(lcstr,"Unknown[%03x]",off);
+                         return(lcstr);
+        }
+    }
+
+
+
+
+    // ================================================================================
+    // Cache Maintenance Behaviours
+    // ================================================================================
+
+    //--------------------------------------------------------------------------------
+    behavior CacheMaintenance_CacheSync()
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheMaintenance_CacheSync()\n");
+
+        // We don't have buffers modelled, so nothing to do
+    }
+
+    //--------------------------------------------------------------------------------
+    behavior CacheMaintenance_InvalidateLineByPA(uint32_t addr, bool ns)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheMaintenance_InvalidateLineByPA()\n");
+
+        // NS bit needs to match
+        int line_index = getHit(addr, ns);
+
+        if (CacheLine_Found(line_index))
+        {
+            CacheLine_InvalidateForce(line_index);
+        }
+    }
+
+    //--------------------------------------------------------------------------------
+    behavior CacheMaintenance_InvalidateByWay(uint16_t wayBits, bool ns)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheMaintenance_InvalidateByWay()\n");
+
+        for (unsigned int way = 0; way < numWays; way++)
+        {
+            if (wayBits & (1 << way))
+            {
+                for (unsigned int set = 0; set < numSets; set++)
+                {
+                    int line_index = line_no_from_set_way(set, way);
+
+                    // secure     access invalidates both S and NS lines
+                    // non-secure access invalidates only NS lines
+                    if ((ns == false) || (CacheLine_GetTagNS(line_index) == true))
+                    {
+                        CacheLine_InvalidateForce(line_index);
+                    }
+                }
+            }
+        }
+    }
+
+    //--------------------------------------------------------------------------------
+    behavior CacheMaintenance_CleanLineByPA(uint32_t addr, bool ns)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheMaintenance_CleanLineByPA()\n");
+
+        // NS bit needs to match
+        int line_index = getHit(addr, ns);
+
+        if (CacheLine_Found(line_index))
+        {
+            CacheLine_Clean(line_index);
+        }
+    }
+
+    //--------------------------------------------------------------------------------
+    behavior CacheMaintenance_CleanLineByIndexWay(unsigned int set_index, unsigned int way,
+                                                  bool ns)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheMaintenance_CleanLineByIndexWay()\n");
+
+        int line_index = line_no_from_set_way(set_index, way);
+
+        // secure     access invalidates both S and NS lines
+        // non-secure access invalidates only NS lines
+        if ((ns == false) || (CacheLine_GetTagNS(line_index) == true))
+        {
+            CacheLine_Clean(line_index);
+        }
+    }
+
+    //--------------------------------------------------------------------------------
+    behavior CacheMaintenance_CleanByWay(uint16_t wayBits, bool ns)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheMaintenance_CleanByWay(wayBits=0x%x, ns=%s)\n", wayBits, ns ? "N" : "S");
+
+        for (unsigned int way = 0; way < numWays; way++)
+        {
+            if (wayBits & (1 << way))
+            {
+                for (unsigned int set = 0; set < numSets; set++)
+                {
+                    int line_index = line_no_from_set_way(set, way);
+
+                    // secure     access invalidates both S and NS lines
+                    // non-secure access invalidates only NS lines
+                    if ((ns == false) || (CacheLine_GetTagNS(line_index) == true))
+                    {
+                        CacheLine_Clean(line_index);
+                    }
+                }
+            }
+        }
+    }
+
+    //--------------------------------------------------------------------------------
+    behavior CacheMaintenance_CleanAndInvalidateLineByPA(uint32_t addr, bool ns)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheMaintenance_CleanAndInvalidateLineByPA()\n");
+
+        CacheMaintenance_CleanLineByPA(addr, ns);
+        CacheMaintenance_InvalidateLineByPA(addr, ns);
+    }
+
+    //--------------------------------------------------------------------------------
+    behavior CacheMaintenance_CleanAndInvalidateLineByIndexWay(unsigned int set_index,
+                                                               unsigned int way,
+                                                               bool ns)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheMaintenance_CleanAndInvalidateLineByIndexWay(%d,%d,%s)\n", set_index, way, ns ? "NS" : "S");
+
+        int line_index = line_no_from_set_way(set_index, way);
+
+        // secure     access invalidates both S and NS lines
+        // non-secure access invalidates only NS lines
+        if ((ns == false) || (CacheLine_GetTagNS(line_index) == true))
+        {
+            CacheLine_Clean(line_index);
+            CacheLine_InvalidateForce(line_index);
+        }
+    }
+
+    //--------------------------------------------------------------------------------
+    behavior CacheMaintenance_CleanAndInvalidateByWay(uint16_t wayBits, bool ns)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheMaintenance_CleanAndInvalidateByWay()\n");
+
+        CacheMaintenance_CleanByWay(wayBits, ns);
+        CacheMaintenance_InvalidateByWay(wayBits, ns);
+    }
+
+
+    //--------------------------------------------------------------------------------
+    behavior CacheMaintenance_UnlockAllByWay(uint16_t wayBits, bool ns)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheMaintenance_UnlockAllByWay()\n");
+
+        for (unsigned int way = 0; way < numWays; way++)
+        {
+            if (wayBits & (1 << way))
+            {
+                for (unsigned int set = 0; set < numSets; set++)
+                {
+                    int line_index = line_no_from_set_way(set, way);
+
+                    // secure     access invalidates both S and NS lines
+                    // non-secure access invalidates only NS lines
+                    if ((ns == false) || (CacheLine_GetTagNS(line_index) == true))
+                    {
+                        CacheLine_UnLock(line_index);
+                    }
+                }
+            }
+        }
+    }
+
+
+    // ================================================================================
+    // Error Handling Behaviours
+    // ================================================================================
+
+    //--------------------------------------------------------------------------------
+    behavior Error_TriggerInterruptSlaveError()
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("Error_TriggerInterruptSlaveError()\n");
+
+        // Trigger SLVERRINTR if configured accordingly
+        if ((InterruptMask >> SLVERR_LSB) & 0x1)
+        {
+            PL310_DBG("MaskedInterruptStatus: 0x%08X -> ", MaskedInterruptStatus);
+            MaskedInterruptStatus |= (1 << SLVERR_LSB);
+            PL310_DBG("0x%08X\n", MaskedInterruptStatus);
+            self.SLVERRINTR.setValue(sg::Signal::Set);
+            self.L2CCINTR.setValue(sg::Signal::Set);
+        }
+        RawInterruptStatus |= (1 << SLVERR_LSB);
+    }
+
+    //--------------------------------------------------------------------------------
+    behavior Error_TriggerInterruptDecodeError()
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("Error_TriggerInterruptDecodeError()\n");
+
+        // Trigger DECERRINTR if configured accordingly
+        if ((InterruptMask >> DECERR_LSB) & 0x1)
+        {
+            PL310_DBG("MaskedInterruptStatus: 0x%08X -> ", MaskedInterruptStatus);
+            MaskedInterruptStatus |= (1 << DECERR_LSB);
+            PL310_DBG("0x%08X\n", MaskedInterruptStatus);
+            self.DECERRINTR.setValue(sg::Signal::Set);
+            self.L2CCINTR.setValue(sg::Signal::Set);
+        }
+        RawInterruptStatus |= (1 << DECERR_LSB);
+    }
+
+
+    // ================================================================================
+    // Refill Buffer Behaviours
+    // ================================================================================
+
+    /* Returns true if success, false if something went wrong there. */
+    //--------------------------------------------------------------------------------
+    behaviour Refill_FillLineData(int cache_line_idx, pv::Transaction tx, pv::Tx_Result& result) : bool
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("Refill_FillLineData(%d)\n", cache_line_idx);
+
+        uint64_t* read_data = reinterpret_cast<uint64_t*>(self.cache_control.getLineContentsForWrite(cache_line_idx));
+        pv::bus_addr_t line_base_addr = tx.getAddress() & LineBaseMask;
+
+        refillBuffer.tx_gen->setPrivileged (tx.isPrivileged() );
+        refillBuffer.tx_memattr->setPrivileged(tx.isPrivileged());
+        refillBuffer.tx_gen->setInstruction(tx.isInstruction());
+        refillBuffer.tx_memattr->setInstruction(tx.isInstruction());
+        refillBuffer.tx_gen->setNonSecure  (tx.isNonSecure()  );
+        refillBuffer.tx_memattr->setNormalWorld(tx.isNonSecure());
+
+        // setLocked()     already set in init()
+        // setExclusive()  already set in init()
+
+        refillBuffer.tx_memattr->setOuterBufferable      (tx.getMemoryAttributes() ? tx.getMemoryAttributes()->isOuterBufferable()       : false);
+        refillBuffer.tx_memattr->setOuterCacheable       (tx.getMemoryAttributes() ? tx.getMemoryAttributes()->isOuterCacheable()        : false);
+        refillBuffer.tx_memattr->setOuterReadAllocatable (tx.getMemoryAttributes() ? tx.getMemoryAttributes()->isOuterReadAllocatable()  : false);
+        refillBuffer.tx_memattr->setOuterWriteAllocatable(tx.getMemoryAttributes() ? tx.getMemoryAttributes()->isOuterWriteAllocatable() : false);
+        refillBuffer.tx_gen->setMemoryAttributes(refillBuffer.tx_memattr);
+
+        bool result_ok = true;
+        for (unsigned int offset = 0; offset < LineSize; offset += 8)
+        {
+            PL310_DBG("  read64(0x%08x)\n", (uint32_t)(line_base_addr + offset));
+            bool beat_ok = refillBuffer.tx_gen->read64(line_base_addr + offset, read_data + offset/8);
+            result_ok &= beat_ok;
+            PL310_DBG("    beat_ok=%s, data[%d]=0x%016llX\n",
+                   beat_ok ? "true" : "false",
+                   offset/8,
+                   (unsigned long long)read_data[offset/8]);
+
+            if (!beat_ok)
+            {
+            // We currently cannot distinguish DECERR from SLVERR, so DECERR is mapped to SLVERR if not PL310_VALIDATION
+#ifdef PL310_VALIDATION
+                uint32_t user_flags = refillBuffer.tx_memattr->getUserFlags();
+                if (user_flags & PL310VAL_UF_DECERR_MASK)
+                {
+                    // DECERR
+                    Error_TriggerInterruptDecodeError();
+                    if (Refill_IsTxBeatAddrWithinRefillBeat(tx, line_base_addr + offset))
+                    {
+                        result = tx.generateDecodeAbort();
+                    }
+                }
+                else
+                {
+#endif
+                    // SLVERR
+                    Error_TriggerInterruptSlaveError();
+                    if (Refill_IsTxBeatAddrWithinRefillBeat(tx, line_base_addr + offset))
+                    {
+                        result = tx.generateSlaveAbort();
+                    }
+#ifdef PL310_VALIDATION
+                }
+                refillBuffer.tx_memattr->setUserFlags(0);
+                refillBuffer.tx_gen->setMemoryAttributes(refillBuffer.tx_memattr);
+#endif
+            }
+
+        }
+
+        if (result_ok)
+        {
+            CacheLine_SetValid(cache_line_idx);
+        }
+        else
+        {
+            PL310_DBG(" - refill result not ok\n");
+        }
+
+        return result_ok;
+    }
+
+
+    //--------------------------------------------------------------------------------
+    behaviour Refill_IsTxBeatAddrWithinRefillBeat(pv::Transaction tx, pv::bus_addr_t refill_beat_addr) : bool
+    //--------------------------------------------------------------------------------
+    {
+        pv::bus_addr_t tx_beat_addr_begin     = tx.getAddress(); // this is already the address for this beat
+        pv::bus_addr_t tx_beat_addr_end       = tx_beat_addr_begin + tx.getAccessByteWidth();
+        pv::bus_addr_t refill_beat_addr_begin = refill_beat_addr;
+        pv::bus_addr_t refill_beat_addr_end   = refill_beat_addr_begin + 8 /*64Bit data read per beat*/;
+
+        return (((tx_beat_addr_begin >= refill_beat_addr_begin) && (tx_beat_addr_begin <  refill_beat_addr_end))    ||
+                ((tx_beat_addr_end   >  refill_beat_addr_begin) && (tx_beat_addr_end   <= refill_beat_addr_end)));
+    }
+
+
+
+    // ================================================================================
+    // Eviction Buffer Behaviours
+    // ================================================================================
+
+    /* Returns true if success, false if something went wrong there. */
+    //--------------------------------------------------------------------------------
+    behaviour Evict_CopyLineDataToL3(int cache_line_idx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("Evict_CopyLineDataToL3(%d)\n", cache_line_idx);
+
+        uint64_t* write_data = reinterpret_cast<uint64_t*>(self.cache_control.getLineContentsForWrite(cache_line_idx));
+
+        pv::bus_addr_t line_base_addr = CacheLine_GetTagAddr(cache_line_idx) & LineBaseMask;
+
+        // NS flag of transaction depends on ns bit of cache line
+        evictionBuffer.tx_gen->setNonSecure(CacheLine_GetTagNS(cache_line_idx));
+        evictionBuffer.tx_memattr->setNormalWorld(CacheLine_GetTagNS(cache_line_idx));
+        evictionBuffer.tx_gen->setMemoryAttributes(evictionBuffer.tx_memattr);
+
+        bool result_ok = true;
+        for (unsigned int offset = 0; offset < LineSize; offset += 8)
+        {
+            PL310_DBG("  write64(addr=0x%08x, data[%d]=0x%016llX)\n",
+                   (uint32_t)(line_base_addr + offset),
+                   offset/8,
+                   (unsigned long long)write_data[offset/8]);
+            result_ok &= evictionBuffer.tx_gen->write64(line_base_addr + offset, write_data + offset/8);
+            PL310_DBG("    result_ok=%s\n",
+                   result_ok ? "true" : "false");
+            
+        }
+
+        if (!result_ok)
+        {
+            // We currently cannot distinguish DECERR from SLVERR, so DECERR is mapped to SLVERR if not PL310_VALIDATION
+#ifdef PL310_VALIDATION
+            uint32_t user_flags = evictionBuffer.tx_memattr->getUserFlags();
+            if (user_flags & PL310VAL_UF_OVERALL_DECERR_MASK)
+            {
+                Error_TriggerInterruptDecodeError();
+            }
+            else
+            {
+#endif
+                Error_TriggerInterruptSlaveError();
+
+#ifdef PL310_VALIDATION
+            }
+            evictionBuffer.tx_memattr->setUserFlags(0);
+            evictionBuffer.tx_gen->setMemoryAttributes(evictionBuffer.tx_memattr);
+#endif
+        }
+
+        return result_ok;
+    }
+
+
+
+    // ================================================================================
+    // Cache Line Behaviours
+    // ================================================================================
+
+
+    /*! Change the valid flag for a line.  If the line is dirty, clearing
+     *  the valid flag will cause the line to be invalidated without
+     *  being cleaned.
+     */
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_SetValid(int idx)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheLine_SetValid(%d) [%s]\n", idx, lines[idx].valid ? "no change" : "false->true");
+        lines[idx].valid = true;
+        // in exclusive mode this can happen... assert(lines[idx].dirty == false);
+
+        if (LockdownByLineEnable)
+        {
+            PL310_DBG("    lock: true\n");
+            lines[idx].lock = true;
+        }
+    }
+
+    /*! Change the dirty flag for a line.  If the line is valid, clearing
+     *  the dirty flag will cause the line to be cleaned.
+     */
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_SetDirty(int idx)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheLine_SetDirty(%d) [%s]\n", idx, lines[idx].dirty ? "no change" : "false->true");
+        // in exclusive mode this can happen... assert(lines[idx].valid);
+        lines[idx].dirty = true;
+    }
+
+    /*! Change the dirty flag for a line.  If the line is valid, clearing
+     *  the dirty flag will cause the line to be cleaned.
+     */
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_ClearDirty(int idx)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheLine_ClearDirty(%d) [%s]\n", idx, !lines[idx].dirty ? "no change" : "true->false");
+        // in exclusive mode this can happen... assert(lines[idx].valid);
+        lines[idx].dirty = false;
+    }
+
+    /*! True if the line contains valid tag and line data. */
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_IsValid(int idx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        bool ret = lines[idx].valid /*|| (ac_exclusive && lines[idx].dirty)*/;
+        return ret;
+    }
+
+    /*! True if the line data contains dirty write-back data, which
+     *  should be written to the next level on a clean/flush.
+     */
+    //--------------------------------------------------------------------------------
+        behaviour CacheLine_IsDirty(int idx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        return lines[idx].dirty;
+    }
+
+    /*! True if the line has been locked during the LockdownByLineEnable phase.
+     */
+    //--------------------------------------------------------------------------------
+        behaviour CacheLine_IsLock(int idx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        return lines[idx].lock;
+    }
+
+    /*! Unlock cache line.
+     */
+    //--------------------------------------------------------------------------------
+        behaviour CacheLine_UnLock(int idx)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheLine_UnLock(%d) [%s] - %s addr=0x%08x,ns=%s\n",
+                  idx,
+                  lines[idx].lock ? "true->false" : "no change",
+                  lines[idx].valid ? "valid:" : "invalid:",
+                  (uint32_t)lines[idx].tag.addr,
+                  lines[idx].tag.ns ? "N" : "S");
+        lines[idx].lock = false;
+    }
+
+     /*! Clean a line (does nothing if not dirty). */
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_Clean(int idx)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheLine_Clean(%d) [%s] - addr=0x%08x,ns=%s\n",
+               idx,
+               lines[idx].dirty ? "dirty->clean" : "no change",
+               (uint32_t)lines[idx].tag.addr,
+               lines[idx].tag.ns ? "N" : "S");
+
+        if (lines[idx].dirty)
+        {
+            // Evict to L3
+            eventCounter.Event_CO();
+            if (Evict_CopyLineDataToL3(idx))
+            {
+                lines[idx].dirty = false;
+            }
+            else
+            {
+                // Nothing to be done here, only the interrupt (if enabled) has been triggered
+            }
+        }
+    }
+
+    /*! Invalidate a valid line, without cleaning it: any dirty data
+     *  will be discarded.  Does nothing if not valid.
+     */
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_Invalidate(int idx)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheLine_Invalidate(%d) [%s%s] - addr=0x%08x,ns=%s\n",
+                  idx,
+                  lines[idx].valid && !lines[idx].lock ? "valid->invalid" : "no change",
+                  lines[idx].valid &&  lines[idx].lock ? " due lock" : "",
+                  (uint32_t)lines[idx].tag.addr,
+                  lines[idx].tag.ns ? "N" : "S");
+
+        if (lines[idx].valid
+            && !lines[idx].lock)
+        {
+            lines[idx].dirty = false;
+            lines[idx].valid = false;
+            lines[idx].preferred_for_next_eviction = false;
+            self.cache_control.invalidateLineHit(idx, pv::REVOKE_READ_WRITE_HIT);
+        }
+    }
+
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_InvalidateForce(int idx)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheLine_InvalidateForce(%d) [%s] - addr=0x%08x,ns=%s\n",
+                  idx,
+                  lines[idx].valid ? "valid->invalid" : "no change",
+                  (uint32_t)lines[idx].tag.addr,
+                  lines[idx].tag.ns ? "N" : "S");
+
+        if (lines[idx].valid)
+        {
+            lines[idx].dirty = false;
+            lines[idx].valid = false;
+            lines[idx].preferred_for_next_eviction = false;
+            self.cache_control.invalidateLineHit(idx, pv::REVOKE_READ_WRITE_HIT);
+        }
+    }
+
+
+    /*! Prepare a victim line to be filled: evict any existing data,
+     *  and set the tag bits.  The line is not marked valid.
+     */
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_PrepareForReplacement(int idx,
+                                              pv::bus_addr_t new_tag_addr,
+                                              bool new_ns)
+    //--------------------------------------------------------------------------------
+    {
+        // Force the old line to be cleaned and invalidated.
+        CacheLine_Clean(idx);
+        CacheLine_Invalidate(idx);
+
+        assert (!lines[idx].valid);
+
+        lines[idx].tag.addr = new_tag_addr & ~(LineSize - 1);
+        lines[idx].tag.ns   = new_ns;
+    }
+
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_IsHit(int idx, pv::bus_addr_t addr, bool ns) : bool
+    //--------------------------------------------------------------------------------
+    {
+        bool ret = (CacheLine_IsValid(idx)        &&
+                    lines[idx].tag.addr == addr   &&
+                    lines[idx].tag.ns   == ns);
+        return ret;
+    }
+
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_GetTagAddr(int idx) : pv::bus_addr_t
+    //--------------------------------------------------------------------------------
+    {
+        return lines[idx].tag.addr;
+    }
+
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_GetTagNS(int idx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        return lines[idx].tag.ns;
+    }
+
+
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_Found(int idx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        return (idx != PL310_CACHE_LINE_NOT_FOUND);
+    }
+
+
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_SetPreferredForNextEviction(int idx)
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("CacheLine_SetPreferredForNextEviction(%d)\n", idx);
+        lines[idx].preferred_for_next_eviction = true;
+    }
+
+    //--------------------------------------------------------------------------------
+    behaviour CacheLine_IsPreferredForNextEviction(int idx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        return lines[idx].preferred_for_next_eviction;
+    }
+
+
+
+
+
+    // ================================================================================
+    // Cache Behaviours
+    // ================================================================================
+
+
+    /*! Convert a set/way into an index into the CacheLineData array. */    
+    //--------------------------------------------------------------------------------
+    behaviour line_no_from_set_way(int set, int way) : int
+    //--------------------------------------------------------------------------------
+    {
+        return set * numWays + way;
+    }
+
+    /*! Convert an address into a cache index. */
+    //--------------------------------------------------------------------------------
+    behaviour index_from_address(pv::bus_addr_t address) : int
+    //--------------------------------------------------------------------------------
+    {
+        return (int)((address / LineSize) & (numSets - 1));
+    }
+
+    /*! Get a pointer to the cache line data for the cache-line
+     *  containing the given address.  Returns PL310_CACHE_LINE_NOT_FOUND if not present.
+     */
+    //--------------------------------------------------------------------------------
+    behaviour getHit(pv::bus_addr_t address, bool ns) : int
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("getHit(addr=0x%08X, ns=%s)\n", (uint32_t)address, ns ? "NS" : "S");
+    
+        int set_index = index_from_address(address);
+        PL310_DBG("  set_index=0x%x", set_index);
+
+        pv::bus_addr_t address_base = address & ~(LineSize - 1);
+        // Perform a linear search through the available ways in this set.
+        for (unsigned seek_way = 0; seek_way < numWays; ++seek_way)
+        {
+            int line_index = line_no_from_set_way(set_index, seek_way);
+            if (CacheLine_IsHit(line_index, address_base, ns))
+            {
+                PL310_DBG(",way=0x%x\n", seek_way);
+                return line_index;
+            }
+        }
+        // Couldn't find a valid match
+        PL310_DBG(", miss\n");
+        return PL310_CACHE_LINE_NOT_FOUND;
+    }
+
+
+
+    /*! Select a cache line to be replaced in order to fill data
+     *  for the given address.  Returns PL310_CACHE_LINE_NOT_FOUND if no suitable unlocked
+     *  victim can be found.
+     */
+    //--------------------------------------------------------------------------------
+    behaviour getVictim(pv::bus_addr_t address,
+                        bool           ns,
+                        bool           isInstruction,
+                        unsigned int   maskedCpuId) : int
+    //--------------------------------------------------------------------------------
+    {
+        PL310_DBG("getVictim(addr=0x%08X, ns=%s, I/D=%s, id=%d)\n", (uint32_t)address, ns ? "NS" : "S", isInstruction ? "I" : "D", maskedCpuId);
+
+        int set_index = index_from_address(address);
+
+        int lockdown_ways;
+
+        if (isInstruction)
+        {
+            lockdown_ways = InstructionLockdown[maskedCpuId];
+        }
+        else
+        {
+            lockdown_ways = DataLockdown[maskedCpuId];
+        }
+
+        unsigned int i;
+        unsigned int way = 0; // initialized with 0 to omit compiler warnings (for the time being)
+        int line_index = 0;
+
+        // first look for a free and unlocked way
+        way = wayOfLastVictim;
+        for (i = 0; i < numWays; i++)
+        {
+            way = (way + 1) % numWays;
+            line_index = line_no_from_set_way(set_index, way);
+            if ((!lines[line_index].valid)          &&  // not valid
+                (!CacheLine_IsLock(line_index))     &&  // not locked during LockdownByLineEnable phase
+                ((lockdown_ways & (1 << way)) == 0))    // not locked by way lockdown
+            {
+                break;
+            }
+
+        }
+
+        PL310_DBG("%s", (i < numWays) ? "  found free way\n" : "");
+
+        if (ac_exclusive && (i == numWays))
+        {
+            // no free way and exclusive configuration, we need to search a preferred victim
+
+            for (i = 0; i < numWays; i++)
+            {
+                way = (way + 1) % numWays;
+                line_index = line_no_from_set_way(set_index, way);
+                if ((lines[line_index].preferred_for_next_eviction)      &&  // preferred candidate
+                    (!CacheLine_IsLock(line_index)))                         // not locked during LockdownByLineEnable phase
+                {
+                    break;
+                }
+
+            }
+
+            PL310_DBG("%s", (i < numWays) ? "  found preferred way\n" : "");
+        }
+
+        if (i == numWays)
+        {
+            // no free way, we need to search a real victim
+
+            for (i = 0; i < numWays; i++)
+            {
+                way = (way + 1) % numWays;
+
+                if (((lockdown_ways & (1 << way)) == 0)                       &&  // not locked by way lockdown
+                    (!CacheLine_IsLock(line_no_from_set_way(set_index, way))))    // not locked during LockdownByLineEnable phase
+                {
+                    break;
+                }
+            }
+
+            PL310_DBG("%s", (i < numWays) ? "  found real victim\n" : "");
+
+            if (i == numWays)
+            {
+                // no unlocked way found
+                PL310_DBG("  all ways locked!\n");
+
+                return PL310_CACHE_LINE_NOT_FOUND;
+                //^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            }
+
+            line_index = line_no_from_set_way(set_index, way);
+
+        }
+
+        PL310_DBG("  set=0x%x, way=0x%x\n", set_index, way); 
+
+        wayOfLastVictim = way;
+        CacheLine_PrepareForReplacement(line_index, address, ns);
+
+        return line_index;
+    }
+
+
+    /*! Support CacheLineData::read() - select an appropriate
+     *  cache line to use for the given memory read, or PL310_CACHE_LINE_NOT_FOUND if
+     *  the access misses at this cache level.
+     */
+    //--------------------------------------------------------------------------------
+        behaviour getLineForRead(pv::Transaction tx) : int //Component__PL310_L2CC::CacheLineData*
+    //--------------------------------------------------------------------------------
+    {
+        // If the cache is not enabled, don't bother searching
+        if (!Config_IsCacheEnbled())
+        {
+            PL310_DBG("disabled\n");
+            return PL310_CACHE_LINE_NOT_FOUND;
+        }
+
+        // If the line is not cacheable, don't bother searching.
+        if (!Config_IsCacheable(tx)) {
+            PL310_DBG("not cacheable\n");
+            return PL310_CACHE_LINE_NOT_FOUND;
+        }
+
+        // See if the line is already in cache.
+        int hit = getHit(tx.getAddress(), tx.isNonSecure());
+        if (CacheLine_Found(hit))
+        {
+            PL310_DBG("hit\n");
+            eventCounter.Event_XRHIT(tx);
+            return hit;
+        }
+        // If not, see if we should try allocating the line to cache.
+        if (!Config_IsReadAllocatable(tx))
+        {
+            PL310_DBG("no read allocate\n");
+            return PL310_CACHE_LINE_NOT_FOUND;
+        }
+
+        if (Config_IsExclusive(tx))
+        {
+            // Don't allocate line
+            PL310_DBG("no allocate since exclusive\n");
+            return PL310_CACHE_LINE_NOT_FOUND;
+        }
+
+        // Select a victim cache line to be replaced by the allocation.
+        int victim = getVictim(tx.getAddress(), tx.isNonSecure(), tx.isInstruction(), tx.getMasterID() & 0x7/*CpuId*/);
+        return victim;
+    }
+
+
+
+    /*! Support CacheLineData::read() - select an appropriate
+     *  cache line to use for the given memory read, or PL310_CACHE_LINE_NOT_FOUND if
+     *  the access misses at this cache level.
+     */
+    //--------------------------------------------------------------------------------
+        behaviour getLineForPrefetchReadRefill(pv::Transaction tx) : int
+    //--------------------------------------------------------------------------------
+    {
+        // The only differences to getLineForRead() are:
+        //
+        //   - Don't check for Config_IsReadAllocatable(tx)
+        //   - Check for Config_IsExclusive(tx) before calling getHit()
+        //
+
+        // If the cache is not enabled, don't bother searching
+        if (!Config_IsCacheEnbled())
+        {
+            PL310_DBG("disabled (prefetch)\n");
+            return PL310_CACHE_LINE_NOT_FOUND;
+        }
+
+        // If the line is not cacheable, don't bother searching.
+        if (!Config_IsCacheable(tx)) {
+            PL310_DBG("not cacheable (prefetch)\n");
+            return PL310_CACHE_LINE_NOT_FOUND;
+        }
+
+        if (Config_IsExclusive(tx))
+        {
+            // Don't allocate line
+            PL310_DBG("no allocate since exclusive (prefetch)\n");
+            return PL310_CACHE_LINE_NOT_FOUND;
+        }
+
+        // See if the line is already in cache.
+        int hit = getHit(tx.getAddress(), tx.isNonSecure());
+        if (CacheLine_Found(hit))
+        {
+            PL310_DBG("hit (prefetch)\n");
+            //eventCounter.Event_XRHIT(tx);
+            return PL310_CACHE_LINE_NOT_FOUND; // means do not prefetch refill this line as it is already in the cache
+        }
+        // If not, see if we should try allocating the line to cache.
+        //if (!Config_IsReadAllocatable(tx))
+        //{
+        //    PL310_DBG("no read allocate\n");
+        //    return PL310_CACHE_LINE_NOT_FOUND;
+        //}
+
+        // Select a victim cache line to be replaced by the allocation.
+        int victim = getVictim(tx.getAddress(), tx.isNonSecure(), tx.isInstruction(), tx.getMasterID() & 0x7/*CpuId*/);
+        return victim;
+    }
+
+
+
+
+    /*! Support CacheLineData::write() - select an appropriate
+     *  cache line to use for the given memory write, or PL310_CACHE_LINE_NOT_FOUND if
+     *  the access misses at this cache level.
+     */
+    //--------------------------------------------------------------------------------
+    behaviour getLineForWrite(pv::Transaction tx) : int // Component__PL310_L2CC::CacheLineData*
+    //--------------------------------------------------------------------------------
+    {
+        // If the cache is not enabled, don't bother searching
+        ///if (!enabled[ns])
+        if (!Config_IsCacheEnbled())
+        {
+            PL310_DBG("disabled\n");
+            return PL310_CACHE_LINE_NOT_FOUND;
+        }
+
+        // If the line is not cacheable, don't bother searching.
+        if (!Config_IsCacheable(tx)) {
+            PL310_DBG("not cacheable\n");
+            return PL310_CACHE_LINE_NOT_FOUND;
+        }
+
+        // See if the line is already in cache.
+        int hit = getHit(tx.getAddress(), tx.isNonSecure());
+        if (CacheLine_Found(hit))
+        {
+            PL310_DBG("hit (before shared invalidate check)\n");
+
+            // Special 'shared' behaviour: ($2.3.2)
+            // "[When the Shared Attribute Invalidate Enable bit is set]
+            //  writes targeting a full cache line and hitting in the L2 invalidate
+            //  the corresponding cache line and are forwarded to L3.
+            if (Config_SharedAttributeInvalidate(tx))
+            {
+                PL310_DBG("shared invalidate: ");
+                CacheLine_Invalidate(hit);
+
+                return PL310_CACHE_LINE_NOT_FOUND;
+            }
+
+            eventCounter.Event_DWHIT(); // Q: Is 'shared' stuff above counted?
+            return hit;
+        }
+
+        // miss
+        bool exclusive_allocate_and_set_dirty_on_user_sigs = false;
+        if (Config_IsExclusive(tx))
+        {
+            if (Config_IsEvictionFromL1(tx))
+            {
+                PL310_DBG("  exclusive_allocate_and_set_dirty_on_user_sigs=true\n");
+                exclusive_allocate_and_set_dirty_on_user_sigs = true;
+            }
+        }
+
+        // If not, see if we should try allocating the line to cache.
+        if (! exclusive_allocate_and_set_dirty_on_user_sigs && !Config_IsWriteAllocatable(tx))
+        {
+            PL310_DBG("no write allocate\n");
+            return PL310_CACHE_LINE_NOT_FOUND;
+        }
+
+            
+        // Select a victim cache line to be filled if we allocate to cache.
+        int victim = getVictim(tx.getAddress(), tx.isNonSecure(), tx.isInstruction(), tx.getMasterID() & 0x7/*CpuId*/);
+        if (CacheLine_Found(victim))
+        {
+            if (exclusive_allocate_and_set_dirty_on_user_sigs)
+            {
+                // set dirty to AWUSERSx[9]
+            }
+
+            eventCounter.Event_WA();
+        }
+        return victim;
+    }
+
+
+    //--------------------------------------------------------------------------------
+    behaviour Config_IsImpreciseWriteAbort(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        const pv::MemoryAttributes *ma = tx.getMemoryAttributes();
+        if (!ma)
+        {
+            PL310_DBG("Config_IsImpreciseWriteAbort() is false (A)\n");
+            return false;
+        }
+
+        //if ((ma->isOuterCacheable()             &&
+        //     (ma->isOuterReadAllocatable() ||
+        //      ma->isOuterWriteAllocatable())))
+        //{
+        //    PL310_DBG("Config_IsImpreciseWriteAbort() is true (B)\n");
+        //    return true;
+        //}
+        if (tx.isExclusive())
+        {
+            if (ma->isOuterCacheable()          &&
+                Config_IsShareable(tx))
+            {
+                PL310_DBG("Config_IsImpreciseWriteAbort() is true (C)\n");
+                return true;
+            }
+        }
+        else
+        {
+            if (ma->isOuterBufferable()         ||
+                ma->isOuterCacheable()          ||
+                ma->isOuterReadAllocatable()    ||
+                ma->isOuterWriteAllocatable())
+            {
+                PL310_DBG("Config_IsImpreciseWriteAbort() is true (D)\n");
+                return true;
+            }
+        }
+
+        PL310_DBG("Config_IsImpreciseWriteAbort() is false (E)\n");
+        return false;
+    }
+
+    /*! Cacheable policy. */
+    //--------------------------------------------------------------------------------
+    behaviour Config_IsCacheable(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        const pv::MemoryAttributes *ma = tx.getMemoryAttributes();
+        if (!ma)                    return false;
+        if (!ma->isOuterCacheable())  return false;
+        
+        return (ma->isOuterReadAllocatable() ||
+                ma->isOuterWriteAllocatable() ||
+                Config_IsShareable(tx));
+    }
+
+    /*! Read allocatable policy. */
+    //--------------------------------------------------------------------------------
+    behaviour Config_IsReadAllocatable(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        return tx.getMemoryAttributes() && tx.getMemoryAttributes()->isOuterReadAllocatable();
+    }
+
+    /*! Write allocatable policy. */
+    //--------------------------------------------------------------------------------
+    behaviour Config_IsWriteAllocatable(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        const pv::MemoryAttributes *ma = tx.getMemoryAttributes();
+        if (!ma)                    return false;
+
+        switch (ac_force_wa) {
+        case 0:
+            return ma->isOuterWriteAllocatable();
+     
+        case 2:
+            return (ma->isOuterWriteAllocatable() || 
+                    ma->isOuterReadAllocatable());
+        default:
+            // ac_force_wa == 1 means: no write allocation
+            return false;
+        }
+    }
+
+    /*! Write-back policy. */
+    //--------------------------------------------------------------------------------
+        behaviour Config_CanWriteBack(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        const pv::MemoryAttributes *ma = tx.getMemoryAttributes();
+        assert(ma != NULL); // Can only get here if ma is not NULL
+
+        // Transaction must be bufferable to be WriteBack.
+        if (!ma->isOuterBufferable()) return false;
+
+        // Unless it's a shared transaction, it will be WriteBack.
+        if (!Config_IsShareable(tx))  return true;
+
+        // $2.3.2: Shared only applies where AxCACHES = 001x
+        if (ma->isOuterReadAllocatable() ||
+            ma->isOuterWriteAllocatable())
+        {
+            return true;
+        }
+
+        // $2.3.2: The Shared attribute transforms Normal Memory Non-Cacheable into
+        //         [..] write through no write allocate
+        return false;
+    }
+
+
+    /*! Share-able policy. */
+    //--------------------------------------------------------------------------------
+    behaviour Config_IsShareable(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        if (ac_shared_ov != 0)   return false;
+
+        const pv::MemoryAttributes *ma = tx.getMemoryAttributes();
+        if (!ma)                 return false;
+        return (ma->isOuterShareable());
+    }
+
+    /*! Share Attribute Invalidate check: look for whole line shared writes.
+     *  See $2.3.2, p2-19.
+     */
+    //--------------------------------------------------------------------------------
+    behaviour Config_SharedAttributeInvalidate(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        // Can't be true if transaction is non-shareable
+        if (!Config_IsShareable(tx))       return false;
+
+        // Shared attribute is ignored unless AxCACHES is 001x
+        if (Config_IsWriteAllocatable(tx) ||
+            Config_IsReadAllocatable(tx))
+        {
+            return false;
+        }
+
+        // Ignore unless Shared Attribute Invalidate Enable is set
+        if (!ac_shared_inv)                return false;
+
+        // Only applies if transaction targets a full line.
+        return Config_IsTargetingFullCacheLine(tx);
+    }
+
+
+
+    /*! Exclusive policy. */
+    //--------------------------------------------------------------------------------
+    behaviour Config_IsExclusive(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        const pv::MemoryAttributes *ma = tx.getMemoryAttributes();
+        if (!ma)                 return false;
+        if (ac_exclusive != 1)   return false;
+        if (tx.isInstruction())  return false; // exclusive cache mechanism is _not_ for instruction fetches
+
+        if (!ma->isInnerBufferable()) return false;
+        if (!ma->isOuterBufferable()) return false;
+        if (!ma->isInnerCacheable())  return false;
+        if (!ma->isOuterCacheable())  return false;
+
+        return (ma->isInnerReadAllocatable() || ma->isInnerWriteAllocatable() )
+            && (ma->isOuterReadAllocatable() || ma->isOuterWriteAllocatable() );
+    }
+
+
+
+
+    /*! Exclusive - evictions from L1. */
+    //--------------------------------------------------------------------------------
+    behaviour Config_IsEvictionFromL1(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        const pv::MemoryAttributes *ma = tx.getMemoryAttributes();
+        if (!ma) return false;
+        
+        uint32_t user_flags = ma->getUserFlags();
+        
+        return PL310_UF_IS_L1_EVICTION(user_flags);  // AWUSERSx[8] == 1
+    }
+
+    /*! Exclusive - evictions from L1. */
+    //--------------------------------------------------------------------------------
+    behaviour Config_IsDirtyEvictionFromL1(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        const pv::MemoryAttributes *ma = tx.getMemoryAttributes();
+        if (!ma) return false;
+        uint32_t user_flags = ma->getUserFlags();
+        return PL310_UF_IS_L1_DIRTY_EVICTION(user_flags);  // AWUSERSx[9:8] == 0b01
+    }
+
+    /*! Exclusive - evictions from L1. */
+    //--------------------------------------------------------------------------------
+    behaviour Config_IsCleanEvictionFromL1(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        const pv::MemoryAttributes *ma = tx.getMemoryAttributes();
+        if (!ma) return false;
+        uint32_t user_flags = ma->getUserFlags();
+        return PL310_UF_IS_L1_CLEAN_EVICTION(user_flags);  // AWUSERSx[9:8] == 0b11
+    }
+
+
+    /*! Access targeting full cache line? */
+    //--------------------------------------------------------------------------------
+    behaviour Config_IsTargetingFullCacheLine(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        // We must be starting at the start of a line
+        if ((tx.getAddress() & (LineSize - 1)) != 0)  return false;
+
+        // There must be at least a full line's worth of transaction data left
+        unsigned remaining = (tx.getBurstLength() - tx.getBurstLength()) * tx.getAccessByteWidth();
+
+        return (remaining >= LineSize);
+    }
+
+
+    /*! Should this access to regbase generate a slave abort? */
+    //--------------------------------------------------------------------------------
+    behaviour Config_ShouldAbortRegisterAccess(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        if (tx.getAccessWidth() != pv::ACCESS_32_BITS)  return true;
+        if ((tx.getAddress() & 0x3) != 0)               return true;
+        if (tx.isExclusive())                           return true;
+        if (tx.getBurstLength() > 1)                    return true;
+
+        const pv::MemoryAttributes *ma = tx.getMemoryAttributes();
+        if (!ma)                                        return false;
+
+        uint32_t user_flags = ma->getUserFlags();
+        if ((user_flags & PL310VAL_UF_SPLIT_MASK) != 0) return true;
+
+        return false;
+    }
+
+
+    /*! Should this access to regbase generate a decode abort? */
+    //--------------------------------------------------------------------------------
+    behaviour Config_ShouldDecodeAbortRegisterAccess(pv::Transaction tx) : bool
+    //--------------------------------------------------------------------------------
+    {
+        bool generate_decode_abort = false;
+
+        if (tx.isNonSecure())
+        {
+            uint32_t offset = tx.getAddress() & 0x0FFF;
+
+            if ((tx.getPayload()->burst_sequence == 0)     &&
+                (((offset & 0xF00) == 0x100) ||
+                 (((offset & 0xF00) == 0x900) && false) ||
+                 ((offset & 0xF00) == 0xC00) ||
+                 ((offset & 0xF00) == 0xF00)))
+            {
+                generate_decode_abort = true;
+                PL310_DBG("  generate_decode_abort=true, offset=0x%04X\n", offset);
+            }
+
+        }
+
+        return generate_decode_abort;
+    }
+
+
+    //--------------------------------------------------------------------------------
+    behaviour cache_read(pv::ReadTransaction tx) : pv::Tx_Result
+    //--------------------------------------------------------------------------------
+    {
+        if (!cache_state_modelled)
+        {
+            return self.cache_control.passThroughRead(0/*FUTURE: out_port*/, tx);
+        }
+
+        bool has_done_passThroughRead = false;
+
+        eventCounter.Event_XRREQ(tx);
+
+        int victim = getLineForRead(tx);
+        pv::Tx_Result result(1);
+
+        if (CacheLine_Found(victim))
+        {
+            bool is_exclusive = Config_IsExclusive(tx);
+
+            PL310_DBG("%s", (!CacheLine_IsValid(victim) && is_exclusive) ? "exclusive -> not filling line data for read\n" : "");
+
+            if (!CacheLine_IsValid(victim) && !is_exclusive)
+            {
+                PL310_DBG("filling line data for read\n");
+
+                if (!Refill_FillLineData(victim, tx, result))
+                {
+                    // Something went wrong ...
+                    // result already set in Refill_FillLineData()
+
+                    return result;
+                  //^^^^^^
+                  //^^^^^^
+                }
+            }
+
+            result = self.cache_control.readFromLine(tx, victim);
+
+            if (is_exclusive && (tx.getBurstSequence() == (tx.getBurstLength() - 1)))
+            {
+                // It is important to do this only at the last beat
+                // of the burst (at least CacheLine_Invalidate())
+                // in order to get a hit for all beats.
+
+                PL310_DBG("due to exclusive config: ");
+                if (CacheLine_IsDirty(victim))
+                {
+                    CacheLine_SetPreferredForNextEviction(victim);
+                }
+                else
+                {
+                    CacheLine_Invalidate(victim);
+                }
+            }
+        }
+        else
+        {
+            // Didn't allocate line into this cache level
+            // Try getting data value from next cache level.
+
+            has_done_passThroughRead = true;
+            result = self.cache_control.passThroughRead(0/*FUTURE: out_port*/, tx);
+
+            // error handling
+            if (static_cast<int>(result._priv) != static_cast<int>(tx.readComplete()._priv))
+            {
+                if (Config_IsCacheable(tx))
+                {
+                    PL310_DBG("read through abort is imprecise\n");
+
+                    // We currently cannot distinguish DECERR from SLVERR, so DECERR is mapped to SLVERR if not PL310_VALIDATION
+#ifdef PL310_VALIDATION
+                    uint32_t user_flags = tx.getMemoryAttributes()->getUserFlags();
+                    if (user_flags & PL310VAL_UF_OVERALL_DECERR_MASK)
+                    {
+                        // DECERR
+                        Error_TriggerInterruptDecodeError();
+                    }
+                    else
+                    {
+#endif
+                        // SLVERR
+                        Error_TriggerInterruptSlaveError();
+#ifdef PL310_VALIDATION
+                    }
+#endif
+                }
+                else
+                {
+                    PL310_DBG("read through abort is precise\n");
+                }
+            }
+
+        }
+
+
+        // Prefetch handling
+        // -----------------
+        if (((ac_instprefetch && tx.isInstruction()) || (ac_dataprefetch && !tx.isInstruction())) &&  // prefetch enabled
+            (tx.getAccessBitWidth() == 64) && // DWORD
+            (tx.getBurstLength() == 4) && // AXI len == 3
+            (!tx.isLocked()) &&
+            (!tx.isExclusive()) &&
+            // not fixed burst (wrapped burst is allowed), but currently this cannot happen with PVBus
+            ((tx.getBurstSequence() == (tx.getBurstLength() - 1)) || has_done_passThroughRead)  // and last beat of a burst
+            )
+        {
+            pv::bus_addr_t prefetch_addr = (tx.getAddress() & ~0x1F) + (PrefetchOffset + 1) * 0x20;
+            uint32_t mask_64K_uint32 = ~((1 << 12) - 1);
+            bool is_not_crossing_64K_boundary = ((prefetch_addr & mask_64K_uint32) == (tx.getAddress() & mask_64K_uint32));
+
+            PL310_DBG("Prefetch handling - I:%d, D:%d, PrefetchOffset Register:%d, prefetch_addr=0x%08X, crossing 64K boundary:%s\n",
+                      (ac_instprefetch &&  tx.isInstruction()) ? 1 : 0,
+                      (ac_dataprefetch && !tx.isInstruction()) ? 1 : 0,
+                      PrefetchOffset,
+                      static_cast<uint32_t>(prefetch_addr),
+                      is_not_crossing_64K_boundary ? "no" : "yes");
+
+            if (is_not_crossing_64K_boundary)
+            {
+                pv::ReadTransaction tx_prefetch = tx.remap(prefetch_addr);
+                int line = getLineForPrefetchReadRefill(tx_prefetch);
+
+                if (CacheLine_Found(line))
+                {
+                    // refill this prefetch cache line
+                    PL310_DBG("    refill prefetch line\n");
+                    Refill_FillLineData(line, tx_prefetch, result);
+                }
+            }
+        }
+
+
+        return result;
+    }
+
+
+    //--------------------------------------------------------------------------------
+    behaviour cache_debug_read(pv::ReadTransaction tx) : pv::Tx_Result
+    //--------------------------------------------------------------------------------
+    {
+        pv::Tx_Result result;
+
+        int hit;
+
+        if (cache_state_modelled                                              &&
+            Config_IsCacheEnbled()                                            &&    // if the cache is not enabled, don't bother searching
+            CacheLine_Found(hit = getHit(tx.getAddress(), tx.isNonSecure())))       // see if the line is already in cache
+        {
+            // Now copy according data from cache line to the read transaction
+            //const char* line_data8 = self.cache_control.getLineContentsForRead(hit);
+            char* line_data8 = self.cache_control.getLineContentsForWrite(hit);
+            pv::bus_addr_t line_base_addr = tx.getAddress() & LineBaseMask;
+            uint8_t addr_offset8 = tx.getAddress() - line_base_addr;
+            switch (tx.getAccessWidth())
+            {
+            case pv::ACCESS_8_BITS:
+                PL310_DBG("setReturnData8(0x%02X)\n", line_data8[addr_offset8]);
+                tx.setReturnData8(line_data8[addr_offset8]);
+                break;
+            case pv::ACCESS_16_BITS:
+                PL310_DBG("setReturnData16(0x%04X)\n", *reinterpret_cast<uint16_t*>(&line_data8[addr_offset8]));
+                tx.setReturnData16(*reinterpret_cast<uint16_t*>(&line_data8[addr_offset8]));
+                break;
+            case pv::ACCESS_32_BITS:
+                PL310_DBG("setReturnData32(0x%08X)\n", *reinterpret_cast<uint32_t*>(&line_data8[addr_offset8]));
+                tx.setReturnData32(*reinterpret_cast<uint32_t*>(&line_data8[addr_offset8]));
+                break;
+            case pv::ACCESS_64_BITS:
+                PL310_DBG("setReturnData64(0x%016llX)\n", *reinterpret_cast<unsigned long long*>(&line_data8[addr_offset8]));
+                tx.setReturnData64(*reinterpret_cast<uint64_t*>(&line_data8[addr_offset8]));
+                break;
+            default:
+                break;
+            }
+
+            result = tx.readComplete();
+            
+        }
+        else
+        {
+            // Not in cache
+            // Try getting data value from next cache level.
+            result = self.cache_control.passThroughRead(0/*FUTURE: out_port*/, tx);
+        }
+
+        return result;
+    }
+
+
+    //--------------------------------------------------------------------------------
+    behaviour cache_write(pv::WriteTransaction tx) : pv::Tx_Result
+    //--------------------------------------------------------------------------------
+    {
+        if (!cache_state_modelled)
+        {
+            return self.cache_control.passThroughWrite(0/*FUTURE: out_port*/, tx);
+        }
+
+
+        eventCounter.Event_DWREQ();
+
+
+        int victim = getLineForWrite(tx);
+
+        pv::Tx_Result result = tx.writeComplete();
+
+        if (CacheLine_Found(victim))
+        {
+            if (!CacheLine_IsValid(victim))
+            {
+                PL310_DBG("filling line data for write merge\n");
+                if (!Refill_FillLineData(victim, tx, result))
+                {
+                    // Something went wrong ...
+                    PL310_DBG("refill failed -> OKAY resp\n");
+
+                    // refill failed
+                    result = tx.writeComplete();
+
+                  //---------------
+                    return result; // do not write to memory
+                  //---------------
+                }
+            }
+        }
+
+        if (!CacheLine_Found(victim))
+        {
+            PL310_DBG("writethrough (no hit)\n");
+            // Didn't hit/allocate in this cache level
+            // Try getting data value from next cache level.
+            result = self.cache_control.passThroughWrite(0/*FUTURE: out_port*/, tx);
+
+            // error handling
+            if (static_cast<int>(result._priv) != static_cast<int>(tx.writeComplete()._priv))
+            {
+                if (Config_IsImpreciseWriteAbort(tx))
+                {
+                    PL310_DBG("writethrough (no hit) abort is imprecise\n");
+
+                    // We currently cannot distinguish DECERR from SLVERR, so DECERR is mapped to SLVERR if not PL310_VALIDATION
+#ifdef PL310_VALIDATION
+                    uint32_t user_flags = tx.getMemoryAttributes()->getUserFlags();
+                    if (user_flags & PL310VAL_UF_OVERALL_DECERR_MASK)
+                    {
+                        // DECERR
+                        Error_TriggerInterruptDecodeError();
+                    }
+                    else
+                    {
+#endif
+                        // SLVERR
+                        Error_TriggerInterruptSlaveError();
+#ifdef PL310_VALIDATION
+                    }
+#endif
+                    result = tx.writeComplete(); // imprecise, return with OK
+                }
+                else
+                {
+                    PL310_DBG("writethrough (no hit) abort is precise\n");
+                }
+            }
+        }
+        else
+        {
+            assert(CacheLine_IsValid(victim));
+        
+            if (Config_CanWriteBack(tx))
+            {
+                PL310_DBG("writeback - addr=0x%08X, victim=%d, data=0x%016llX\n", uint32_t(tx.getAddress()), victim, (unsigned long long)tx.getData64());
+
+                // exclusive cache?
+                if (Config_IsExclusive(tx) && Config_IsCleanEvictionFromL1(tx))
+                {
+                    PL310_DBG("exclusive clean eviction -> don't change dirty flag\n");
+                }
+                else
+                {
+                    CacheLine_SetDirty(victim);
+                }
+
+                result = self.cache_control.writeToLine(tx, victim);
+            }
+            else
+            {
+                PL310_DBG("writethrough\n");
+
+                // since we have a cache line we need to fill that + doing write through
+                CacheLine_SetDirty(victim);
+
+                result = self.cache_control.writeToLineAndPassThrough(tx, victim, 0 /*FUTURE: out_port*/);
+            }
+        }
+        return result;
+    }
+
+
+    /*! If there is a cache hit the data is written to the according cache line.
+     *  The data is always also forwarded to L3.
+     */
+    //--------------------------------------------------------------------------------
+    behaviour cache_debug_write(pv::WriteTransaction tx) : pv::Tx_Result
+    //--------------------------------------------------------------------------------
+    {
+        // If the cache is not enabled, don't bother searching
+        if (cache_state_modelled && Config_IsCacheEnbled())
+        {
+            // see if the line is already in cache
+            int hit = getHit(tx.getAddress(), tx.isNonSecure());
+
+            if (CacheLine_Found(hit))
+            {
+
+                // Now copy according data from the write transaction to cache line
+                char *wptr = self.cache_control.getLineContentsForWrite(hit);
+                pv::bus_addr_t line_base_addr = tx.getAddress() & LineBaseMask;
+                uint8_t addr_offset8 = tx.getAddress() - line_base_addr;
+                switch (tx.getAccessWidth())
+                {
+                case pv::ACCESS_8_BITS:
+                    wptr[addr_offset8] = tx.getData8();
+                    //PL310_DBG("setCacheData8(0x%02X)\n", wptr[addr_offset8]);
+                    break;
+                case pv::ACCESS_16_BITS:
+                    *reinterpret_cast<uint16_t*>(&wptr[addr_offset8]) = tx.getData16();
+                    //PL310_DBG("setCacheData16(0x%04X)\n", *reinterpret_cast<uint16_t*>(&wptr[addr_offset8]));
+                    break;
+                case pv::ACCESS_32_BITS:
+                    *reinterpret_cast<uint32_t*>(&wptr[addr_offset8]) = tx.getData32();
+                    //PL310_DBG("setCacheData32(0x%08X)\n", *reinterpret_cast<uint32_t*>(&wptr[addr_offset8]));
+                    break;
+                case pv::ACCESS_64_BITS:
+                    *reinterpret_cast<uint64_t*>(&wptr[addr_offset8]) = tx.getData64();
+                    //PL310_DBG("setCacheData64(0x%016llX)\n", *reinterpret_cast<uint64_t*>(&wptr[addr_offset8]));
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+
+        // Forward request to next L3
+        return self.cache_control.passThroughWrite(0/*FUTURE: out_port*/, tx);
+    }
+
+} // end of component

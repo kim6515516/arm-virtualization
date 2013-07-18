@@ -1,0 +1,89 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+ 
+ component VEDaughterBoardCortex_R5x1
+ {
+     properties
+     {
+         version = "8.1.37";
+         component_type = "System";
+         description = "Cortex-R5x1 DaughterBoard for Versatile Express";
+     }
+     
+     composition
+     {
+         clockdivider : ClockDivider("mul"=100000000);
+         clockCLCD : ClockDivider("mul"=23750000);
+         pl111_clcd : PL111_CLCD();
+         core : ARMCortexR5x1CT();
+         pvbusdecoder : PVBusDecoder();
+         pl310_l2cc : PL310_L2CC("REGFILEBASE"=0xAE00A000);
+         dram : RAMDevice("size"=0x40000000);
+         veinterruptmapper : VEInterruptMapper();
+         pl390_gic : PL390_GIC("NUM_CPU"=1,"NUM_SGI"=2,"NUM_PPI"=16,"NUM_SPI"=128);
+     }
+     
+     connection
+     {
+         clockCLCD.clk_out => pl111_clcd.clk_in;
+         self.clk_in => clockCLCD.clk_in;
+         self.clk_in => clockdivider.clk_in;
+         clockdivider.clk_out => core.clk_in;
+         core.ticks[0] => self.ticks[0];
+
+         core.pvbus_m => pvbusdecoder.pvbus_s;
+         pl111_clcd.pvbus_m => pvbusdecoder.pvbus_s;
+         
+         pvbusdecoder.pvbus_m_range[0x00000000..0xFFFFFFFF] => pl310_l2cc.pvbus_s;
+         pvbusdecoder.pvbus_m_range[0x00000000..0x3FFFFFFF] => dram.pvbus;
+         pvbusdecoder.pvbus_m_range[0xAE000000..0xAE000FFF] => pl390_gic.pvbus_cpu;
+         pvbusdecoder.pvbus_m_range[0xAE001000..0xAE001FFF] => pl390_gic.pvbus_distributor;
+         pvbusdecoder.pvbus_m_range[0xA0000000..0xA0010000] => pl111_clcd.pvbus;
+         
+         pl310_l2cc.pvbus_m => self.pvbus_m0;
+
+         self.interrupts => veinterruptmapper.irq_in;
+         pl111_clcd.intr => veinterruptmapper.irq_in[14];
+
+         pl310_l2cc.DECERRINTR => veinterruptmapper.irq_in[16];
+         pl310_l2cc.ECNTRINTR => veinterruptmapper.irq_in[16];
+         pl310_l2cc.ERRRDINTR => veinterruptmapper.irq_in[16];
+         pl310_l2cc.ERRRTINTR => veinterruptmapper.irq_in[16];
+         pl310_l2cc.ERRWDINTR => veinterruptmapper.irq_in[16];
+         pl310_l2cc.SLVERRINTR => veinterruptmapper.irq_in[16];
+         pl310_l2cc.PARRTINTR => veinterruptmapper.irq_in[16];
+         pl310_l2cc.PARRDINTR => veinterruptmapper.irq_in[16];
+         pl310_l2cc.L2CCINTR => veinterruptmapper.irq_in[16];
+         pl310_l2cc.ERRWTINTR => veinterruptmapper.irq_in[16];
+         
+         veinterruptmapper.irq_out[0] => pl390_gic.spi[0];
+         veinterruptmapper.irq_out[1] => pl390_gic.spi[1];
+         veinterruptmapper.irq_out[2] => pl390_gic.spi[2];
+         veinterruptmapper.irq_out[3] => pl390_gic.spi[3];
+         veinterruptmapper.irq_out[4] => pl390_gic.spi[4];
+         veinterruptmapper.irq_out[5] => pl390_gic.spi[64];  // UART0
+         veinterruptmapper.irq_out[6] => pl390_gic.spi[65];  // UART1
+         veinterruptmapper.irq_out[7] => pl390_gic.spi[66];  // UART2
+         veinterruptmapper.irq_out[8] => pl390_gic.spi[67];  // UART3
+         veinterruptmapper.irq_out[9] => pl390_gic.spi[9];
+         veinterruptmapper.irq_out[10] => pl390_gic.spi[10];
+         veinterruptmapper.irq_out[11] => pl390_gic.spi[11];
+         veinterruptmapper.irq_out[12] => pl390_gic.spi[12];
+         veinterruptmapper.irq_out[13] => pl390_gic.spi[13];
+         veinterruptmapper.irq_out[14] => pl390_gic.spi[44]; // PL111 CLCD
+         veinterruptmapper.irq_out[15] => pl390_gic.spi[15];
+         veinterruptmapper.irq_out[16] => pl390_gic.spi[43]; // PL310 Combined interrupt
+         
+         pl390_gic.nirq[0] => core.irq[0];
+         pl390_gic.nfiq[0] => core.fiq[0];
+         
+         pl111_clcd.display => self.mmb;
+     }
+     
+     slave port<ClockSignal> clk_in;
+     slave port<Signal> interrupts[48];
+     master port<PVBus> pvbus_m0;
+     master port<InstructionCount> ticks[1];
+     master port<LCD> mmb;
+ }

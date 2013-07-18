@@ -1,0 +1,16 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ */
+
+extern component PVBusLogger
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "A PVBusLogger has a slave and a master port and traffic is passed straight through.  All traffic is logged using an MTI trace event.";
+    }
+
+    slave port<PVBus> pvbus_s;
+    master port<PVBus> pvbus_m;
+}

@@ -1,0 +1,101 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component EBCortexA9UPCoreTile
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "CortexA9UP Core Tile for Emulation Baseboard.";
+    }
+    composition
+    {
+        pl310_l2cc : PL310_L2CC();
+        periph_clockdivider : ClockDivider(div=2,mul=1);
+        pl390_gic : PL390_GIC("NUM_CPU"=1,"NUM_SPI"=32,"NUM_PRIORITY_LEVELS"=32,"ENABLE_PPI_EDGE"=1);
+        ebinterruptreceiver : EBInterruptReceiver();
+        clockdivider : ClockDivider(div=24,mul=100);
+        pvbusdecoder : PVBusDecoder();
+        connector : EBConnector();
+        core : ARMCortexA9UPCT();
+        ebcortexa9_sysregs : EBCortexA9_SysRegs();
+    }
+    connection
+    {
+        core.ticks[0] => self.ticks;
+        connector.connector => self.hdr;
+        core.pvbus_m0 => pvbusdecoder.pvbus_s;
+        pl390_gic.nirq[0] => core.irq[0];
+        pl390_gic.nfiq[0] => core.fiq[0];
+        clockdivider.clk_out => core.clk_in;
+        clockdivider.clk_out => periph_clockdivider.clk_in;
+        connector.intr_num => ebinterruptreceiver.int_num;
+        connector.intr => ebinterruptreceiver.int_in;
+        connector.clk_bus => clockdivider.clk_in;
+        pl310_l2cc.pvbus_m => connector.pvbus;
+        pvbusdecoder.pvbus_m_range[0x0..0xffffffff] => pl310_l2cc.pvbus_s;   // map the whole array!
+        pvbusdecoder.pvbus_m_range[0x10041000..0x10041fff] => pl390_gic.pvbus_distributor;
+        pvbusdecoder.pvbus_m_range[0x10040000..0x10040fff] => pl390_gic.pvbus_cpu;
+        connector.sysreg_overrides => ebcortexa9_sysregs.sysreg_overrides;
+        ebcortexa9_sysregs.reset_core[0] => core.reset;
+        connector.reset_coretile => ebcortexa9_sysregs.reset_in;
+        // connector.reset_coretile => pl390_gic.reset_in; // DE454669 has to be fixed for using this connection
+        // connector.reset_coretile => core.reset; // DE454669 has to be fixed for using this connection
+        ebcortexa9_sysregs.reset_out => connector.reset_board;
+        ebcortexa9_sysregs.reset_out => pl390_gic.reset_in;
+
+        ebinterruptreceiver.int_out[16] => pl390_gic.ppi_c0[0];
+        ebinterruptreceiver.int_out[17] => pl390_gic.ppi_c0[1];
+        ebinterruptreceiver.int_out[18] => pl390_gic.ppi_c0[2];
+        ebinterruptreceiver.int_out[19] => pl390_gic.ppi_c0[3];
+        ebinterruptreceiver.int_out[20] => pl390_gic.ppi_c0[4];
+        ebinterruptreceiver.int_out[21] => pl390_gic.ppi_c0[5];
+        ebinterruptreceiver.int_out[22] => pl390_gic.ppi_c0[6];
+        ebinterruptreceiver.int_out[23] => pl390_gic.ppi_c0[7];
+        ebinterruptreceiver.int_out[24] => pl390_gic.ppi_c0[8];
+        ebinterruptreceiver.int_out[25] => pl390_gic.ppi_c0[9];
+        ebinterruptreceiver.int_out[26] => pl390_gic.ppi_c0[10];
+        ebinterruptreceiver.int_out[27] => pl390_gic.ppi_c0[11];
+        ebinterruptreceiver.int_out[28] => pl390_gic.ppi_c0[12];
+        ebinterruptreceiver.int_out[29] => pl390_gic.ppi_c0[13];
+        ebinterruptreceiver.int_out[30] => pl390_gic.ppi_c0[14];
+        ebinterruptreceiver.int_out[31] => pl390_gic.ppi_c0[15];
+
+        ebinterruptreceiver.int_out[32] => pl390_gic.spi[0];
+        ebinterruptreceiver.int_out[33] => pl390_gic.spi[1];
+        ebinterruptreceiver.int_out[34] => pl390_gic.spi[2];
+        ebinterruptreceiver.int_out[35] => pl390_gic.spi[3];
+        ebinterruptreceiver.int_out[36] => pl390_gic.spi[4];
+        ebinterruptreceiver.int_out[37] => pl390_gic.spi[5];
+        ebinterruptreceiver.int_out[38] => pl390_gic.spi[6];
+        ebinterruptreceiver.int_out[39] => pl390_gic.spi[7];
+        ebinterruptreceiver.int_out[40] => pl390_gic.spi[8];
+        ebinterruptreceiver.int_out[41] => pl390_gic.spi[9];
+        ebinterruptreceiver.int_out[42] => pl390_gic.spi[10];
+        ebinterruptreceiver.int_out[43] => pl390_gic.spi[11];
+        ebinterruptreceiver.int_out[44] => pl390_gic.spi[12];
+        ebinterruptreceiver.int_out[45] => pl390_gic.spi[13];
+        ebinterruptreceiver.int_out[46] => pl390_gic.spi[14];
+        ebinterruptreceiver.int_out[47] => pl390_gic.spi[15];
+        ebinterruptreceiver.int_out[48] => pl390_gic.spi[16];
+        ebinterruptreceiver.int_out[49] => pl390_gic.spi[17];
+        ebinterruptreceiver.int_out[50] => pl390_gic.spi[18];
+        ebinterruptreceiver.int_out[51] => pl390_gic.spi[19];
+        ebinterruptreceiver.int_out[52] => pl390_gic.spi[20];
+        ebinterruptreceiver.int_out[53] => pl390_gic.spi[21];
+        ebinterruptreceiver.int_out[54] => pl390_gic.spi[22];
+        ebinterruptreceiver.int_out[55] => pl390_gic.spi[23];
+        ebinterruptreceiver.int_out[56] => pl390_gic.spi[24];
+        ebinterruptreceiver.int_out[57] => pl390_gic.spi[25];
+        ebinterruptreceiver.int_out[58] => pl390_gic.spi[26];
+        ebinterruptreceiver.int_out[59] => pl390_gic.spi[27];
+        ebinterruptreceiver.int_out[60] => pl390_gic.spi[28];
+        ebinterruptreceiver.int_out[61] => pl390_gic.spi[29];
+        ebinterruptreceiver.int_out[62] => pl390_gic.spi[30];
+        ebinterruptreceiver.int_out[63] => pl390_gic.spi[31];
+    }
+    master port<InstructionCount> ticks;
+    master port<CompoundPortLisa> hdr;
+}

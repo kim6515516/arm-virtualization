@@ -1,0 +1,992 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// LISA Implementation of PL180 Multimedia Card Interface
+// For details on this PrimeCell, see ARM DDI0172A
+
+component PL180_MCI
+{
+properties
+{
+    version = "8.1.37";
+    component_type = "Peripheral";
+    description = "ARM PrimeCell Multimedia Card Interface (PL180)";
+    documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+}
+
+includes
+{
+#define PL180_ERROR           if (!0) ; else printf
+#define PL180_INTERRUPTS      if (!0) ; else printf
+#define PL180_TRACE           if (!0) ; else printf
+#define PL180_DEBUG           if (!0) ; else printf
+#define PL180_DEBUG_REGISTERS if (!0) ; else printf
+#define PL180_DEBUG_READ      if (!0) ; else printf
+#define PL180_DEBUG_WRITE     if (!0) ; else printf
+}
+
+composition
+{
+busslave : PVBusSlave(size = 0x1000);
+}
+
+connection
+{
+    self.pvbus => busslave.pvbus_s;
+    busslave.device => self.device;
+}
+
+resources
+{
+    // debugger visible registers
+    REGISTER { description("Power control register"), reg_number(0x000),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(8)              } MCIPower;
+    REGISTER { description("Clock control register"), reg_number(0x004),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(16)                } MCIClock;
+    REGISTER { description("Argument register"),      reg_number(0x008),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(32)             } MCIArgument;
+    REGISTER { description("Command register"),       reg_number(0x00C),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(16)             } MCICommand;
+    REGISTER { description("Response command register"), reg_number(0x010),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)             } MCIRespCmd;
+    REGISTER { description("Response register"),         reg_number(0x014),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(32)             } MCIResponse0;
+    REGISTER { description("Response register"),         reg_number(0x018),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(32)             } MCIResponse1;
+    REGISTER { description("Response register"),         reg_number(0x01C),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(32)             } MCIResponse2;
+    REGISTER { description("Response register"),         reg_number(0x020),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(32)             } MCIResponse3;
+    REGISTER { description("Data timer"),                reg_number(0x024),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(32)             } MCIDataTimer;
+    REGISTER { description("Data length register"),      reg_number(0x028),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(16)             } MCIDataLength;
+    REGISTER { description("Data control register"),     reg_number(0x02C),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)             } MCIDataCtrl;
+    REGISTER { description("Data counter"),              reg_number(0x030),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(16)             } MCIDataCnt;
+    REGISTER { description("Status register"),           reg_number(0x034),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(32)             } MCIStatus;
+    REGISTER { description("Clear register"),            reg_number(0x038),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(16)             } MCIClear;
+    REGISTER { description("Interrupt 0 mask register"), reg_number(0x03C),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(32)             } MCIMask0;
+    REGISTER { description("Interrupt 1 mask register"), reg_number(0x040),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(32)             } MCIMask1;
+    REGISTER { description("SD card select register"),   reg_number(0x044),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)             } MCISelect;
+    REGISTER { description("FIFO counter"),              reg_number(0x048),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(16)             } MCIFifoCnt;
+
+    REGISTER { description("Data FIFO register"),        reg_number(0x080),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth(32)             } MCIFIFO;
+
+    // ID registers
+    REGISTER { description("Peripheral ID bits 7:0"),    reg_number(0xFE0),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)              } MCIPeriphID0;
+    REGISTER { description("Peripheral ID bits 8:15"),   reg_number(0xFE4),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)              } MCIPeriphID1;
+    REGISTER { description("Peripheral ID bits 23:16"),  reg_number(0xFE8),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)              } MCIPeriphID2;
+    REGISTER { description("Peripheral ID bits 31:24"),  reg_number(0xFEC),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)              } MCIPeriphID3;
+    REGISTER { description("PrimeCell ID bits 7:0"),     reg_number(0xFF0),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)              } MCIPCellID0;
+    REGISTER { description("PrimeCell ID bits 8:15"),    reg_number(0xFF4),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)              } MCIPCellID1;
+    REGISTER { description("PrimeCell ID bits 23:16"),   reg_number(0xFF8),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)              } MCIPCellID2;
+    REGISTER { description("PrimeCell ID bits 31:24"),   reg_number(0xFFC),
+        read_function(debug_read), write_function(debug_write),
+        display_format("hex"), bitwidth( 8)              } MCIPCellID3;
+
+
+    // Internal state
+    uint8_t stat_CmdSent;
+    uint8_t stat_CmdTimeOut;
+    uint8_t stat_CmdRespEnd;
+    uint8_t stat_DataEnd;
+    uint8_t stat_DataBlockEnd;
+
+    uint8_t        *tx_addr;
+    const uint8_t  *rx_addr;
+    uint32_t        transfer_len;  // These members reflect state of the MMC-facing
+    uint32_t        transfer_idx;  // current transfer
+
+    bool            receiving;     // flag to indicate that receive is in process
+    // (this is the status register RxActive bit, and is true when the data path
+    // state machine is in the WAIT_R or RECEIVE states.)
+    bool            transmitting;  // flag to indicate that receive is in process
+    // (set after first Tx call from MMC card)
+
+    uint32_t  data_ctrl_len;
+    uint32_t nrread;
+    bool doTrace;
+
+    enum {
+        MCIStatus_STATIC_MASK  = ((1<<11)-1),
+        MCIStatus_CMDCRCFAIL_BIT     = 0,
+        MCIStatus_DATACRCFAIL_BIT    = 1,
+        MCIStatus_CMDTIMEOUT_BIT     = 2,
+        MCIStatus_DATATIMEOUT_BIT    = 3,
+        MCIStatus_TXUNDERRUN_BIT     = 4,
+        MCIStatus_RXOVERRUN_BIT      = 5,
+        MCIStatus_CMDRESPEND_BIT     = 6,
+        MCIStatus_CMDSENT_BIT        = 7,
+        MCIStatus_DATAEND_BIT        = 8,
+        MCIStatus_STARTBITERROR_BIT  = 9,
+        MCIStatus_DATABLOCKEND_BIT   = 10,
+
+        MCIStatus_TXACTIVE_BIT       = 12,
+        MCIStatus_RXACTIVE_BIT       = 13,
+        MCIStatus_TXFIFOHALFEMPTY_BIT = 14, // (TXFIFOHALFFULL_BIT)
+        MCIStatus_RXFIFOHALFFULL_BIT = 15,
+        MCIStatus_TXFIFOFULL_BIT     = 16,
+        MCIStatus_RXFIFOFULL_BIT     = 17,
+        MCIStatus_TXFIFOEMPTY_BIT    = 18,
+        MCIStatus_RXFIFOEMPTY_BIT    = 19,
+        MCIStatus_TXDATAAVAIL_BIT    = 20,
+        MCIStatus_RXDATAAVAIL_BIT    = 21,
+
+    }; // MCIStatus register defines
+
+    enum {
+        MCI_FIFOSIZE     = 16,
+        MCI_FIFOHALFSIZE = 8,
+    };
+
+    enum {
+        MCIDataCtrl_MASK            = 0xff,
+        MCIDataCtrl_EN_MASK         = (1     ),
+        MCIDataCtrl_DIR_MASK        = (1  <<1),
+        MCIDataCtrl_MODE_MASK       = (1  <<2),
+        MCIDataCtrl_DMA_MASK        = (1  <<3),
+        MCIDataCtrl_BLOCKSIZE_MASK  = (0xf<<4),
+    };
+
+    sg::Signal::State MCIINTR_int[2];
+
+} // end resources
+
+
+/********************
+ * Behavior Section
+ ********************/
+behavior init_id_registers()
+{
+    MCIPCellID0    = 0x80;
+    MCIPCellID1    = 0x11;
+    MCIPCellID2    = 0x04;
+    MCIPCellID3    = 0x00;
+
+    MCIPeriphID0   = 0x0d;
+    MCIPeriphID1   = 0xF0;
+    MCIPeriphID2   = 0x05;
+    MCIPeriphID3   = 0xB1;
+}
+
+behavior init()
+{
+    composition.init();
+    init_id_registers();
+
+    MCIStatus = 0;
+    doTrace = true;
+    common_reset();
+}
+
+behavior reset(int level)
+{
+    composition.reset(level);
+    common_reset();
+}
+
+behaviour common_reset()
+{
+    // registers
+    init_id_registers();
+    MCIPower      = 0;
+    MCIClock      = 0;
+    MCIArgument   = 0;
+    MCICommand    = 0;
+    MCIRespCmd    = 0;
+    MCIResponse0  = 0;
+    MCIResponse1  = 0;
+    MCIResponse2  = 0;
+    MCIResponse3  = 0;
+    MCIDataTimer  = 0;
+    MCIDataLength = 0;
+    MCIDataCtrl   = 0;
+    MCIDataCnt    = 0;
+    // MCIStatus is updated by update_static_status below
+    MCIClear      = 0;
+    MCIMask0      = 0;
+    MCIMask1      = 0;
+    MCISelect     = 0;
+    MCIFifoCnt    = 0;
+    MCIFIFO       = 0;
+
+    // reset data state
+    tx_addr      = (uint8_t *)       0;
+    rx_addr      = (const uint8_t *) 0;
+    receiving    = false;
+    transmitting = false;
+
+    transfer_len = 0;
+    transfer_idx = 0;
+
+    // state
+    stat_CmdSent    = 0;
+    stat_CmdTimeOut = 0;
+    stat_CmdRespEnd = 0;
+    stat_DataEnd    = 0;
+    stat_DataBlockEnd = 0;
+
+    MCIINTR_int[0] = sg::Signal::Clear;
+    MCIINTR_int[1] = sg::Signal::Clear;
+
+    // Must be after tx/rx data state is reset
+    update_status(true); // Update static, sets interrupt lines
+
+    PL180_TRACE("%s:%d %s() common_reset done\n", __FILE__, __LINE__, __FUNCTION__);
+}
+
+// External ports
+
+master port <Signal>  MCIINTR[2];
+
+master port <MMC_Protocol> mmc_m
+{
+    // These behaviours initialize state for transfers
+    // Updated state affects dynamic state register bits: see merge_dynamic_status()
+    // See write_word_to_mmc() / read_word_from_mmc() for actual transfers
+
+    behaviour Rx(const uint8_t *block, uint32_t len) : bool
+    {
+        if (transfer_len != 0)
+        {
+            // (if we're already transferring, the previous transaction is assumed void)
+            PL180_ERROR("%s: MMC requested Rx  while another transfer is in process "
+                    "(Rx %p, Tx %p, len %u, idx=%u).\n",
+                    getInstanceName().c_str(), rx_addr, tx_addr, transfer_len, transfer_idx);
+        }
+        receiving     = true;
+        rx_addr       = block;
+        transfer_len  = (len+3)/4;
+        transfer_idx  = 0;
+        PL180_DEBUG_READ("%s:%d %s() new transfer_len=0x%08X\n", __FILE__, __LINE__, __FUNCTION__, transfer_len);
+        update_status(true);  // Update dynamic status only and interrupts
+        return true;
+    }
+
+    behavior Tx(uint8_t *block, uint32_t len) : bool
+    {
+        PL180_DEBUG_WRITE("%s: Card called Tx with %p[%u].(MCIDataCtrl & MCIDataCtrl_EN_MASK)=0x%08x (MCIDataCtrl & MCIDataCtrl_DIR_MASK)=0x%08X MCIDataCtrl=0x%08X\n",
+                getInstanceName().c_str(), block, len
+                , (MCIDataCtrl & MCIDataCtrl_EN_MASK)
+                , (MCIDataCtrl & MCIDataCtrl_DIR_MASK)
+                , MCIDataCtrl);
+        if (transfer_len != 0)
+        {
+            // (if we're already transferring, the previous transaction is assumed void)
+            PL180_ERROR("%s: MMC requested Tx while another transfer is in process "
+                    "(Rx %p, Tx %p, len %u) new: Tx=%p.\n",
+                    getInstanceName().c_str(), rx_addr, tx_addr, transfer_len, block);
+        }
+        transmitting  = true;
+        tx_addr       = block;
+        transfer_len  = (len+3)/4;
+        transfer_idx  = 0;
+        update_status(true); // Update dynamic status only and interrupts
+        return true;
+    }
+}
+
+// Data transfer routines -- fake the FIFO by reading directly from the MMC data block
+behavior read_word_from_mmc(void) : uint32_t
+{
+    uint32_t ret;
+    if (receiving && transfer_len)
+    {
+        stat_DataBlockEnd = 0; // default: block end not yet reached
+        if (transfer_idx == 0)
+        {
+            PL180_DEBUG_READ("%s:%d %s() read_word_from_mmc() starting receiving for address %p \n"
+                    , __FILE__, __LINE__, __FUNCTION__, rx_addr);
+        }
+        ret = ((uint32_t*)rx_addr)[transfer_idx++];
+
+        MCIDataCnt -= 4;
+
+        // Check if we've run out of data
+        if (MCIDataCnt == 0) stat_DataEnd = 1;
+
+        // We've read a word from the FIFO
+        if (MCIFifoCnt > 0) MCIFifoCnt--;
+
+        if (transfer_idx >= transfer_len)
+        {
+            PL180_DEBUG_READ("%s:%d %s()  rx_addr=%p block transferred\n", __FILE__, __LINE__, __FUNCTION__, rx_addr);
+            receiving = false;
+            rx_addr = 0;
+            transfer_len = 0;
+            stat_DataBlockEnd = 1; // bit is set when controller has written block to card
+            mmc_m.Rx_rdy();
+        }
+
+        // Dynamic flags may need to be updated because of the FIFO read
+        // and static ones for stat_DataBlockEnd above.
+        update_status(true);
+
+        return ret;
+    }
+
+    // Errored transfer
+    // (Controller tried to read more data than was in the FIFO?)
+    PL180_ERROR("%s: Host requested data with Rx FIFO empty.\n", getInstanceName().c_str());
+    return 0xdeaddead;
+}
+
+// Data transfer routines -- fake the FIFO by writing directly to the MMC data block
+behavior write_word_to_mmc(uint32_t data)
+{
+    if (transmitting)
+    {
+        stat_DataBlockEnd = 0; // default: block end not yet reached
+        PL180_DEBUG_WRITE("%s: write_word_to_mmc tx_addr[%4d] = 0x%08X transfer_len=%4d MCIDataCnt=%d\n"
+                , getInstanceName().c_str(), transfer_idx, data, transfer_len, MCIDataCnt - 4);
+
+        ((uint32_t *) tx_addr)[transfer_idx++] = data;
+        MCIDataCnt -= 4;
+
+        // Check if we've run out of data
+        if (MCIDataCnt == 0) stat_DataEnd = 1;
+
+        // We've read a word from the FIFO
+        if (MCIFifoCnt > 0) MCIFifoCnt--;
+
+        if (transfer_idx >= transfer_len)
+        {
+            PL180_DEBUG_WRITE("%s: write_word_to_mmc() finished transmitting\n", getInstanceName().c_str());
+            transmitting = false;
+            tx_addr = 0;
+            transfer_len = 0;
+            stat_DataBlockEnd = 1; // bit is set when controller has written block to card
+            mmc_m.Tx_done();
+        }
+
+        // Dynamic flags may need to be updated because of the FIFO read
+        // and static ones for stat_DataBlockEnd above.
+        update_status(true);
+
+        return;
+    }
+
+    // Errored transfer
+    // (Controller tried to read more data than was in the FIFO?)
+    PL180_ERROR("%s: Host requested data with Tx FIFO full.\n", getInstanceName().c_str());
+}
+
+slave  port<PVBus> pvbus;
+
+internal slave port<PVDevice> device
+{
+    // Pass on read/write requests to registerRead()/registerWrite().
+    behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+    {
+        if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+
+        // Always do an aligned 32-bit read and let the bus extract the appropriate data
+        return tx.setReturnData32(registerRead(tx.getAddress() & ~3));
+    }
+
+    behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+    {
+        if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned())
+            return tx.generateAbort();
+
+        registerWrite(tx.getAddress(),tx.getData32());
+        return tx.writeComplete();
+    }
+
+    behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+    {
+        return device.read(tx);
+    }
+    
+    behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+    {
+        return device.write(tx);
+    }        
+} // end of the internal device port
+
+
+//
+// State machine updates
+//
+
+// Updates status, and sets interrupts if necessary
+behavior update_status(bool update_static)
+{
+    if (update_static)
+        update_static_status();
+
+    merge_dynamic_status();
+    update_intr(0, MCIStatus & MCIMask0);
+    update_intr(1, MCIStatus & MCIMask1);
+}
+
+behavior clear_status(uint32_t bits)
+{
+    //PL180_TRACE("%s:%d %s() \n", __FILE__, __LINE__, __FUNCTION__);
+
+    if (bits & (1<<MCIStatus_CMDTIMEOUT_BIT))    stat_CmdTimeOut   = 0;
+    if (bits & (1<<MCIStatus_CMDRESPEND_BIT))    stat_CmdRespEnd   = 0;
+    if (bits & (1<<MCIStatus_CMDSENT_BIT))       stat_CmdSent      = 0;
+    if (bits & (1<<MCIStatus_DATAEND_BIT))       stat_DataEnd      = 0;
+    if (bits & (1<<MCIStatus_DATABLOCKEND_BIT))  stat_DataBlockEnd = 0;
+
+    update_static_status();
+    merge_dynamic_status();
+
+    update_intr(0, MCIStatus & MCIMask0);
+    update_intr(1, MCIStatus & MCIMask1);
+}
+
+
+
+// clear dynamic bits from stored status,
+// and update them
+behavior merge_dynamic_status(void)
+{
+    MCIStatus = MCIStatus & (MCIStatus_STATIC_MASK);
+    int32_t wordsLeft;
+
+    if (!(MCIDataCtrl & MCIDataCtrl_EN_MASK))
+    {
+        return;
+    }
+
+    // The following should only set if data transfer is enabled
+
+    MCIStatus |= (receiving << MCIStatus_RXACTIVE_BIT);
+    MCIStatus |= (transmitting << MCIStatus_TXACTIVE_BIT);
+    wordsLeft = (transfer_len - transfer_idx);
+    if ((MCIDataCtrl & MCIDataCtrl_DIR_MASK))          // Card to controller
+    {
+        if (receiving)
+        {
+            MCIStatus |=
+                ((wordsLeft >= MCI_FIFOHALFSIZE)  << MCIStatus_RXFIFOHALFFULL_BIT) |
+                ((wordsLeft >= MCI_FIFOSIZE)      << MCIStatus_RXFIFOFULL_BIT) |
+                ((wordsLeft == 0)                 << MCIStatus_RXFIFOEMPTY_BIT) |
+                ((wordsLeft >  0)                 << MCIStatus_RXDATAAVAIL_BIT);
+        }
+        else
+        {
+            PL180_DEBUG("%s: merge_dynamic_status() - Card to controller NOT receiving\n",
+                    getInstanceName().c_str());
+        }
+    } // card to controller
+    else // if (!(MCIDataCtrl & MCIDataCtrl_DIR_MASK))           // Controller to card
+    {
+        if (transmitting)
+        {
+            MCIStatus |=
+                ((wordsLeft >= MCI_FIFOHALFSIZE) << MCIStatus_TXFIFOHALFEMPTY_BIT) |
+                ((wordsLeft >= MCI_FIFOSIZE)     << MCIStatus_TXFIFOFULL_BIT) |
+                ((wordsLeft == 0)                << MCIStatus_TXFIFOEMPTY_BIT) |
+                ((wordsLeft >  0)                << MCIStatus_TXDATAAVAIL_BIT);
+            PL180_DEBUG("%s: merge_dynamic_status() - Controller to card txdata=%2d "
+                    "MCIDataCtrl=0x%08X MCIDataCtrl_DIR_MASK=0x%08X MCIStatus=0x%08X\n",
+                    getInstanceName().c_str(), transfer_len - transfer_idx,
+                    MCIDataCtrl, MCIDataCtrl_DIR_MASK, MCIStatus);
+        }
+        else
+        {
+            PL180_DEBUG("%s: merge_dynamic_status() - Controller to card NOT transmitting\n",
+                    getInstanceName().c_str());
+        }
+    } // controller to card
+} // merge_dynamic_status
+
+behavior intstat(void) : char *
+{
+    static    char int_stat_tmp[2048];
+    sprintf(int_stat_tmp, "0x%08x m0=0x%08x m1=0x%08x:%7s %7s %7s %7s %7s %7s %7s %7s %7s %7s %7s %7s %7s %7s"
+            , MCIStatus
+            , MCIMask0
+            , MCIMask1
+            , MCIStatus & (1 << MCIStatus_RXACTIVE_BIT)       ? "R      " : ""
+            , MCIStatus & (1 << MCIStatus_TXACTIVE_BIT)       ? "T      " : ""
+            , MCIStatus & (1 << MCIStatus_TXFIFOEMPTY_BIT)    ? "TXE    " : ""
+            , MCIStatus & (1 << MCIStatus_TXFIFOFULL_BIT)     ? "TXF    " : ""
+            , MCIStatus & (1 << MCIStatus_TXFIFOHALFEMPTY_BIT)? "TXHE   " : ""
+            , MCIStatus & (1 << MCIStatus_RXFIFOHALFFULL_BIT) ? "RXHF   " : ""
+            , MCIStatus & (1 << MCIStatus_RXFIFOFULL_BIT)     ? "RXF    " : ""
+            , MCIStatus & (1 << MCIStatus_RXFIFOEMPTY_BIT)    ? "RXE    " : ""
+            , MCIStatus & (1 << MCIStatus_RXDATAAVAIL_BIT)    ? "RDA    " : ""
+            , MCIStatus & (1 << MCIStatus_CMDTIMEOUT_BIT)     ? "CMDTO  " : ""
+            , MCIStatus & (1 << MCIStatus_CMDRESPEND_BIT)     ? "CMDRE  " : ""
+            , MCIStatus & (1 << MCIStatus_CMDSENT_BIT)        ? "CMDSENT" : ""
+            , MCIStatus & (1 << MCIStatus_DATAEND_BIT)        ? "DE     " : ""
+            , MCIStatus & (1 << MCIStatus_DATABLOCKEND_BIT)   ? "DBE    " : ""
+            );
+        return int_stat_tmp;
+}
+
+// merge static stat_* variables into MCIStatus
+behavior update_static_status(void)
+{
+    // The bottom 11 bits (0:10) of the status are 'sticky' -
+    // they need to be cleared using MCIClear
+
+    MCIStatus = MCIStatus & (~MCIStatus_STATIC_MASK);
+    MCIStatus |= (stat_CmdTimeOut   << MCIStatus_CMDTIMEOUT_BIT) |
+        (stat_CmdRespEnd   << MCIStatus_CMDRESPEND_BIT) |
+        (stat_CmdSent      << MCIStatus_CMDSENT_BIT) |
+        (stat_DataEnd      << MCIStatus_DATAEND_BIT) |
+        (stat_DataBlockEnd << MCIStatus_DATABLOCKEND_BIT);
+}
+
+
+// Given an old status mask and a new one, update the relevant
+// interrupt
+behavior update_intr(uint32_t index, uint32_t status)
+{
+    if (index > 1) return;
+
+    sg::Signal::State state = (status)?sg::Signal::Set:sg::Signal::Clear;
+
+    if (MCIINTR_int[index] != state)
+    {
+        //PL180_TRACE("%s: intr%d %s status=0x%08X.\n" , getInstanceName().c_str(), index, (state==sg::Signal::Set)?"set":"cleared", status);
+
+        MCIINTR_int[index] = state;
+        PL180_INTERRUPTS("%s() int%d=%d (int0=%d int1=%d) %s\n", __FUNCTION__, index
+                , (state == sg::Signal::Clear) ? 0 : 1
+                , (MCIINTR_int[0] == sg::Signal::Clear) ? 0 : 1
+                , (MCIINTR_int[1] == sg::Signal::Clear) ? 0 : 1
+                , (state == sg::Signal::Clear) ? "" : intstat()
+                );
+        if (MCIINTR[index].setValue.implemented())
+        {
+            MCIINTR[index].setValue(state);
+        }
+    }
+}
+
+
+// Send command, on write to MCICommand register
+behavior sendCmd(uint32_t data)
+{
+    MCICommand = data;
+    if (!(data & (1<<10))) // Enable bit not set
+        return;
+
+    // All commands are sent atomically
+    mmc_resp_t rt;         // response type
+    mmc_cxd_resp_t resp;   // response data (if any)
+    uint32_t  exp_rt  = (data >> 6) & 3;
+    mmc_cmd_t cmd     = (mmc_cmd_t)(data & 63);
+
+    PL180_DEBUG("%s:%d %s() cmd=%d\n", __FILE__, __LINE__, __FUNCTION__, cmd);
+
+    // Need to be aware of stop transmission
+    if (cmd == MMC_STOP_TRANSMISSION)   // 12
+    {
+        PL180_DEBUG_WRITE("got stop transmission ...\n");
+        transmitting = false;
+        receiving = false;
+        transfer_idx  = 0;
+        transfer_len = 0;
+    }
+    // Send the command
+    rt = mmc_m.cmd(cmd, MCIArgument, &resp);
+    stat_CmdTimeOut = 0;
+    stat_CmdRespEnd = 0;
+    stat_CmdSent    = 0;
+    switch (exp_rt)
+    {
+        case 1: // Expect a short response, unless CmdRespEd or CmdCrcFail
+            if ((rt == MMC_RNONE) || (rt == MMC_RERROR))
+            {   // We got no response
+                if(MMC_RERROR != rt)
+                {
+                    // Don't complain about response if error
+                    // This happens when Linux probes for SDIO and sends CMD5 ...
+                    PL180_ERROR("%s: Cmd %d expected a short response, but got %d - CmdTimeOut.\n"
+                            , getInstanceName().c_str(), (int)cmd, (int)rt);
+                }
+                stat_CmdTimeOut = 1;
+                break;
+            } else if (rt == MMC_R128) {
+                // We got a longer response than expected!
+                // Print a message, but actually no error condition flagged
+                PL180_TRACE("%s: Cmd %d expected a short response, but got %d - ignoring.\n",
+                        getInstanceName().c_str(), (int)cmd, (int)rt);
+            }
+            stat_CmdRespEnd = 1;
+            MCIResponse0 = resp.cxd[0];
+            MCIRespCmd = data & 0x3f;
+            break;
+        case 3: // Expect a long response, unless CmdRespEd or CmdCrcFail
+            if (rt != MMC_R128)
+            {  // Any response we got was shorter than the one we wanted!
+                PL180_ERROR("%s: Cmd %d expected a long response, but got %d - CmdTimeOut.\n",
+                        getInstanceName().c_str(), (int)cmd, (int)rt);
+                stat_CmdTimeOut = 1;
+                break;
+            }
+            stat_CmdRespEnd = 1;
+            MCIResponse0 = resp.cxd[0];
+            MCIResponse1 = resp.cxd[1];
+            MCIResponse2 = resp.cxd[2];
+            MCIResponse3 = resp.cxd[3];
+            MCIRespCmd = data & 0x3f;
+            break;
+        case 0: // No response expected
+        case 2: // No response expected
+            stat_CmdSent = 1;
+        default:
+            if (rt != MMC_RNONE)
+            {
+                PL180_TRACE("%s: Cmd %d expected no response, but got %d.\n",
+                        getInstanceName().c_str(), (int)cmd, (int)rt);
+
+            }
+            break;
+    } // end switch response length expected
+    PL180_TRACE("%s: Cmd with exp_rt=%d done stat_CmdRespEnd=%d\n", getInstanceName().c_str(), exp_rt, stat_CmdRespEnd);
+    update_status(true); // Update static, sets interrupt lines
+
+}
+
+/**************************************************
+ * pvbus access
+ * ************************************************/
+behavior registerRead(uint32_t addr) : uint32_t
+{
+    uint32_t data = 0;
+
+    switch(addr)
+    {
+        case 0x000:
+            data = MCIPower;
+            break;
+        case 0x004:
+            data = MCIClock;
+            break;
+        case 0x008:
+            data = MCIArgument;
+            break;
+        case 0x00C:
+            data = MCICommand;
+            break;
+        case 0x010:
+            data = MCIRespCmd;
+            break;
+        case 0x014:
+            data = MCIResponse0;
+            break;
+        case 0x018:
+            data = MCIResponse1;
+            break;
+        case 0x01C:
+            data = MCIResponse2;
+            break;
+        case 0x020:
+            data = MCIResponse3;
+            break;
+        case 0x024:
+            data = MCIDataTimer;
+            break;
+        case 0x028:
+            data = MCIDataLength;
+            break;
+        case 0x02C:
+            data = MCIDataCtrl;
+            break;
+        case 0x030:
+            data = MCIDataCnt;
+            break;
+        case 0x034:
+            data = MCIStatus;
+            break;
+        case 0x038:
+            // MCIClear is write only
+            data = 0;
+            break;
+        case 0x03C:
+            data = MCIMask0;
+            break;
+        case 0x040:
+            data = MCIMask1;
+            break;
+        case 0x044:
+            break;
+        case 0x048:
+            // This needs to be revisited
+            if (MCIFifoCnt  == (MCIDataLength+3)/4)
+            {
+                MCIFifoCnt--;
+            }
+            data = MCIFifoCnt;
+            break;
+        case 0x080:    // MCIFIFO
+            data = read_word_from_mmc();
+#if 0
+            PL180_TRACE("%02X %02X %02X %02X%s"
+                    , (data >>  0) & 0xff
+                    , (data >>  8) & 0xff
+                    , (data >> 16) & 0xff
+                    , (data >> 24) & 0xff
+                    ,(++nrread) % 8 ? " " : "\n _____");
+#endif
+            break;
+
+            // ID registers
+        case 0xFE0:
+            data = MCIPCellID0;
+            break;
+        case 0xFE4:
+            data = MCIPCellID1;
+            break;
+        case 0xFE8:
+            data = MCIPCellID2;
+            break;
+        case 0xFEC:
+            data = MCIPCellID3;
+            break;
+        case 0xFF0:
+            data = MCIPeriphID0;
+            break;
+        case 0xFF4:
+            data = MCIPeriphID1;
+            break;
+        case 0xFF8:
+            data = MCIPeriphID2;
+            break;
+        case 0xFFC:
+            data = MCIPeriphID3;
+            break;
+        default:
+            PL180_ERROR("%s Read register: Invalid address 0x%x\n",
+                    getInstanceName().c_str(), addr);
+            return 0;
+    } // end switch
+
+    PL180_DEBUG_REGISTERS("%s: r 0x%08x <- %s[%03x]\n",
+            getInstanceName().c_str(), data, register_name(addr), addr);
+
+    return data;
+
+} // end registerRead
+
+behavior registerWrite(uint32_t addr, uint32_t data)
+{
+    bool readonly = false;
+
+    PL180_DEBUG_REGISTERS("%s: w 0x%08x -> %s[%03x]\n",
+            getInstanceName().c_str(), data, register_name(addr), addr);
+
+    switch(addr)
+    {
+        case 0x000:
+            // 1:0 Ctrl: 0=Power-off, 1=Res, 2=Power-up, 3=Power-on
+            // 5:2 Output voltage (ignored)
+            // 6   OpenDrain (MCICMD output control)
+            // 7   Rod control (ignored)
+            MCIPower = data & 0xff;
+            if ( (data & 3) == 2 ) // Power up -> power-on immediately
+            {
+                MCIPower |= 3;
+            }
+            break;
+        case 0x004:
+            // The following is no modelled:
+            // ClkDiv has no effect
+            // Enable bit: MCI bus clock can not be disabled
+            // PwrSave mode: MCI bus clock output is not modelled
+            // Bypass of clock divide is not modelled
+            // There's no differentiation of Wide / Standard bus modes
+            MCIClock = data & ((1<<12)-1);
+            break;
+        case 0x008:
+            MCIArgument = data;
+            break;
+        case 0x00C:
+            sendCmd(data & ((1<<11)-1));
+            break;
+        case 0x010:
+            break;
+        case 0x014: // MCIResponse0
+        case 0x018:
+        case 0x01C:
+        case 0x020:
+            // MCIResponse registers 0-3 are read-only
+            break;
+        case 0x024:
+            MCIDataTimer = data;
+            break;
+        case 0x028:
+            MCIDataLength = data & 0xffff;
+            break;
+        case 0x02C: // MCIDataCtrl
+            MCIDataCtrl = data & MCIDataCtrl_MASK;
+            if (MCIDataCtrl & MCIDataCtrl_EN_MASK)
+            {
+                MCIDataCnt  = MCIDataLength; // implicit state change from IDLE->WAIT
+                // Should be set when  the enable bit is set in MCIDataCtrl
+                // However, this appears to expose an issue in bootmon's mci.c, L3658
+                // So, defer the setting by one read(!)
+                MCIFifoCnt  = (MCIDataLength+3)/4;
+                // Enabling in receive mode immediately lights Rx FIFO status bits: 
+                if ((MCIDataCtrl & MCIDataCtrl_DIR_MASK))
+                {
+                    receiving = true;
+                    transfer_idx = transfer_len = 0;
+                }
+            }
+            else
+            {
+                if ((MCIDataCtrl & MCIDataCtrl_DIR_MASK))
+                {
+                    receiving = false;
+                    transfer_len = 0;
+                }
+            }
+            update_status(true);
+            break;
+        case 0x030:
+            // MCIDataCnt is read only
+            break;
+        case 0x034:
+            // MCIStatus is read only
+            break;
+        case 0x038:
+            // MCIClear
+            clear_status(data);  // clears masked bits, updates interrupts
+            break;
+        case 0x03C:
+            MCIMask0 = data & ((1<<22)-1);
+            // Maybe there's new interrupts now
+            update_status(true);
+            break;;
+        case 0x040:
+            MCIMask1 = data & ((1<<22)-1);
+            // Maybe there's new interrupts now
+            update_status(true);
+            break;
+        case 0x044:
+            break;
+        case 0x048:
+            // MCIFifoCnt is read only
+            break;
+        case 0x080:    // MCIFIFO
+            write_word_to_mmc(data);
+            break;
+
+            // ID registers
+        case 0xFE0:
+        case 0xFE4:
+        case 0xFE8:
+        case 0xFEC:
+        case 0xFF0:
+        case 0xFF4:
+        case 0xFF8:
+        case 0xFFC:
+            readonly = true;
+            break;
+        default:
+            PL180_ERROR("%s Write register: Invalid address 0x%x\n",
+                    getInstanceName().c_str(), addr);
+            break;
+    } // end switch
+
+    if (readonly)
+    {
+        PL180_ERROR("%s Write to read only register at 0x%x.\n",
+                getInstanceName().c_str(), addr);
+    }
+
+} // end registerWrite
+
+// debugger support
+behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+{
+    *datap = registerRead(reg_id);
+    return ACCESS_FUNC_OK;
+}
+
+behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+{
+    registerWrite(reg_id, (uint32_t)*datap);
+    return ACCESS_FUNC_OK;
+}
+
+behavior register_name(uint32_t off) : const char *
+{
+    switch(off)
+    {
+        case 0x000: return("MCIPower");
+        case 0x004: return("MCIClock");
+        case 0x008: return("MCIArgument");
+        case 0x00C: return("MCICommand");
+        case 0x010: return("MCIRespCmd");
+        case 0x014: return("MCIResponse0");
+        case 0x018: return("MCIResponse1");
+        case 0x01C: return("MCIResponse2");
+        case 0x020: return("MCIResponse3");
+        case 0x024: return("MCIDataTimer");
+        case 0x028: return("MCIDataLength");
+        case 0x02C: return("MCIDataCtrl");
+        case 0x030: return("MCIDataCnt");
+        case 0x034: return("MCIStatus");
+        case 0x038: return("MCIClear");
+        case 0x03C: return("MCIMask0");
+        case 0x040: return("MCIMask1");
+        case 0x044: return("MCISelect");
+        case 0x048: return("MCIFifoCnt");
+        case 0x080: return("MCIFIFO");
+        case 0xFE0: return("MCIPeriphID0");
+        case 0xFE4: return("MCIPeriphID1");
+        case 0xFE8: return("MCIPeriphID2");
+        case 0xFEC: return("MCIPeriphID3");
+        case 0xFF0: return("MCIPCellID0");
+        case 0xFF4: return("MCIPCellID1");
+        case 0xFF8: return("MCIPCellID2");
+        case 0xFFC: return("MCIPCellID3");
+        default:    return("Unknown");
+    } // end switch
+
+}
+} // end of component

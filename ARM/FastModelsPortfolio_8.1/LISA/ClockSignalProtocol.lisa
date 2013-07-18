@@ -1,0 +1,69 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// A ClockSignal port represents a timebase of a given frequency.  This is
+// an opaque port type: it contains no user-accessible behaviour.
+//
+// ClockSignal output ports are provided on the library components,
+// MasterClock and ClockDivider.  The MasterClock produces a clock signal
+// at a base clock rate, which can nominally be considered to be 1Hz.
+// ClockDivider components can be used to take an input ClockSignal
+// (from a MasterClock or from another ClockDivider), and generate an
+// output that is related to the input signal by a given ratio.
+//
+// ClockSignals can be used as input to CpuComponents, to define the
+// core clock rate.  They can also be used to drive the clock port of
+// a ClockTimer component, which can be used to generate events in the
+// scheduler.
+//
+// Note that a ClockSignal does not actually define a fixed square-wave
+// signal - it merely defines a frequency that can be used by counter-
+// timers.
+//
+// Here is an example system using ClockSignals:
+//   composition {
+//     masterclock : MasterClock;
+//     div_24MHz : ClockDivider(div = 1, mul = 24000000);
+//     timer : ClockTimer;
+//   }
+//   master port<TimerControl> timer_control;
+//   slave port<TimerCallback> timer_callback {
+//     behavior signal() : uint32_t {
+//       // handle timed event here
+//       // ...
+//       return 10; // reschedule in 10 ticks of input clock.
+//     }
+//   }
+//   behavior start_timer() {
+//     timer_control.set(10);  // start timer counting 10 ticks.
+//   }
+//   connection {
+//     masterclock.clk_out  => div_24MHz.clk_in;
+//     div_24MHz.clk_out    => timer.clk_in;
+//     self.timer_control   => timer.timer_control;
+//     timer.timer_callback => self.timer_callback;
+//   }
+
+protocol ClockSignal
+{
+    includes
+    {
+        #include "sg/SGSchedulerInterfaceForComponents.h"
+    }
+
+    properties { 
+        version = "8.1.37";
+        description = "ClockSignal Protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    // Private internal methods used between Scheduler components.
+    behavior setClock(sg::FrequencySource*);
+    behavior getClock() : sg::FrequencySource*;
+    behavior rateInHz() : double;
+    behavior currentTicks() : uint64_t;
+}
+

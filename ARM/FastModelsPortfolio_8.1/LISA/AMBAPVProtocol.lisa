@@ -1,0 +1,103 @@
+/*
+ * AMBAPVProtocol.lisa - AMBA-PV protocol definition.
+ *
+ * Copyright 2007-2012 ARM Limited.
+ * All rights reserved.
+ */
+
+protocol AMBAPV {
+    includes {
+        #include <amba_pv.h>
+    }
+    properties {
+        version = "8.1.37";
+        description = "AMBA-PV protocol";
+        sc_master_base_class_name = "amba_pv::amba_pv_master_base";
+        sc_master_socket_class_name = "amba_pv::amba_pv_master_socket<64>";
+        sc_slave_base_class_name = "amba_pv::amba_pv_slave_base<64>";
+        sc_slave_socket_class_name = "amba_pv::amba_pv_slave_socket<64>";
+        dso_safe = 0;
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    /* User-layer behaviours for the AMBA-PV protocol */
+
+    /* Completes a single read transaction. */
+    slave optional
+    behaviour read(int socket_id,
+                   const sc_dt::uint64 & addr,
+                   unsigned char * data,
+                   unsigned int size,
+                   const amba_pv::amba_pv_control * ctrl,
+                   sc_core::sc_time & t): amba_pv::amba_pv_resp_t {
+        return amba_pv::AMBA_PV_SLVERR;
+    }
+
+    /* Completes a single write transaction. */
+    slave optional
+    behaviour write(int socket_id,
+                    const sc_dt::uint64 & addr,
+                    unsigned char * data,
+                    unsigned int size,
+                    const amba_pv::amba_pv_control * ctrl,
+                    unsigned char * strb,
+                    sc_core::sc_time & t): amba_pv::amba_pv_resp_t {
+        return amba_pv::AMBA_PV_SLVERR;
+    }
+
+    /* Completes a debug read transaction. */
+    slave optional
+    behaviour debug_read(int socket_id,
+                         const sc_dt::uint64 & addr,
+                         unsigned char * data,
+                         unsigned int length,
+                         const amba_pv::amba_pv_control * ctrl): unsigned int {
+        return 0;
+    };
+
+    /* Completes a debug write transaction. */
+    slave optional
+    behaviour debug_write(int socket_id,
+                          const sc_dt::uint64 & addr,
+                          unsigned char * data,
+                          unsigned int length,
+                          const amba_pv::amba_pv_control * ctrl): unsigned int {
+        return 0;
+    };
+
+    /* Slave behaviours for the AMBA-PV protocol */
+
+    /* Blocking transport. */
+    slave optional
+    behaviour b_transport(int socket_id,
+                          amba_pv::amba_pv_transaction & trans,
+                          sc_core::sc_time & t) {
+    };
+
+    /* Debug access to a slave. */
+    slave optional
+    behaviour transport_dbg(int socket_id,
+                            amba_pv::amba_pv_transaction & trans): unsigned int {
+        return 0;
+    };
+
+    /* Requests a DMI access. */
+    slave optional
+    behaviour get_direct_mem_ptr(int socket_id,
+                                 amba_pv::amba_pv_transaction & trans,
+                                 tlm::tlm_dmi & dmi_data) : bool {
+        dmi_data.allow_read_write();
+        dmi_data.set_start_address(0x0);
+        dmi_data.set_end_address(sc_dt::uint64(-1));
+        return false;
+    };
+
+    /* Master behaviours for the AMBA-PV protocol */
+
+    /* Invalidates a DMI access. */
+    master optional
+    behaviour invalidate_direct_mem_ptr(int socket_id,
+                                        sc_dt::uint64 start_range,
+                                        sc_dt::uint64 end_range) {
+    };
+}

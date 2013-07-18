@@ -1,0 +1,73 @@
+component "AMBAPVSignal2SGSignal"
+{
+        path="../LISA/AMBAPVSignal2SGSignal.lisa";
+}
+component "AMBAPVSignalState2SGStateSignal"
+{
+        path="../LISA/AMBAPVSignalState2SGStateSignal.lisa";
+}
+component "AMBAPVValue2SGValue"
+{
+        path="../LISA/AMBAPVValue2SGValue.lisa";
+}
+component "AMBAPVValue2SGValue64"
+{
+        path="../LISA/AMBAPVValue2SGValue64.lisa";
+}
+component "AMBAPVValueState2SGValueState"
+{
+        path="../LISA/AMBAPVValueState2SGValueState.lisa";
+}
+component "AMBAPVValueState2SGValueState64"
+{
+        path="../LISA/AMBAPVValueState2SGValueState64.lisa";
+}
+component "SGSignal2AMBAPVSignal"
+{
+        path="../LISA/SGSignal2AMBAPVSignal.lisa";
+}
+component "SGStateSignal2AMBAPVSignalState"
+{
+        path="../LISA/SGStateSignal2AMBAPVSignalState.lisa";
+}
+component "SGValue2AMBAPVValue"
+{
+        path="../LISA/SGValue2AMBAPVValue.lisa";
+}
+component "SGValue2AMBAPVValue64"
+{
+        path="../LISA/SGValue2AMBAPVValue64.lisa";
+}
+component "SGValueState2AMBAPVValueState"
+{
+        path="../LISA/SGValueState2AMBAPVValueState.lisa";
+}
+component "SGValueState2AMBAPVValueState64"
+{
+        path="../LISA/SGValueState2AMBAPVValueState64.lisa";
+}
+protocol "AMBAPVSignal"
+{
+        path="../LISA/AMBAPVSignalProtocol.lisa";
+}
+protocol "AMBAPVValue"
+{
+        path="../LISA/AMBAPVValueProtocol.lisa";
+}
+protocol "AMBAPVValueState"
+{
+        path="../LISA/AMBAPVValueProtocol.lisa";
+}
+protocol "AMBAPVValue64"
+{
+        path="../LISA/AMBAPVValue64Protocol.lisa";
+}
+protocol "AMBAPVValueState64"
+{
+        path="../LISA/AMBAPVValue64Protocol.lisa";
+}
+files
+{
+path = "${MAXCORE_HOME}/AMBA-PV/include/";
+}
+

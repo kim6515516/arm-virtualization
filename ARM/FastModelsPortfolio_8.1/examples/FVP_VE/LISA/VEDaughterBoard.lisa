@@ -1,0 +1,188 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+
+component VEDaughterBoard
+{
+
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Daughtercard, inspired by the ARM Versatile Express development platform.";
+    }
+
+    composition
+    {
+        pvbusdecoder : PVBusDecoder();
+        coresight_mapper : PVBusMapper();
+
+        sram : RAMDevice("size"=0x10000); // 64kB System SRAM
+
+        // Other DaughterCard & misc items
+        vedcc : VEDCC();
+        clockdivider : ClockDivider("mul"=100000000); // 100 MHz
+        clockCLCD    : ClockDivider("mul"=100000); // 1MHz
+ 
+        // 8 GB RAM - 32bit models will run out of address space if we try to use all this
+        // the accessible range is explicitly limited by parameter
+        dram : RAMDevice("size"=0x200000000);
+
+        dram_aliased : TZSwitch();
+        dram_limit_4 : TZSwitch();
+        dram_limit_8 : TZSwitch();
+
+        // The introuter simply passes through the interrupt - it allows me to connect
+        // mismatch sized vector array ports at the cost of a tiny bit of efficiency
+        introuter : VEInterruptMapper(); 
+
+        secure_region : TZSwitch();
+        nonsecure_region : TZSwitch();
+
+        securitydecoder : PVBusDecoder();
+        securepvbusdecoder : PVBusDecoder();
+
+        secureRO      : IntelStrataFlashJ3("size"=0x4000000); // 64MB NOR Flash
+        secureROloader: FlashLoader();
+        secureSRAM    : RAMDevice("size"=0x20000);
+        secureDRAM    : RAMDevice("size"=0x2000000);
+
+        hdlcd  : PL370_HDLCD();
+
+        dmc     : RAMDevice("size"=0x1000);
+        dmc_phy : RAMDevice("size"=0x1000);
+    }
+
+
+    connection
+    {
+        self.clk_in => clockdivider.clk_in;
+        self.clk_in => clockCLCD.clk_in;
+
+        clockdivider.clk_out => self.cpu_clk;
+        clockCLCD.clk_out => hdlcd.clk_in;
+        self.cpu_pvbus => securitydecoder.pvbus_s;
+
+
+        securitydecoder.pvbus_m_range[ 0x0000000000..0x0007FFFFFF ] => secure_region.pvbus_input   [ 0x0000000000..0x0007FFFFFF ];
+        securitydecoder.pvbus_m_range[ 0x0008000000..0x007DFFFFFF ] => nonsecure_region.pvbus_input[ 0x0008000000..0x007DFFFFFF ];
+        securitydecoder.pvbus_m_range[ 0x007E000000..0x007FFFFFFF ] => secure_region.pvbus_input   [ 0x007E000000..0x007FFFFFFF ];
+        securitydecoder.pvbus_m_range[ 0x0080000000..0xFFFFFFFFFF ] => nonsecure_region.pvbus_input[ 0x0080000000..0xFFFFFFFFFF ];
+
+        secure_region.pvbus_port_a => pvbusdecoder.pvbus_s;
+        secure_region.pvbus_port_b => securepvbusdecoder.pvbus_s;
+        nonsecure_region.pvbus_port_a => pvbusdecoder.pvbus_s;
+
+        self.clcd_pvbus => pvbusdecoder.pvbus_s;
+        hdlcd.display => self.mmb;
+        // wire through the interrupts to the GIC
+        self.interrupts   => introuter.irq_in;
+        introuter.irq_out => self.cpu_irqs;
+        hdlcd.intr => self.cpu_irqs[85];
+        hdlcd.pvbus_m => pvbusdecoder.pvbus_s;
+           
+
+        pvbusdecoder.pvbus_m_range[0x0080000000..0x00ffffffff] => dram.pvbus; // 32-bit space. 2GB DRAM at 2GB-4GB.
+
+                                                                              // 36-bit space. 8GB DRAM at 32GB-40GB. Remainder unmapped.
+        pvbusdecoder.pvbus_m_range[0x0800000000..0x087fffffff] => dram_aliased.pvbus_input[0x000000000..0x07fffffff];  // 2GB aliased with lower memory region
+        pvbusdecoder.pvbus_m_range[0x0880000000..0x08ffffffff] => dram_limit_4.pvbus_input[0x080000000..0x0ffffffff];  // 2GB present only in >= 4GB system
+        pvbusdecoder.pvbus_m_range[0x0900000000..0x09ffffffff] => dram_limit_8.pvbus_input[0x100000000..0x1ffffffff];  // 4GB present only in >= 8GB system
+
+                                                                              // 40-bit space. 8GB DRAM at 512GB-520GB. Remainder unmapped.
+        pvbusdecoder.pvbus_m_range[0x8000000000..0x807fffffff] => dram_aliased.pvbus_input[0x000000000..0x07fffffff];  // 2GB aliased with lower memory region
+        pvbusdecoder.pvbus_m_range[0x8080000000..0x80ffffffff] => dram_limit_4.pvbus_input[0x080000000..0x0ffffffff];  // 2GB present only in >= 4GB system
+        pvbusdecoder.pvbus_m_range[0x8100000000..0x81ffffffff] => dram_limit_8.pvbus_input[0x100000000..0x1ffffffff];  // 4GB present only in >= 8GB system
+
+        dram_aliased.pvbus_port_a => dram.pvbus;
+        dram_limit_4.pvbus_port_a => dram.pvbus;
+        dram_limit_8.pvbus_port_a => dram.pvbus;
+        
+        pvbusdecoder.pvbus_m_range[0x002e000000..0x002e00ffff] => sram.pvbus;
+    
+        self.CB => vedcc.CB;
+
+        pvbusdecoder.pvbus_m_range[0x0000000000..0x0003ffffff] => self.smb_cs[0]; // NOR0
+        pvbusdecoder.pvbus_m_range[0x0008000000..0x000Bffffff] => self.smb_cs[0]; // NOR0
+        pvbusdecoder.pvbus_m_range[0x000C000000..0x000fffffff] => self.smb_cs[4]; // NOR1
+        pvbusdecoder.pvbus_m_range[0x0010000000..0x0013ffffff] => self.smb_cs[5]; // TBD
+        pvbusdecoder.pvbus_m_range[0x0014000000..0x0017ffffff] => self.smb_cs[1]; // PSRAM (unimplemented)
+        pvbusdecoder.pvbus_m_range[0x0018000000..0x001Bffffff] => self.smb_cs[2]; // usb/eth/vram
+        pvbusdecoder.pvbus_m_range[0x001C000000..0x001fffffff] => self.smb_cs[3]; // peripherals
+
+        pvbusdecoder.pvbus_m_range[0x0022000000..0x00223fffff] => coresight_mapper.pvbus_s; // CoreSight and peripherals
+        
+        // HDLCD
+        pvbusdecoder.pvbus_m_range[0x002B000000..0x002B00ffff] => hdlcd.pvbus;
+    
+        // DMC
+        pvbusdecoder.pvbus_m_range[0x002b0a0000..0x002B0affff] => dmc.pvbus;
+        
+
+        securepvbusdecoder.pvbus_m_range[0x0000000000..0x0003FFFFFF] => secureRO.pvbus;   //  64MB Secure RO
+        secureROloader.flash_device0 => secureRO.flashloader;
+        securepvbusdecoder.pvbus_m_range[0x0004000000..0x000401FFFF] => secureSRAM.pvbus; // 128kB Secure SRAM
+        securepvbusdecoder.pvbus_m_range[0x007E000000..0x007FFFFFFF] => secureDRAM.pvbus; //  32MB Secure DRAM
+
+        // DMC Phy
+        pvbusdecoder.pvbus_m_range[0x007fef0000..0x007fefffff] => dmc_phy.pvbus;
+
+        // CoreSight bus for cores that implement it
+        coresight_mapper.control    => self.coresight_mapper_control;
+        coresight_mapper.pvbus_m[0] => self.cpu_memorymapped_debug;     // Connected at the top level, if supported
+    }
+
+    resources
+    {
+        PARAMETER { description("Size of main memory in gigabytes (2, 4 or 8)"), type(int), default(4), min(2), max(8) } dram_size;
+        PARAMETER { description("Alias the bottom 2GB region in upper memory"), type(bool), default(true) } dram_alias;
+
+        PARAMETER { description("Support a region of secure memory"), type(bool), default(false), runtime(false) } secure_memory;
+    }
+
+    behaviour init()
+    {
+        if (secure_memory)
+        {
+            secure_region.control.routeAccesses(TZINPUT_SECURE, TZROUTE_TO_PORT_B);
+            secure_region.control.routeAccesses(TZINPUT_NORMAL, TZROUTE_ABORT);
+            nonsecure_region.control.routeAccesses(TZINPUT_SECURE, TZROUTE_ABORT);
+            nonsecure_region.control.routeAccesses(TZINPUT_NORMAL, TZROUTE_TO_PORT_A);
+        }
+        else
+        {
+            secure_region.control.routeAccesses(TZINPUT_ANY, TZROUTE_TO_PORT_A);
+            nonsecure_region.control.routeAccesses(TZINPUT_ANY, TZROUTE_TO_PORT_A);
+        }
+
+        dram_aliased.control.routeAccesses(TZINPUT_ANY, (dram_alias) ? TZROUTE_TO_PORT_A : TZROUTE_ABORT);
+
+        dram_limit_4.control.routeAccesses(TZINPUT_ANY, (dram_size < 4) ? TZROUTE_ABORT : TZROUTE_TO_PORT_A);
+        dram_limit_8.control.routeAccesses(TZINPUT_ANY, (dram_size < 8) ? TZROUTE_ABORT : TZROUTE_TO_PORT_A);
+
+        composition.init();
+    }
+
+    internal port<PVBusMapperControl> coresight_mapper_control
+    {
+        slave behavior remap(pv::RemapRequest& req_) : unsigned
+        {
+            // Always map everything to port 0, the CPU memory mapped debug port.  If nothing is
+            // actually connected at the top level, the bus mapper will generate a data abort,
+            // unlike the bus decoder which causes a runtime error.
+            return 0;
+        }
+    }
+
+    slave port<ClockSignal>  clk_in;
+    slave port<Signal>       interrupts[48];
+    master port<PVBus>       smb_cs[8];
+    master port<LCD>         mmb;
+    slave port<VECBProtocol> CB;
+
+    master port<ClockSignal>    cpu_clk;
+    slave  port<PVBus>          cpu_pvbus;
+    master port<PVBus>          cpu_memorymapped_debug;
+    slave  port<PVBus>          clcd_pvbus;
+    master port<Signal>         cpu_irqs[224];
+}

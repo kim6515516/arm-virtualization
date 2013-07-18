@@ -1,0 +1,507 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+ 
+/* A  simple device for passing information in/out of the simulator
+ *
+ * This device provides a memory mapped buffer for passing message data in and out of the vm
+ * to a higher level device such as vfs.
+ *
+ * The buffer can either be filled/emptied using PIO, by writing/reading the data register or
+ * used as a memory mapped buffer by programming the start/end registers to indicate buffer
+ * data.
+ * 
+ * status signals give an indication of whether there is data ready to be read and these
+ * can also generate an interrupt.
+ *
+ */
+
+component MessageBox
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Generic MessageBox";
+    }
+    
+    includes
+    {
+        // shared definitions between driver/device
+        #include "MBoxTypes.h"
+        
+        #define MESSAGEBOX_TRACE        if (!0) ; else printf
+        #define MESSAGEBOX_TRACE_DATA   if (!0) ; else printf
+        #define MESSAGEBOX_TRACE_MSG    if (!0) ; else printf
+    }
+
+    resources
+    {        
+        PARAMETER { description("MessageBox ID"), type(uint32_t), default(0x01400400) } id;
+
+        REGISTER { description("MessageBox ID (RO)"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0) } MESSAGEBOX_ID;
+        REGISTER { description("Data (RW)"),          bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x4) } MESSAGEBOX_DATA;
+        REGISTER { description("Control (RW)"),       bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x8) } MESSAGEBOX_CONTROL;
+        REGISTER { description("Status (RW)"),        bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xc) } MESSAGEBOX_STATUS;
+        REGISTER { description("Start (RW)"),         bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x10) } MESSAGEBOX_START;
+        REGISTER { description("End (RW)"),           bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x14) } MESSAGEBOX_END;
+        REGISTER { description("Irq Mask (RW)"),      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x18) } MESSAGEBOX_IRQMASK;
+        
+        // memory mapped buffer
+        uint8_t buffer[MBOX_BUFFER_SIZE];
+        
+        uint32_t start;     // start pointer for data in buffer
+        uint32_t end;       // end pointer for data in buffer
+        uint32_t status;    // status register
+        uint32_t control;   // control register
+        uint32_t irqmask;   // irq status masking register
+       
+        bool irq;           // current IRQ signal status
+    }
+    
+    composition
+    {
+        // note: it should be possible to use defines but this appears to not work
+        // note: the size of the slave region needs to be larger than the device size
+        busslave : PVBusSlave(size=0x20000);
+    }
+    
+    connection
+    {
+        self.pvbus_s => busslave.pvbus_s;
+        busslave.device => self.device;
+    }
+   
+ // external ports
+    
+    slave port<PVBus> pvbus_s;
+    
+    master port<Signal> intr;
+    
+    slave port<MessageBoxProtocol> message
+    {
+        // slave behaviour used by upper layer to request a buffer for composing a
+        // reply message to the vm
+        
+        behaviour begin_msg(void** bufferp, uint32_t reserve_len)
+        {
+            assert(reserve_len <= MBOX_BUFFER_SIZE);
+            
+            *bufferp = buffer;
+            
+            start = 0;
+            end   = reserve_len; // advisory - not used
+         
+            update_interrupts();
+        }
+        
+        // slave behaviour used by upper layer to cancel a reply message to the vm
+        
+        behaviour cancel_msg()
+        {
+            start = 0;
+            end   = 0;
+            
+            status |= MBOX_STATUS_RXEMPTY;
+            update_interrupts();
+        }
+        
+        // slave behaviour used by upper layer to commit a reply message to the vm
+        
+        behaviour end_msg(uint32_t len)
+        {
+            // finalise buffer pointers for driver.
+            end = start + len;
+            
+            if (end > MBOX_BUFFER_SIZE)
+                end = 0;
+                
+            MESSAGEBOX_TRACE("outgoing message at 0x%x, len %d\n", start, end-start);
+            
+            if (end > start)
+                status &= ~MBOX_STATUS_RXEMPTY; 
+            
+            // always indicate ready or the protocol will get stuck
+            
+            status |= MBOX_STATUS_RXREADY;
+            update_interrupts();
+        }
+    }
+    
+ // internal ports
+    
+    internal slave port<PVDevice> device
+    {
+        // all accesses must be 32 bit
+        
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            return tx.setReturnData32(registerRead(tx.getAddress()));
+        }
+        
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(),tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    behaviour init()
+    {
+        composition.init();
+        control = 0; 
+        status  = MBOX_STATUS_RXEMPTY;
+        start   = 0;
+        end     = 0;
+        irqmask = 0;
+        irq     = false;
+        
+        // configure register and buffer regions of the messagebuffer device area
+        
+        busslave.control.setAccess(MBOX_REGISTER_BASE, MBOX_REGISTER_BASE+MBOX_REGISTER_SIZE, pv::ACCESSTYPE_RW, pv::ACCESSMODE_DEVICE);
+        busslave.control.setAccess(MBOX_BUFFER_BASE, MBOX_BUFFER_BASE+MBOX_BUFFER_SIZE, pv::ACCESSTYPE_RW, pv::ACCESSMODE_MEMORY);
+        
+        // map the buffer into the busslave controlled memory area
+        
+        busslave.control.provideReadWriteStorage(MBOX_BUFFER_BASE, MBOX_BUFFER_BASE+MBOX_BUFFER_SIZE, buffer);
+    }
+    
+ // implementation
+ 
+    // control register implementation
+ 
+    behaviour set_control(uint32_t control)
+    {
+        // one of - start/end/cancel message
+        switch(control)
+        {
+            case MBOX_CONTROL_START:
+            
+                // indication from driver that an outgoing message is about
+                // to be sent. 
+                // todo: start/end don't strictly need to be reset here
+            
+                start = 0;
+                end   = 0;
+                status &=~ MBOX_STATUS_TXFULL;
+                status |= MBOX_STATUS_RXEMPTY;
+                
+                update_interrupts();
+            break;
+            
+            case MBOX_CONTROL_END:
+                
+                // immediately start processing the message. The reply may not
+                // become available for some time.
+                
+                // start, end must correctly indicate the message start end
+                
+                if (end < start)
+                    end = start;
+                    
+                MESSAGEBOX_TRACE("incoming message at 0x%x, len %d\n", start, end-start); 
+                    
+                if (message.handle_message.implemented())
+                    message.handle_message(buffer+start, end-start);
+                                    
+            break;
+            
+            case MBOX_CONTROL_CANCEL:
+            
+                // not used - START acts as a cancel
+                
+            break;
+            
+            default:
+            
+                // unrecognised command - ignored for now
+                
+            break;
+        }
+    }
+    
+    // data register (read) implementation
+    
+    behaviour read_data() : uint32_t
+    {
+        // any read from the device will clear the ready flag
+        
+        if (status & MBOX_STATUS_RXREADY)
+        {
+            status &= ~MBOX_STATUS_RXREADY;
+            update_interrupts();
+        }
+        
+        // return the next word of data from the buffer, updating the dma pointer
+        
+        uint32_t data = 0;
+        if (start < end)
+        {
+            // Cast through a union to avoid violation of strict aliasing rule.
+            union { uint8_t *p; uint32_t *u32; } cast;
+            cast.p = buffer + start;
+            data = *(cast.u32);
+
+            start += 4;
+
+            if (start == end)
+            {
+                status |= MBOX_STATUS_RXEMPTY;
+                update_interrupts();
+            }
+        }
+
+        return data;  
+    }
+
+    // data register (write) implementation
+
+    behaviour write_data(uint32_t data)
+    {
+        // add another word of data to the buffer, if there is room
+
+        if (end < MBOX_BUFFER_SIZE)
+        {
+            // Cast through a union to avoid violation of strict aliasing rule.
+            union { uint8_t *p; uint32_t *u32; } cast;
+            cast.p = buffer + end;
+            *(cast.u32) = data;
+
+            end += 4;
+            if (end == MBOX_BUFFER_SIZE)
+            {
+                status |= MBOX_STATUS_TXFULL;
+                update_interrupts();
+            }
+        }
+    }
+    
+    // start register (read) implementation
+    
+    behaviour get_start() : uint32_t
+    {
+        // return the start offset in the buffer of the current
+        // incoming/outgoing buffer. This value is incremented by 4 on each
+        // write to the data register
+        
+        // todo: change this so we need to write to the STATUS register to achieve this
+    
+        if (status & MBOX_STATUS_RXREADY)
+        {
+            status &= ~MBOX_STATUS_RXREADY;
+            update_interrupts();
+        }
+        
+        return start;
+    }
+    
+    // start register (write) implementation
+    
+    behaviour set_start(uint32_t data)
+    {
+        // set the start offset in the buffer of the current incoming/outgoing
+        // buffer.
+        
+        if (data >= MBOX_BUFFER_SIZE)
+            data = 0;
+            
+        start = data;
+            
+        if (start >= end)
+        {
+             status |= MBOX_STATUS_TXFULL;
+             update_interrupts();
+        }
+    }
+    
+    // end register (read) implementation
+    
+    behaviour get_end() : uint32_t
+    {
+        // return the end offset in the buffer of the current incoming/outgoing
+        // buffer.
+        
+        // this is read sensitive as it clears the ready signal
+        // todo: change this so we need to write to the STATUS register to achieve this
+    
+        if (status & MBOX_STATUS_RXREADY)
+        {
+            status &= ~MBOX_STATUS_RXREADY;
+            update_interrupts();
+        }
+        
+        return end;
+    }
+    
+    // end register (write) implementation
+    
+    behaviour set_end(uint32_t data)
+    {        
+        if (data >= MBOX_BUFFER_SIZE)
+            data = 0;
+            
+        end = data;
+            
+        if (start >= end)
+        {
+             status |= MBOX_STATUS_TXFULL;
+             update_interrupts();
+        }
+    }
+
+    // common routine for updating the irq signal
+    
+    behaviour update_interrupts()
+    {
+        bool new_irq = (status & irqmask) != 0;
+        
+        if (irq != new_irq)
+        {
+            irq = new_irq;
+            if (intr.setValue.implemented())
+                intr.setValue(irq ? sg::Signal::Set : sg::Signal::Clear);
+        }
+    }
+ 
+ // bus interface
+ 
+    behavior registerRead(uint32_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+        switch (device_addr)
+        {
+        case MBOX_REG_ID:
+            data = id;
+            
+            MESSAGEBOX_TRACE("MESSAGEBOX_ID -> %x\n", data);
+            break;
+        
+        case MBOX_REG_DATA:
+            data = read_data();
+            
+            MESSAGEBOX_TRACE_DATA("MESSAGEBOX_DATA -> %x\n", data);
+            break;
+        
+        case MBOX_REG_CONTROL:
+            data = control;
+            
+            MESSAGEBOX_TRACE("MESSAGEBOX_CONTROL -> %x\n", data);
+            break;
+           
+        case MBOX_REG_STATUS:
+            data = status;
+            
+            MESSAGEBOX_TRACE("MESSAGEBOX_STATUS -> %x\n", data);
+            break;
+            
+        case MBOX_REG_START:      
+            data = get_start();
+            
+            MESSAGEBOX_TRACE("MESSAGEBOX_START -> %x\n", data);
+            break;
+            
+        case MBOX_REG_END:      
+            data = get_end();
+            
+            MESSAGEBOX_TRACE("MESSAGEBOX_END -> %x\n", data);
+            break;
+            
+        case MBOX_REG_IRQMASK:
+            data = irqmask;
+            
+            MESSAGEBOX_TRACE("MESSAGEBOX_IRQMASK -> %x\n", data);
+            
+        default:
+        
+            MESSAGEBOX_TRACE("MESSAGEBOX unimplemented register @ 0x%x\n", device_addr);
+            break;
+        }
+        return data;
+    }
+    
+    behavior registerWrite(uint32_t device_addr, uint32_t data)
+    {
+        switch (device_addr)
+        {
+        case MBOX_REG_ID:
+            MESSAGEBOX_TRACE("MESSAGEBOX_ID (read only)<- %x\n", data);
+            return;
+        
+        case MBOX_REG_DATA:
+            MESSAGEBOX_TRACE_DATA("MESSAGEBOX_DATA <- %x\n", data);
+            
+            write_data(data);
+            
+            return;
+        
+        case MBOX_REG_CONTROL:
+            MESSAGEBOX_TRACE("MESSAGEBOX_CONTROL <- %x\n", data);
+            
+            set_control(data);
+            
+            return;
+           
+        case MBOX_REG_STATUS:
+            MESSAGEBOX_TRACE("MESSAGEBOX_STATUS (read only)<- %x\n", data);
+            return;
+            
+        case MBOX_REG_START:
+            MESSAGEBOX_TRACE("MESSAGEBOX_START <- %x\n", data);
+            
+            set_start(data);
+            
+            return;
+ 
+        case MBOX_REG_END:
+            MESSAGEBOX_TRACE("MESSAGEBOX_END <- %x\n", data);
+            
+            set_end(data);
+            
+            return;
+           
+        case MBOX_REG_IRQMASK:
+            MESSAGEBOX_TRACE("MESSAGEBOX_IRQMASK <- %x\n", data);
+            
+            irqmask = data;
+            
+            update_interrupts();
+            
+            return;
+            
+        default:
+            MESSAGEBOX_TRACE("MESSAGEBOX unimplemented register @ 0x%x <- %x\n", device_addr, data);
+            
+            return;
+        }
+    }    
+    
+    
+ // debugger register access support
+ 
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : CADIReturn_t
+    {
+        *datap = registerRead(reg_id);
+
+        return eslapi::CADI_STATUS_OK;
+    }
+
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : CADIReturn_t
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+
+        return eslapi::CADI_STATUS_OK;
+    }
+
+}

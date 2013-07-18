@@ -1,0 +1,365 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    MPSVisualisation.sgcanvas
+#//  Created: Tue Feb 10 14:27:52 2009
+#//  By: Fast Models  System Canvas 0.0.051  (Feb  6 2009)
+#//
+# *  Do NOT modify this file. It is for internal use by System Canvas only.
+#//
+#//  Copyright (c) 2004-2008 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "idler"
+        (
+            x = 0;
+            y = 0;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "gui_callback"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "timer"
+        (
+            x = 250;
+            y = 0;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "timer_callback"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "timer_control"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+    )
+    ports
+    (
+        define "char_lcd"
+        (
+            x = 500;
+            y = 0;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "clock_50Hz"
+        (
+            x = 750;
+            y = 0;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "cpu_leds"
+        (
+            x = 1000;
+            y = 0;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "cpu_switches"
+        (
+            x = 0;
+            y = 230;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dut_led_7seg"
+        (
+            x = 250;
+            y = 230;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dut_leds"
+        (
+            x = 500;
+            y = 230;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dut_switches_and_buttons"
+        (
+            x = 750;
+            y = 230;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "gui_callback"
+        (
+            x = 1000;
+            y = 230;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "lcd"
+        (
+            x = 0;
+            y = 450;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "lcd_layout"
+        (
+            x = 250;
+            y = 450;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "percfg"
+        (
+            x = 500;
+            y = 450;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "ticks"
+        (
+            x = 750;
+            y = 450;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "timer_callback_handler"
+        (
+            x = 1000;
+            y = 450;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "touch_screen"
+        (
+            x = 0;
+            y = 680;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+    )
+    connections
+    (
+    )
+    portmaps
+    (
+        define "idler.gui_callback=>self.gui_callback"
+        (
+            point
+            (
+                x = 180;
+                y = 30;
+                automatic = true;
+            )
+            point
+            (
+                x = 180;
+                y = 220;
+                automatic = true;
+            )
+            point
+            (
+                x = 1070;
+                y = 220;
+                automatic = true;
+            )
+            point
+            (
+                x = 1070;
+                y = 240;
+                automatic = true;
+            )
+        )
+        define "self.clock_50Hz=>timer.clk_in"
+        (
+            point
+            (
+                x = 820;
+                y = 10;
+                automatic = true;
+            )
+            point
+            (
+                x = 820;
+                y = -10;
+                automatic = true;
+            )
+            point
+            (
+                x = 240;
+                y = -10;
+                automatic = true;
+            )
+            point
+            (
+                x = 240;
+                y = 30;
+                automatic = true;
+            )
+        )
+        define "timer.timer_callback=>self.timer_callback_handler"
+        (
+            point
+            (
+                x = 430;
+                y = 30;
+                automatic = true;
+            )
+            point
+            (
+                x = 430;
+                y = 440;
+                automatic = true;
+            )
+            point
+            (
+                x = 1070;
+                y = 440;
+                automatic = true;
+            )
+            point
+            (
+                x = 1070;
+                y = 460;
+                automatic = true;
+            )
+        )
+    )
+    labels
+    (
+    )
+)

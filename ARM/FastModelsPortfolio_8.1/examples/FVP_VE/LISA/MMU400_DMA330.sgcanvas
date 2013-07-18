@@ -1,0 +1,2781 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    MMU400_DMA330.sgcanvas
+#//  Created: Wed Apr 03 12:19:36 2013
+#//  By: Fast Models  System Canvas 8.0.037  (Dec  7 2012)
+#//
+# *  Do NOT modify this file. It is for internal use by System Canvas only.
+#//
+#//  Copyright (c) 2004-2008 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 12;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Arial";
+            font_size = 10;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Arial";
+            font_size = 10;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "dmac0"
+        (
+            x = 410;
+            y = -990;
+            width = 211;
+            height = 101;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_abort_master_port"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_master_port"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_master_port[0]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[1]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[2]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[3]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[4]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[5]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[6]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[7]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[8]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[9]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[10]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[11]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[12]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[13]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[14]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[15]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[16]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[17]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[18]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[19]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[20]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[21]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[22]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[23]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[24]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[25]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[26]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[27]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[28]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[29]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[30]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[31]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s_ns"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_in"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "dmac1"
+        (
+            x = 410;
+            y = -870;
+            width = 211;
+            height = 99;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_abort_master_port"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_master_port"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_master_port[0]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[1]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[2]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[3]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[4]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[5]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[6]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[7]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[8]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[9]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[10]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[11]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[12]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[13]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[14]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[15]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[16]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[17]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[18]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[19]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[20]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[21]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[22]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[23]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[24]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[25]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[26]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[27]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[28]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[29]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[30]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[31]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s_ns"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_in"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "dmac2"
+        (
+            x = 410;
+            y = -750;
+            width = 211;
+            height = 101;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_abort_master_port"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_master_port"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_master_port[0]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[1]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[2]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[3]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[4]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[5]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[6]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[7]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[8]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[9]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[10]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[11]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[12]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[13]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[14]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[15]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[16]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[17]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[18]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[19]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[20]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[21]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[22]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[23]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[24]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[25]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[26]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[27]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[28]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[29]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[30]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[31]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s_ns"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_in"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "dmac3"
+        (
+            x = 410;
+            y = -630;
+            width = 211;
+            height = 99;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_abort_master_port"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_master_port"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_master_port[0]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[1]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[2]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[3]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[4]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[5]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[6]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[7]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[8]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[9]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[10]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[11]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[12]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[13]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[14]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[15]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[16]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[17]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[18]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[19]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[20]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[21]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[22]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[23]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[24]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[25]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[26]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[27]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[28]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[29]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[30]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq_master_port[31]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s_ns"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_in"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "label0"
+        (
+            x = 760;
+            y = -960;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "label1"
+        (
+            x = 770;
+            y = -830;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "label2"
+        (
+            x = 770;
+            y = -690;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "label3"
+        (
+            x = 770;
+            y = -560;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "mmu400"
+        (
+            x = 1120;
+            y = -910;
+            width = 241;
+            height = 201;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "apb3_control_ns"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "apb3_control_s"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "apb4_control"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "cfg_cttw_in"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "cfg_flt_irpt_ns"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "cfg_flt_irpt_s"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "comb_irpt_ns"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "comb_irpt_s"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "cxt_irpt_ns"
+                (
+                x = 0;
+                y = 82;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "glbl_flt_irpt_ns"
+                (
+                x = 0;
+                y = 102;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "glbl_flt_irpt_s"
+                (
+                x = 0;
+                y = 122;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "priv_internals"
+                (
+                x = 0;
+                y = 82;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 142;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_ptw_m"
+                (
+                x = 0;
+                y = 162;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 102;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_in"
+                (
+                x = 0;
+                y = 122;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+    )
+    ports
+    (
+        define "clk_in"
+        (
+            x = -170;
+            y = -1040;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dmac0_pvbus_s"
+        (
+            x = 270;
+            y = -950;
+            width = 131;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dmac0_pvbus_s_ns"
+        (
+            x = 110;
+            y = -930;
+            width = 151;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dmac1_pvbus_s"
+        (
+            x = 260;
+            y = -830;
+            width = 131;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dmac1_pvbus_s_ns"
+        (
+            x = 110;
+            y = -810;
+            width = 141;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dmac2_pvbus_s"
+        (
+            x = 260;
+            y = -710;
+            width = 131;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dmac2_pvbus_s_ns"
+        (
+            x = 100;
+            y = -690;
+            width = 141;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dmac3_pvbus_s"
+        (
+            x = 260;
+            y = -590;
+            width = 131;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "dmac3_pvbus_s_ns"
+        (
+            x = 110;
+            y = -560;
+            width = 141;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "interrupt_cfg_flt_irpt_ns"
+        (
+            x = 1550;
+            y = -880;
+            width = 201;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "interrupt_cfg_flt_irpt_s"
+        (
+            x = 1550;
+            y = -850;
+            width = 201;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "interrupt_cxt_irpt_ns"
+        (
+            x = 1550;
+            y = -820;
+            width = 201;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "interrupt_glbl_flt_irpt_ns"
+        (
+            x = 1550;
+            y = -790;
+            width = 201;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "interrupt_glbl_flt_irpt_s"
+        (
+            x = 1550;
+            y = -760;
+            width = 201;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "interrupts_from_dmac0"
+        (
+            x = 760;
+            y = -990;
+            width = 171;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "interrupts_from_dmac1"
+        (
+            x = 770;
+            y = -860;
+            width = 171;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "interrupts_from_dmac2"
+        (
+            x = 770;
+            y = -720;
+            width = 171;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "interrupts_from_dmac3"
+        (
+            x = 770;
+            y = -600;
+            width = 171;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "master_interrupts_from_dmacs"
+        (
+            x = 700;
+            y = -1120;
+            width = 231;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "mmu_apb4_control"
+        (
+            x = 880;
+            y = -1070;
+            width = 161;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "pvbus_m"
+        (
+            x = 1550;
+            y = -730;
+            width = 161;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "reset_in"
+        (
+            x = -40;
+            y = -520;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+    )
+    connections
+    (
+        define "dmac0.pvbus_m=>label0.pvbus_s"
+        (
+            point
+            (
+                x = 690;
+                y = -920;
+                automatic = true;
+            )
+            point
+            (
+                x = 690;
+                y = -930;
+                automatic = true;
+            )
+        )
+        define "dmac1.pvbus_m=>label1.pvbus_s"
+        (
+        )
+        define "dmac2.pvbus_m=>label2.pvbus_s"
+        (
+            point
+            (
+                x = 700;
+                y = -680;
+                automatic = true;
+            )
+            point
+            (
+                x = 700;
+                y = -660;
+                automatic = true;
+            )
+        )
+        define "dmac3.pvbus_m=>label3.pvbus_s"
+        (
+            point
+            (
+                x = 700;
+                y = -560;
+                automatic = true;
+            )
+            point
+            (
+                x = 700;
+                y = -530;
+                automatic = true;
+            )
+        )
+        define "label0.pvbus_m=>mmu400.pvbus_s"
+        (
+            point
+            (
+                x = 1040;
+                y = -930;
+                automatic = false;
+            )
+            point
+            (
+                x = 1040;
+                y = -780;
+                automatic = false;
+            )
+        )
+        define "label1.pvbus_m=>mmu400.pvbus_s"
+        (
+            point
+            (
+                x = 1030;
+                y = -800;
+                automatic = true;
+            )
+            point
+            (
+                x = 1030;
+                y = -780;
+                automatic = true;
+            )
+        )
+        define "label2.pvbus_m=>mmu400.pvbus_s"
+        (
+            point
+            (
+                x = 1030;
+                y = -660;
+                automatic = true;
+            )
+            point
+            (
+                x = 1030;
+                y = -780;
+                automatic = true;
+            )
+        )
+        define "label3.pvbus_m=>mmu400.pvbus_s"
+        (
+            point
+            (
+                x = 1030;
+                y = -530;
+                automatic = true;
+            )
+            point
+            (
+                x = 1030;
+                y = -780;
+                automatic = true;
+            )
+        )
+    )
+    portmaps
+    (
+        define "dmac0.irq_abort_master_port=>self.master_interrupts_from_dmacs"
+        (
+            point
+            (
+                x = 660;
+                y = -960;
+                automatic = true;
+            )
+            point
+            (
+                x = 660;
+                y = -1110;
+                automatic = true;
+            )
+        )
+        define "dmac0.irq_master_port=>self.interrupts_from_dmac0"
+        (
+            point
+            (
+                x = 690;
+                y = -940;
+                automatic = true;
+            )
+            point
+            (
+                x = 690;
+                y = -980;
+                automatic = true;
+            )
+        )
+        define "dmac1.irq_abort_master_port=>self.master_interrupts_from_dmacs"
+        (
+            point
+            (
+                x = 660;
+                y = -840;
+                automatic = true;
+            )
+            point
+            (
+                x = 660;
+                y = -1110;
+                automatic = true;
+            )
+        )
+        define "dmac1.irq_master_port=>self.interrupts_from_dmac1"
+        (
+            point
+            (
+                x = 700;
+                y = -820;
+                automatic = true;
+            )
+            point
+            (
+                x = 700;
+                y = -850;
+                automatic = true;
+            )
+        )
+        define "dmac2.irq_abort_master_port=>self.master_interrupts_from_dmacs"
+        (
+            point
+            (
+                x = 660;
+                y = -720;
+                automatic = true;
+            )
+            point
+            (
+                x = 660;
+                y = -1110;
+                automatic = true;
+            )
+        )
+        define "dmac2.irq_master_port=>self.interrupts_from_dmac2"
+        (
+            point
+            (
+                x = 700;
+                y = -700;
+                automatic = true;
+            )
+            point
+            (
+                x = 700;
+                y = -710;
+                automatic = true;
+            )
+        )
+        define "dmac3.irq_abort_master_port=>self.master_interrupts_from_dmacs"
+        (
+            point
+            (
+                x = 660;
+                y = -600;
+                automatic = true;
+            )
+            point
+            (
+                x = 660;
+                y = -1110;
+                automatic = true;
+            )
+        )
+        define "dmac3.irq_master_port=>self.interrupts_from_dmac3"
+        (
+            point
+            (
+                x = 700;
+                y = -580;
+                automatic = true;
+            )
+            point
+            (
+                x = 700;
+                y = -590;
+                automatic = true;
+            )
+        )
+        define "mmu400.cfg_flt_irpt_ns=>self.interrupt_cfg_flt_irpt_ns"
+        (
+            point
+            (
+                x = 1460;
+                y = -880;
+                automatic = true;
+            )
+            point
+            (
+                x = 1460;
+                y = -870;
+                automatic = true;
+            )
+        )
+        define "mmu400.cfg_flt_irpt_s=>self.interrupt_cfg_flt_irpt_s"
+        (
+            point
+            (
+                x = 1460;
+                y = -860;
+                automatic = true;
+            )
+            point
+            (
+                x = 1460;
+                y = -840;
+                automatic = true;
+            )
+        )
+        define "mmu400.cxt_irpt_ns=>self.interrupt_cxt_irpt_ns"
+        (
+            point
+            (
+                x = 1460;
+                y = -800;
+                automatic = true;
+            )
+            point
+            (
+                x = 1460;
+                y = -810;
+                automatic = true;
+            )
+        )
+        define "mmu400.glbl_flt_irpt_ns=>self.interrupt_glbl_flt_irpt_ns"
+        (
+        )
+        define "mmu400.glbl_flt_irpt_s=>self.interrupt_glbl_flt_irpt_s"
+        (
+            point
+            (
+                x = 1460;
+                y = -760;
+                automatic = true;
+            )
+            point
+            (
+                x = 1460;
+                y = -750;
+                automatic = true;
+            )
+        )
+        define "mmu400.pvbus_ptw_m=>self.pvbus_m"
+        (
+        )
+        define "self.clk_in=>dmac0.clk_in"
+        (
+            point
+            (
+                x = 150;
+                y = -1030;
+                automatic = true;
+            )
+            point
+            (
+                x = 150;
+                y = -960;
+                automatic = true;
+            )
+        )
+        define "self.clk_in=>dmac1.clk_in"
+        (
+            point
+            (
+                x = 0;
+                y = -1030;
+                automatic = false;
+            )
+            point
+            (
+                x = 0;
+                y = -840;
+                automatic = false;
+            )
+        )
+        define "self.clk_in=>dmac2.clk_in"
+        (
+            point
+            (
+                x = 0;
+                y = -1030;
+                automatic = false;
+            )
+            point
+            (
+                x = 0;
+                y = -720;
+                automatic = false;
+            )
+        )
+        define "self.clk_in=>dmac3.clk_in"
+        (
+            point
+            (
+                x = 0;
+                y = -1030;
+                automatic = false;
+            )
+            point
+            (
+                x = 0;
+                y = -600;
+                automatic = false;
+            )
+        )
+        define "self.dmac0_pvbus_s=>dmac0.pvbus_s"
+        (
+        )
+        define "self.dmac0_pvbus_s_ns=>dmac0.pvbus_s_ns"
+        (
+        )
+        define "self.dmac1_pvbus_s=>dmac1.pvbus_s"
+        (
+        )
+        define "self.dmac1_pvbus_s_ns=>dmac1.pvbus_s_ns"
+        (
+        )
+        define "self.dmac2_pvbus_s=>dmac2.pvbus_s"
+        (
+        )
+        define "self.dmac2_pvbus_s_ns=>dmac2.pvbus_s_ns"
+        (
+        )
+        define "self.dmac3_pvbus_s=>dmac3.pvbus_s"
+        (
+        )
+        define "self.dmac3_pvbus_s_ns=>dmac3.pvbus_s_ns"
+        (
+            point
+            (
+                x = 330;
+                y = -550;
+                automatic = true;
+            )
+            point
+            (
+                x = 330;
+                y = -560;
+                automatic = true;
+            )
+        )
+        define "self.mmu_apb4_control=>mmu400.apb4_control"
+        (
+            point
+            (
+                x = 1080;
+                y = -1060;
+                automatic = true;
+            )
+            point
+            (
+                x = 1080;
+                y = -840;
+                automatic = true;
+            )
+        )
+        define "self.reset_in=>dmac0.reset_in"
+        (
+            point
+            (
+                x = 70;
+                y = -510;
+                automatic = false;
+            )
+            point
+            (
+                x = 70;
+                y = -900;
+                automatic = false;
+            )
+        )
+        define "self.reset_in=>dmac1.reset_in"
+        (
+            point
+            (
+                x = 70;
+                y = -510;
+                automatic = false;
+            )
+            point
+            (
+                x = 70;
+                y = -780;
+                automatic = false;
+            )
+        )
+        define "self.reset_in=>dmac2.reset_in"
+        (
+            point
+            (
+                x = 70;
+                y = -510;
+                automatic = false;
+            )
+            point
+            (
+                x = 70;
+                y = -660;
+                automatic = false;
+            )
+        )
+        define "self.reset_in=>dmac3.reset_in"
+        (
+            point
+            (
+                x = 130;
+                y = -510;
+                automatic = false;
+            )
+            point
+            (
+                x = 130;
+                y = -520;
+                automatic = false;
+            )
+            point
+            (
+                x = 270;
+                y = -520;
+                automatic = true;
+            )
+            point
+            (
+                x = 270;
+                y = -540;
+                automatic = true;
+            )
+        )
+        define "self.reset_in=>mmu400.reset_in"
+        (
+            point
+            (
+                x = 70;
+                y = -510;
+                automatic = false;
+            )
+            point
+            (
+                x = 70;
+                y = -440;
+                automatic = false;
+            )
+            point
+            (
+                x = 1080;
+                y = -440;
+                automatic = false;
+            )
+            point
+            (
+                x = 1080;
+                y = -760;
+                automatic = false;
+            )
+        )
+    )
+    labels
+    (
+    )
+)

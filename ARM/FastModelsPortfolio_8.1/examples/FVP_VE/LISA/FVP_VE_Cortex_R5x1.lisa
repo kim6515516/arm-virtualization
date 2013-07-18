@@ -1,0 +1,168 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+ 
+component FVP_VE_Cortex_R5x1
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Top level component of the Cortex_R5x1 Versatile Express inspired model.";
+    }
+
+    composition
+    {
+        vemotherboard : VEMotherBoardR();
+        masterclock : MasterClock();
+        daughterboard : VEDaughterBoardCortex_R5x1();
+    }
+    connection
+    {
+        masterclock.clk_out => daughterboard.clk_in;
+        masterclock.clk_out => vemotherboard.masterclk;
+
+        vemotherboard.interrupts => daughterboard.interrupts;
+
+        daughterboard.pvbus_m0 => vemotherboard.core_pvbus;
+        daughterboard.ticks => vemotherboard.cluster0_ticks[0];
+        daughterboard.mmb => vemotherboard.mmb_db1;
+    }
+    behaviour setupGlobalSystemAttributes()
+    {
+#ifdef HIDE_PARAMS
+        hideParameter("");
+        hideParameter("vemotherboard.proc_id0");
+        hideParameter("vemotherboard.proc_id1");
+
+        hideParameter("vemotherboard.pl011_uart4.clock_rate");
+        hideParameter("vemotherboard.pl011_uart4.baud_rate");
+        hideParameter("vemotherboard.pl011_uart4.uart_enable");
+        hideParameter("vemotherboard.pl011_uart4.out_file");
+        hideParameter("vemotherboard.pl011_uart4.in_file");
+        hideParameter("vemotherboard.pl011_uart4.in_file_escape_sequence");
+        hideParameter("vemotherboard.pl011_uart3.clock_rate");
+        hideParameter("vemotherboard.pl011_uart3.baud_rate");
+        hideParameter("vemotherboard.pl011_uart3.uart_enable");
+        hideParameter("vemotherboard.pl011_uart3.out_file");
+        hideParameter("vemotherboard.pl011_uart3.in_file");
+        hideParameter("vemotherboard.pl011_uart3.in_file_escape_sequence");
+        hideParameter("vemotherboard.pl011_uart2.clock_rate");
+        hideParameter("vemotherboard.pl011_uart2.baud_rate");
+        hideParameter("vemotherboard.pl011_uart2.uart_enable");
+        hideParameter("vemotherboard.pl011_uart2.out_file");
+        hideParameter("vemotherboard.pl011_uart2.in_file");
+        hideParameter("vemotherboard.pl011_uart2.in_file_escape_sequence");
+        hideParameter("vemotherboard.pl011_uart1.clock_rate");
+        hideParameter("vemotherboard.pl011_uart1.baud_rate");
+        hideParameter("vemotherboard.pl011_uart1.uart_enable");
+        hideParameter("vemotherboard.pl011_uart1.out_file");
+        hideParameter("vemotherboard.pl011_uart1.in_file");
+        hideParameter("vemotherboard.pl011_uart1.in_file_escape_sequence");
+        hideParameter("vemotherboard.pl011_uart0.clock_rate");
+        hideParameter("vemotherboard.pl011_uart0.baud_rate");
+        hideParameter("vemotherboard.pl011_uart0.uart_enable");
+        hideParameter("vemotherboard.pl011_uart0.out_file");
+        hideParameter("vemotherboard.pl011_uart0.in_file");
+        hideParameter("vemotherboard.pl011_uart0.in_file_escape_sequence");
+
+        hideParameter("vemotherboard.mmc.p_prodName");
+        hideParameter("vemotherboard.mmc.p_prodRev");
+        hideParameter("vemotherboard.mmc.p_manid");
+        hideParameter("vemotherboard.mmc.p_OEMid");
+        hideParameter("vemotherboard.mmc.p_sernum");
+
+        hideParameter("vemotherboard.ve_sysregs.tilePresent");
+        hideParameter("vemotherboard.sp810_sysctrl.sysid");
+
+        hideParameter("vemotherboard.vis.window_title");
+        hideParameter("vemotherboard.vis.cpu_name");
+        hideParameter("vemotherboard.vis.daughter_led_count");
+        hideParameter("vemotherboard.vis.daughter_user_switch_count");
+        hideParameter("vemotherboard.vis.recorder.recordingFileName");
+        hideParameter("vemotherboard.vis.recorder.playbackFileName");
+        hideParameter("vemotherboard.vis.recorder.recordingTimeBase");
+        hideParameter("vemotherboard.vis.recorder.verbose");
+        hideParameter("vemotherboard.vis.recorder.checkInstructionCount");
+
+        hideParameter("daughterboard.core.GROUP_ID");
+        hideParameter("daughterboard.core.LOCK_STEP");
+        hideParameter("daughterboard.core.MICRO_SCU");
+        hideParameter("daughterboard.core.INST_ENDIAN");
+        hideParameter("daughterboard.core.NUM_BREAKPOINTS");
+        hideParameter("daughterboard.core.NUM_WATCHPOINTS");
+        hideParameter("daughterboard.core.icache-state_modelled");
+        hideParameter("daughterboard.core.dcache-state_modelled");
+        hideParameter("daughterboard.core.SLSPLIT");
+
+        hideParameter("daughterboard.core.cpu0.vfp-present");
+        hideParameter("daughterboard.core.cpu0.DP_FLOAT");
+        hideParameter("daughterboard.core.cpu0.CFGEND");
+        hideParameter("daughterboard.core.cpu0.CFGIE");
+        hideParameter("daughterboard.core.cpu0.CFGNMFI");
+        hideParameter("daughterboard.core.cpu0.TEINIT");
+        hideParameter("daughterboard.core.cpu0.VINITHI");
+        hideParameter("daughterboard.core.cpu0.vfp-enable_at_reset");
+        hideParameter("daughterboard.core.cpu0.INITRAMA");
+        hideParameter("daughterboard.core.cpu0.INITRAMB");
+        hideParameter("daughterboard.core.cpu0.dcache-size");
+        hideParameter("daughterboard.core.cpu0.icache-size");
+        hideParameter("daughterboard.core.cpu0.atcm_base");
+        hideParameter("daughterboard.core.cpu0.btcm_base");
+        hideParameter("daughterboard.core.cpu0.CFGATCMSZ");
+        hideParameter("daughterboard.core.cpu0.CFGBTCMSZ");
+        hideParameter("daughterboard.core.cpu0.NUM_MPU_REGION");
+
+        hideParameter("daughterboard.pl310_l2cc.cache-state_modelled");
+        hideParameter("daughterboard.pl310_l2cc.ASSOCIATIVITY");
+        hideParameter("daughterboard.pl310_l2cc.CACHEID");
+        hideParameter("daughterboard.pl310_l2cc.WAYSIZE");
+        hideParameter("daughterboard.pl310_l2cc.CFGBIGEND");
+        hideParameter("daughterboard.pl310_l2cc.LOCKDOWN_BY_MASTER");
+        hideParameter("daughterboard.pl310_l2cc.LOCKDOWN_BY_LINE");
+
+        hideParameter("daughterboard.pl390_gic.NUM_LSPI");
+        hideParameter("daughterboard.pl390_gic.NUM_PRIORITY_LEVELS");
+        hideParameter("daughterboard.pl390_gic.ENABLE_TRUSTZONE");
+        hideParameter("daughterboard.pl390_gic.ENABLE_LEGACY_FIQ");
+        hideParameter("daughterboard.pl390_gic.ENABLE_LEGACY_IRQ");
+        hideParameter("daughterboard.pl390_gic.ENABLE_PPI_EDGE");
+        hideParameter("daughterboard.pl390_gic.D_ID_WIDTH");
+        hideParameter("daughterboard.pl390_gic.C_ID_WIDTH");
+        hideParameter("daughterboard.pl390_gic.AXI_IF");
+        hideParameter("daughterboard.pl390_gic.ARCHITECTURE_VERSION");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_D0");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_D1");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_D2");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_D3");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_D4");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_D5");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_D6");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_D7");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_D0");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_D1");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_D2");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_D3");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_D4");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_D5");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_D6");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_D7");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_C0");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_C1");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_C2");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_C3");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_C4");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_C5");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_C6");
+        hideParameter("daughterboard.pl390_gic.INIT_MATCH_C7");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_C0");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_C1");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_C2");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_C3");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_C4");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_C5");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_C6");
+        hideParameter("daughterboard.pl390_gic.INIT_ENABLE_C7");
+#endif
+    }
+}

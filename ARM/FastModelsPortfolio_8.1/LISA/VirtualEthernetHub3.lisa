@@ -1,0 +1,46 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+component VirtualEthernetHub3 {
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "3 Port Ethernet Hub";
+        documentation_file = "None";
+    }
+
+    includes {
+        #include "components/VirtualEthernet/Protocol/EthernetFrame.h"
+        #include "stdio.h"
+    }
+
+    resources {
+    }    
+
+    slave port <VirtualEthernet> deva {
+        behaviour sendToSlave(EthernetFrame* frame) {
+            if(devb.sendToMaster.implemented())
+                devb.sendToMaster(frame);
+            if(devc.sendToMaster.implemented())
+                devc.sendToMaster(frame);
+        }
+    }
+    
+    slave port <VirtualEthernet> devb {
+        behaviour sendToSlave(EthernetFrame* frame) {
+            if(deva.sendToMaster.implemented())
+                deva.sendToMaster(frame);
+            if(devc.sendToMaster.implemented())
+                devc.sendToMaster(frame);
+        }
+    }
+
+    slave port <VirtualEthernet> devc {
+        behavior sendToSlave(EthernetFrame* frame) {
+            if(deva.sendToMaster.implemented())
+                deva.sendToMaster(frame);
+            if(devb.sendToMaster.implemented())
+                devb.sendToMaster(frame);
+        }
+    }
+}

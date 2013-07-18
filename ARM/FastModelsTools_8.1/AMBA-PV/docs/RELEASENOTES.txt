@@ -1,0 +1,213 @@
+Release Notes for AMBA-PV release 1.7
+=====================================
+
+This is the release 1.7 of AMBA-PV.
+
+AMBA-PV provides a mapping of AMBA buses on top of TLM:
+
+- Dedicated to Programmer's View (PV), it focuses on high-level,
+  functionally accurate, transaction modeling. Low-level signals such as, for
+  example, channel handshake, are not important at that level. 
+
+- Standard for modeling of AMBA ACE, AXI, AHB and APB buses with TLM.
+
+- Targeted at Loosely-Timed (LT) coding style of Accellera Systems Initiative
+  (ASI) TLM, it includes blocking transport, Direct Memory Interface (DMI), and
+  debug interfaces.
+
+- Interoperable, it allows models using the mapped AMBA buses to work
+  in an IEEE-compliant SystemC environment.
+
+AMBA-PV extensions to the TLM Base Protocol (BP) cover the following:
+
+- definition of AMBA-PV extension and traits classes
+- specialisation of TLM sockets and interfaces
+- use of TLM b_transport() blocking transport interface only. 
+
+In addition, AMBA-PV defines class and interfaces for the modeling of side-band
+signals such as, for example, interrupts. 
+
+
+CONTENTS
+========
+
+    1) Software requirements
+
+    2) Package contents
+
+    3) Building the examples
+
+    4) What's new in this release?
+
+    5) Bug fixes and enhancements
+
+    6) New features
+
+    7) Incompatibilities with previous releases
+
+    8) Known problems
+
+    9) Support
+
+
+1) Software requirements
+========================
+
+Supported SystemC version is 2.2.0, 14-Mar-2007.
+Supported TLM version is 2.0.1, 15-Jul-2009.
+This release is supported on the following platforms:
+
+- Linux Red Hat Enterprise 4 Update 4 (32 or 64 bit) with GNU C++ compiler 4.1.2
+
+- Linux Red Hat Enterprise 5 (32 or 64 bit) with GNU C++ compiler 4.1.2 or 4.4.4
+
+- Windows XP SP2 or SP3 (32 bit) with Microsoft Visual C++ 2008 SP1 (aka MSVC++
+  9.0)
+
+- Windows 7 RTM or SP1 (32 or 64 bit) with Microsoft Visual C++ 2008 SP1
+  (aka MSVC++ 9.0) or 2010 SP1 (aka MSVC++ 10.0).
+
+This 1.7 release is not, nor was it intended to be, backward compatible
+with previous releases.
+
+The current implementation of AMBA-PV sockets makes use of ASI TLM simple
+sockets. Hence, when compiling applications that use AMBA-PV sockets with
+ASI SystemC, it is necessary to define the macro SC_INCLUDE_DYNAMIC_PROCESSES
+before including the SystemC header file.
+
+When creating applications on Windows, the /vmg option must be added in the
+Microsoft Visual C++ project settings to correctly compile source code for use
+with SystemC.
+
+When creating applications on Windows, you may see messages like this:
+  "Unknown compiler version - please run the configure tests and report the
+  results"
+This is issued by the Boost library, which is used by ASI SystemC code.
+It can be safely ignored.
+
+
+2) Package contents
+===================
+
+This package contains AMBA-PV 1.7 extensions to TLM. The package has the
+following directory structure:
+
+  docs      * Contains these release notes and the Developer Guide
+              documentation.
+
+  docs/html * Contains the Doxygen-generated Reference Manual documentation.
+
+  examples  * Provides example platforms (assembly of models communicating via
+              AMBA-PV). See the README.txt provided with each example for more
+              information.
+
+  include   * Contains the definition of AMBA-PV extensions to TLM interfaces
+              and classes.
+
+
+3) Building the examples
+========================
+
+To build the examples, the SYSTEMC_HOME environment variable must be set to
+point to the root of your SystemC 2.2.0 installation. Additionally the
+TLM_HOME variable must be set to point to the root of your TLM 2.0.1
+installation.
+
+
+4) What's new in this release?
+==============================
+
+Compared to the previous release, this release has the following new items:
+
+- Bug fixes and enhancements, see section 5 below.
+
+
+5) Bug fixes and enhancements
+=============================
+
+This release contains the following bug fixes and enhancements:
+
+- Adjust DMI range to the slave mapped range in amba_pv_decoder, amba_pv_memory,
+  and amba_pv_simple_memory classes, get_direct_mem_ptr() method, when denying
+  DMI access.
+
+- Added set_id_shift() and get_id_shift() methods to amba_pv_decoder class,
+  enabling to set and retrieve the shift value used in updating the transaction
+  ID to ensure its uniqueness before forwarding the transaction throught to the
+  addressed slave. When the shift value is set to zero, the transaction ID will
+  not be updated.
+
+- Added support for transaction's addresses greater than 32-bit in the
+  amba_pv_address() function.
+
+- Updated amba_pv_simple_probe class to use SC_REPORT_INFO() for printing
+  transactions rather than just std::cout.
+
+
+6) New features
+===============
+
+This release contains the following new features:
+
+- Addition of TLM extended full-duplex interfaces and sockets for enhanced ACE
+  mapping on TLM 2.0. See directory include/tlmx for more details.
+
+- Hierarchical binding support is available when using the following interfaces
+  and classes:
+  o ext::amba_pv_fw_transport_if
+  o ext::amba_pv_bw_transport_if
+  o ext::amba_pv_ace_bw_transport_if
+  o ext::amba_pv_master_socket
+  o ext::amba_pv_slave_socket
+  o ext::amba_pv_ace_master_socket
+  o ext::amba_pv_ace_slave_socket
+  o ext::amba_pv_master_base
+  o ext::amba_pv_slave_base
+  o ext::amba_pv_ace_master_base
+  o ext::amba_pv_ace_slave_base
+  Those classes and interfaces are defined in the ext sub-namespace of the
+  amba_pv one. They will move into the amba_pv namepsace and replace the
+  current ones in a future release.
+  When unsing one of ext::amba_pv_master_socket, ext::amba_pv_ace_master_socket,
+  the socket must be bound to the corresponding backward interface. The classes
+  ext::amba_pv_master_base and ext::amba_pc_ace_master_base provide with default
+  implementations of those interfaces.
+
+
+7) Incompatibilities with previous releases
+===========================================
+
+This release has the following incompatibilities with previous releases:
+
+
+8) Known problems
+=================
+
+This release contains the following known problems:
+
+- When translating TLM Base Protocol (BP) transactions into AMBA-PV ones in the
+  amba_pv_from_tlm_bridge class, the following rules apply:
+  o the address attribute must be aligned to the bus length for burst
+    transactions and to the data length for single transactions
+  o the data length attribute must be a multiple of the bus length for burst
+    transactions
+  o the streaming width attribute must be equal to the bus length for fixed
+    burst transactions
+  o the byte enable pointer attribute must be NULL on read transactions
+  o the byte enable length attribute must be equal to the bus length for
+    single write transactions and a multiple of the bus length for burst write
+    transactions
+  An error response is returned otherwise.
+
+- When enabling DMI for amba_pv_exclusive_monitor, the onus is on the master
+  to not use DMI for exclusive accesses. When the master uses DMI for exclusive
+  accesses, wrong behavior might be observed.
+
+- Note that ASI SystemC 2.2.0 is not supported on Windows 64-bit hosts.
+
+
+9) Support
+==========
+
+For support requests including defect notifications, enhancement requests and
+other feedback, please contact us at support-esl@arm.com.

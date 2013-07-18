@@ -1,0 +1,1223 @@
+/*
+ * Copyright 2012 ARM Limited. All rights reserved.
+ */
+
+/*
+ * PR521-PRDC-012862  TZC400 TrustZone Address Space Controller - Engineering Specification
+ * Document number: ARM-EPM-002449 0.20  19-Mar-2012
+ *
+ * The TZC-400 provides the following key features:
+ *     o Enable a system to define address regions in the address map
+ *     o Enables software to program security access permissions for each 
+ *       address region via an AMBA APB4 interface.
+ *     o Permits the transfer of data between a master and a slave only if the
+ *       security status of the AXI transaction and its identity matches the 
+ *       security settings of the memory region it addresses. These are called 
+ *       Filters.
+ *     o Enable multiple Filter units to share common set region setup
+ *       registers.
+ *     o Filters, and Control unit can support asynchronous clock relative to 
+ *       each other.
+ * In addition to the above, the TZC-400 also provides and implements the
+ * following:
+ *     o Dual read access path, one path is called Fast Path, which is targeted
+ *       for low latency accesses but has limited outstanding access support,
+ *       and another called the Normal Path is targeted for normal accesses 
+ *       with a much higher outstanding access support.
+ *     o Identity based Non_Secure access filtering.
+--------------------------------------------------------------------------------
+ *     o Software configurable permission check failure reporting and interrupt
+ *       signalling.
+ *     o Speculative accesses to support QoS Virtual Network (QVN). This can be
+ *       disabled.
+ *     o Independent clocks for each Filter unit and the common APB interface.
+ *     o Low power interface for each clock domain.
+ *     o Gate keeper, to allow or block accesses to the Filter unit.
+ *     o 256 outstanding accesses globally in powers of twos on the Normal
+ *       Paths.
+ */
+
+component TZC_400
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Component";
+        description = "TrustZone Address Space Controller";
+    }
+
+    includes
+    {
+        #include "pv/RemapRequest.h"
+        #include "pv/RemapDecisionGroup.h"
+        #include <list>
+        #include <sstream>
+        #include "components/TZC400.h"
+    }
+
+    resources
+    {
+        /*
+         * ARM-EPM-0024490 0.20 (previously PR521-PRDC-012862 0.6)
+         * 28-May-2012
+         *
+         * Section 2.1.1 "Features of the TZC-400"
+         *    o Up to eight address regions in additional to the base region (was up to 32)
+         *  Configuration options at compile time:
+         *    o The number of Filter units, 1, 2 or 4
+         *    o Reset values of region configuration registers and other key configuration registers
+         *    o 8, 16 or 32 outstanding accesses on Fast Path read access
+         *    <-- Following configure options are not provided since the model doesn't support detailed AXI signals -->
+         *    o AXI address bus width to be 32-bit, 36-bit, 40-bit, 48-bit or 64-bit globally
+         *    o AXI data bus width to be 32-bit, 64-bit, 128-bit, or 256-bit globally
+         *    o AXI transaction ID tag width to be 2-bit to 24-bit inclusive globally
+         *    o AXI USER bus width to be 2-bit to 32-bit inclusive globally
+         */
+        // Diagnostics messages
+        PARAMETER { description("Diagnostics"), type(uint32_t), default(0), min(0), max(4) } diagnostics;
+        // Master ID maps to NSAID, required for NSAID checking, syntax 7:9,15:9,3:7 ...
+        PARAMETER { description("The mapping between Master ID and NSAID"), type(string), default("") } id_mapping;
+        // Registers reset values
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_build_config;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_action;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_gate_keeper;
+
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_high_0;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0x0f), min(0), max(0xFFFFFFFF) } rst_region_attributes_0;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_id_access_0;
+
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_low_1;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_high_1;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_low_1;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_high_1;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_attributes_1;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_id_access_1;
+
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_low_2;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_high_2;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_low_2;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_high_2;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_attributes_2;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_id_access_2;
+
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_low_3;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_high_3;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_low_3;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_high_3;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_attributes_3;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_id_access_3;
+
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_low_4;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_high_4;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_low_4;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_high_4;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_attributes_4;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_id_access_4;
+
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_low_5;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_high_5;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_low_5;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_high_5;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_attributes_5;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_id_access_5;
+
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_low_6;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_high_6;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_low_6;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_high_6;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_attributes_6;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_id_access_6;
+
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_low_7;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_high_7;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_low_7;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_high_7;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_attributes_7;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_id_access_7;
+
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_low_8;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_base_high_8;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_low_8;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_top_high_8;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_attributes_8;
+        PARAMETER { description("Configurable reset value"), type(uint32_t), default(0), min(0), max(0xFFFFFFFF) } rst_region_id_access_8;
+
+        // APB Control block
+        REGISTER { description("Build Configuration"), read_function(debug_read), write_function(debug_write), reg_number(0x000), display_format("hex"), groups("CONTROL") } BUILD_CONFIG;
+        REGISTER { description("Action"),              read_function(debug_read), write_function(debug_write), reg_number(0x004), display_format("hex"), groups("CONTROL") } ACTION;
+        REGISTER { description("Gate Keeper"),         read_function(debug_read), write_function(debug_write), reg_number(0x008), display_format("hex"), groups("CONTROL") } GATE_KEEPER;
+        REGISTER { description("Speculation Control"), read_function(debug_read), write_function(debug_write), reg_number(0x00C), display_format("hex"), groups("CONTROL") } SPECULATION_CTRL;
+        REGISTER { description("Interrupt Status"),    read_function(debug_read), write_function(debug_write), reg_number(0x010), display_format("hex"), groups("CONTROL") } INT_STATUS;
+        REGISTER { description("Interrupt Clear"),     read_function(debug_read), write_function(debug_write), reg_number(0x014), display_format("hex"), groups("CONTROL") } INT_CLEAR;
+        // 0x018 - Reserved
+        // Fail Status
+        REGISTER { description("Fail Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x020), display_format("hex"), groups("FAIL_STATUS") } FAIL_ADDRESS_LOW_0;
+        REGISTER { description("Fail Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x024), display_format("hex"), groups("FAIL_STATUS") } FAIL_ADDRESS_HIGH_0;
+        REGISTER { description("Fail Control"),        read_function(debug_read), write_function(debug_write), reg_number(0x028), display_format("hex"), groups("FAIL_STATUS") } FAIL_CONTROL_0;
+        REGISTER { description("Fail ID"),             read_function(debug_read), write_function(debug_write), reg_number(0x02C), display_format("hex"), groups("FAIL_STATUS") } FAIL_ID_0;
+
+        REGISTER { description("Fail Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x030), display_format("hex"), groups("FAIL_STATUS") } FAIL_ADDRESS_LOW_1;
+        REGISTER { description("Fail Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x034), display_format("hex"), groups("FAIL_STATUS") } FAIL_ADDRESS_HIGH_1;
+        REGISTER { description("Fail Control"),        read_function(debug_read), write_function(debug_write), reg_number(0x038), display_format("hex"), groups("FAIL_STATUS") } FAIL_CONTROL_1;
+        REGISTER { description("Fail ID"),             read_function(debug_read), write_function(debug_write), reg_number(0x03C), display_format("hex"), groups("FAIL_STATUS") } FAIL_ID_1;
+
+        REGISTER { description("Fail Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x040), display_format("hex"), groups("FAIL_STATUS") } FAIL_ADDRESS_LOW_2;
+        REGISTER { description("Fail Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x044), display_format("hex"), groups("FAIL_STATUS") } FAIL_ADDRESS_HIGH_2;
+        REGISTER { description("Fail Control"),        read_function(debug_read), write_function(debug_write), reg_number(0x048), display_format("hex"), groups("FAIL_STATUS") } FAIL_CONTROL_2;
+        REGISTER { description("Fail ID"),             read_function(debug_read), write_function(debug_write), reg_number(0x04C), display_format("hex"), groups("FAIL_STATUS") } FAIL_ID_2;
+
+        REGISTER { description("Fail Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x050), display_format("hex"), groups("FAIL_STATUS") } FAIL_ADDRESS_LOW_3;
+        REGISTER { description("Fail Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x054), display_format("hex"), groups("FAIL_STATUS") } FAIL_ADDRESS_HIGH_3;
+        REGISTER { description("Fail Control"),        read_function(debug_read), write_function(debug_write), reg_number(0x058), display_format("hex"), groups("FAIL_STATUS") } FAIL_CONTROL_3;
+        REGISTER { description("Fail ID"),             read_function(debug_read), write_function(debug_write), reg_number(0x05C), display_format("hex"), groups("FAIL_STATUS") } FAIL_ID_3;
+
+        // 0x034 - 0x100 Reserved
+        // Region control
+        REGISTER { description("Region 0 Base Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x100), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_LOW_0;
+        REGISTER { description("Region 0 Base Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x104), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_HIGH_0;
+        REGISTER { description("Region 0 Top Address Low"),     read_function(debug_read), write_function(debug_write), reg_number(0x108), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_LOW_0;
+        REGISTER { description("Region 0 Top Address High"),    read_function(debug_read), write_function(debug_write), reg_number(0x10C), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_HIGH_0;
+        REGISTER { description("Region 0 Attribute"),           read_function(debug_read), write_function(debug_write), reg_number(0x110), display_format("hex"), groups("REGION_CONTROL") } REGION_ATTRIBUTES_0;
+        REGISTER { description("Region 0 ID Access"),           read_function(debug_read), write_function(debug_write), reg_number(0x114), display_format("hex"), groups("REGION_CONTROL") } REGION_ID_ACCESS_0;
+
+        REGISTER { description("Region 1 Base Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x120), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_LOW_1;
+        REGISTER { description("Region 1 Base Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x124), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_HIGH_1;
+        REGISTER { description("Region 1 Top Address Low"),     read_function(debug_read), write_function(debug_write), reg_number(0x128), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_LOW_1;
+        REGISTER { description("Region 1 Top Address High"),    read_function(debug_read), write_function(debug_write), reg_number(0x12C), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_HIGH_1;
+        REGISTER { description("Region 1 Attribute"),           read_function(debug_read), write_function(debug_write), reg_number(0x130), display_format("hex"), groups("REGION_CONTROL") } REGION_ATTRIBUTES_1;
+        REGISTER { description("Region 1 ID Access"),           read_function(debug_read), write_function(debug_write), reg_number(0x134), display_format("hex"), groups("REGION_CONTROL") } REGION_ID_ACCESS_1;
+
+        REGISTER { description("Region 2 Base Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x140), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_LOW_2;
+        REGISTER { description("Region 2 Base Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x144), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_HIGH_2;
+        REGISTER { description("Region 2 Top Address Low"),     read_function(debug_read), write_function(debug_write), reg_number(0x148), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_LOW_2;
+        REGISTER { description("Region 2 Top Address High"),    read_function(debug_read), write_function(debug_write), reg_number(0x14C), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_HIGH_2;
+        REGISTER { description("Region 2 Attribute"),           read_function(debug_read), write_function(debug_write), reg_number(0x150), display_format("hex"), groups("REGION_CONTROL") } REGION_ATTRIBUTES_2;
+        REGISTER { description("Region 2 ID Access"),           read_function(debug_read), write_function(debug_write), reg_number(0x154), display_format("hex"), groups("REGION_CONTROL") } REGION_ID_ACCESS_2;
+
+        REGISTER { description("Region 3 Base Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x160), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_LOW_3;
+        REGISTER { description("Region 3 Base Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x164), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_HIGH_3;
+        REGISTER { description("Region 3 Top Address Low"),     read_function(debug_read), write_function(debug_write), reg_number(0x168), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_LOW_3;
+        REGISTER { description("Region 3 Top Address High"),    read_function(debug_read), write_function(debug_write), reg_number(0x16C), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_HIGH_3;
+        REGISTER { description("Region 3 Attribute"),           read_function(debug_read), write_function(debug_write), reg_number(0x170), display_format("hex"), groups("REGION_CONTROL") } REGION_ATTRIBUTES_3;
+        REGISTER { description("Region 3 ID Access"),           read_function(debug_read), write_function(debug_write), reg_number(0x174), display_format("hex"), groups("REGION_CONTROL") } REGION_ID_ACCESS_3;
+
+        REGISTER { description("Region 4 Base Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x180), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_LOW_4;
+        REGISTER { description("Region 4 Base Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x184), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_HIGH_4;
+        REGISTER { description("Region 4 Top Address Low"),     read_function(debug_read), write_function(debug_write), reg_number(0x188), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_LOW_4;
+        REGISTER { description("Region 4 Top Address High"),    read_function(debug_read), write_function(debug_write), reg_number(0x18C), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_HIGH_4;
+        REGISTER { description("Region 4 Attribute"),           read_function(debug_read), write_function(debug_write), reg_number(0x190), display_format("hex"), groups("REGION_CONTROL") } REGION_ATTRIBUTES_4;
+        REGISTER { description("Region 4 ID Access"),           read_function(debug_read), write_function(debug_write), reg_number(0x194), display_format("hex"), groups("REGION_CONTROL") } REGION_ID_ACCESS_4;
+
+        REGISTER { description("Region 5 Base Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x1A0), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_LOW_5;
+        REGISTER { description("Region 5 Base Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x1A4), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_HIGH_5;
+        REGISTER { description("Region 5 Top Address Low"),     read_function(debug_read), write_function(debug_write), reg_number(0x1A8), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_LOW_5;
+        REGISTER { description("Region 5 Top Address High"),    read_function(debug_read), write_function(debug_write), reg_number(0x1AC), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_HIGH_5;
+        REGISTER { description("Region 5 Attribute"),           read_function(debug_read), write_function(debug_write), reg_number(0x1B0), display_format("hex"), groups("REGION_CONTROL") } REGION_ATTRIBUTES_5;
+        REGISTER { description("Region 5 ID Access"),           read_function(debug_read), write_function(debug_write), reg_number(0x1B4), display_format("hex"), groups("REGION_CONTROL") } REGION_ID_ACCESS_5;
+
+        REGISTER { description("Region 6 Base Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x1C0), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_LOW_6;
+        REGISTER { description("Region 6 Base Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x1C4), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_HIGH_6;
+        REGISTER { description("Region 6 Top Address Low"),     read_function(debug_read), write_function(debug_write), reg_number(0x1C8), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_LOW_6;
+        REGISTER { description("Region 6 Top Address High"),    read_function(debug_read), write_function(debug_write), reg_number(0x1CC), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_HIGH_6;
+        REGISTER { description("Region 6 Attribute"),           read_function(debug_read), write_function(debug_write), reg_number(0x1D0), display_format("hex"), groups("REGION_CONTROL") } REGION_ATTRIBUTES_6;
+        REGISTER { description("Region 6 ID Access"),           read_function(debug_read), write_function(debug_write), reg_number(0x1D4), display_format("hex"), groups("REGION_CONTROL") } REGION_ID_ACCESS_6;
+
+        REGISTER { description("Region 7 Base Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x1E0), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_LOW_7;
+        REGISTER { description("Region 7 Base Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x1E4), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_HIGH_7;
+        REGISTER { description("Region 7 Top Address Low"),     read_function(debug_read), write_function(debug_write), reg_number(0x1E8), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_LOW_7;
+        REGISTER { description("Region 7 Top Address High"),    read_function(debug_read), write_function(debug_write), reg_number(0x1EC), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_HIGH_7;
+        REGISTER { description("Region 7 Attribute"),           read_function(debug_read), write_function(debug_write), reg_number(0x1F0), display_format("hex"), groups("REGION_CONTROL") } REGION_ATTRIBUTES_7;
+        REGISTER { description("Region 7 ID Access"),           read_function(debug_read), write_function(debug_write), reg_number(0x1F4), display_format("hex"), groups("REGION_CONTROL") } REGION_ID_ACCESS_7;
+
+        REGISTER { description("Region 8 Base Address Low"),    read_function(debug_read), write_function(debug_write), reg_number(0x200), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_LOW_8;
+        REGISTER { description("Region 8 Base Address High"),   read_function(debug_read), write_function(debug_write), reg_number(0x204), display_format("hex"), groups("REGION_CONTROL") } REGION_BASE_HIGH_8;
+        REGISTER { description("Region 8 Top Address Low"),     read_function(debug_read), write_function(debug_write), reg_number(0x208), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_LOW_8;
+        REGISTER { description("Region 8 Top Address High"),    read_function(debug_read), write_function(debug_write), reg_number(0x20C), display_format("hex"), groups("REGION_CONTROL") } REGION_TOP_HIGH_8;
+        REGISTER { description("Region 8 Attribute"),           read_function(debug_read), write_function(debug_write), reg_number(0x210), display_format("hex"), groups("REGION_CONTROL") } REGION_ATTRIBUTES_8;
+        REGISTER { description("Region 8 ID Access"),           read_function(debug_read), write_function(debug_write), reg_number(0x214), display_format("hex"), groups("REGION_CONTROL") } REGION_ID_ACCESS_8;
+
+        // ID register
+        REGISTER { description("Peripheral Identification 4"),   read_function(debug_read), write_function(debug_write), reg_number(0xFD0), display_format("hex"), groups("ID") } PID4;
+        REGISTER { description("Peripheral Identification 5"),   read_function(debug_read), write_function(debug_write), reg_number(0xFD4), display_format("hex"), groups("ID") } PID5;
+        REGISTER { description("Peripheral Identification 6"),   read_function(debug_read), write_function(debug_write), reg_number(0xFD8), display_format("hex"), groups("ID") } PID6;
+        REGISTER { description("Peripheral Identification 7"),   read_function(debug_read), write_function(debug_write), reg_number(0xFDC), display_format("hex"), groups("ID") } PID7;
+
+        REGISTER { description("Peripheral Identification 0"),   read_function(debug_read), write_function(debug_write), reg_number(0xFE0), display_format("hex"), groups("ID") } PID0;
+        REGISTER { description("Peripheral Identification 1"),   read_function(debug_read), write_function(debug_write), reg_number(0xFE4), display_format("hex"), groups("ID") } PID1;
+        REGISTER { description("Peripheral Identification 2"),   read_function(debug_read), write_function(debug_write), reg_number(0xFE8), display_format("hex"), groups("ID") } PID2;
+        REGISTER { description("Peripheral Identification 3"),   read_function(debug_read), write_function(debug_write), reg_number(0xFEC), display_format("hex"), groups("ID") } PID3;
+
+        REGISTER { description("Component Identification 0"),    read_function(debug_read), write_function(debug_write), reg_number(0xFF0), display_format("hex"), groups("ID") } ID0;
+        REGISTER { description("Component Identification 1"),    read_function(debug_read), write_function(debug_write), reg_number(0xFF4), display_format("hex"), groups("ID") } ID1;
+        REGISTER { description("Component Identification 2"),    read_function(debug_read), write_function(debug_write), reg_number(0xFF8), display_format("hex"), groups("ID") } ID2;
+        REGISTER { description("Component Identification 3"),    read_function(debug_read), write_function(debug_write), reg_number(0xFFC), display_format("hex"), groups("ID") } ID3;
+
+
+        struct AddrRegion // Act as register storage as well
+        {
+            uint32_t region_base_low;
+            uint32_t region_base_high;
+            uint32_t region_top_low;
+            uint32_t region_top_high;
+            uint32_t region_attributes;
+            uint32_t region_id_access;
+
+
+            // Locate in REGION_<n>_ATTRIBUTE register
+            bool s_wr_en;        // [31]  Secure Write Enable
+            bool s_rd_en;        // [30]  Secure Read Enable
+            uint32_t filter_en;  // [3:0] Independent region enable for each filter unit
+
+            // REGION_<n>_ID_ACCESS register
+            uint32_t nsaid_rd_en; // Non-Scure Access ID Filter Read Enable bits
+            uint32_t nsaid_wr_en; // Non-Secure Access ID Filter Write Enables bits
+
+            AddrRegion()
+            {
+                region_base_low = 0x0;
+                region_base_high = 0x0;
+                region_top_low = 0x0;
+                region_top_high = 0x0;
+                region_attributes = 0x0;
+                region_id_access = 0x0;
+
+                s_wr_en = false;
+                s_rd_en = false;
+                filter_en = 0xF;
+                nsaid_rd_en = 0x0000;
+                nsaid_wr_en = 0x0000;
+            }
+        };
+
+        struct FailStatus
+        {
+            uint32_t fail_id;
+            uint32_t fail_control;
+            uint32_t fail_addr_high;
+            uint32_t fail_addr_low;
+
+            FailStatus()
+            {
+                fail_id = 0x0;
+                fail_control = 0x0;
+                fail_addr_high = 0x0;
+                fail_addr_low = 0x0;
+            }
+        };
+
+        vector<AddrRegion> addr_regions; // up to 9 regions
+        vector<FailStatus> fail_status;  // up to 4 filters
+
+        // flags
+        /* SPECULATION_CONTROL */
+        bool write_spec_disable;
+        bool read_spec_disable;
+
+        uint32_t num_of_filters;
+        uint32_t num_of_regions;
+        uint32_t address_width;
+
+        // Used to invalidate all PVBus channels
+        pv::RemapDecisionGroup tzc_group;
+
+        // Master ID/NSAID map
+        TZC400_id_mapper* idmap;
+    }
+
+    composition
+    {
+        // Up to four filter units
+        filter0 : TZFilterUnit();
+        filter1 : TZFilterUnit();
+        filter2 : TZFilterUnit();
+        filter3 : TZFilterUnit();
+
+        // APB control block
+        apbslave : PVBusSlave(size = 0x1000);
+    }
+
+    connection
+    {
+        // Connect APB control block
+        self.apbslave_s => apbslave.pvbus_s;
+        apbslave.device => self.device;
+
+        // Connect Filter Units
+        self.filter_pvbus_s[0] => filter0.pvbus_s;
+        self.filter_pvbus_s[1] => filter1.pvbus_s;
+        self.filter_pvbus_s[2] => filter2.pvbus_s;
+        self.filter_pvbus_s[3] => filter3.pvbus_s;
+
+
+        filter0.pvbus_m => self.filter_pvbus_m[0];
+        filter1.pvbus_m => self.filter_pvbus_m[1];
+        filter2.pvbus_m => self.filter_pvbus_m[2];
+        filter3.pvbus_m => self.filter_pvbus_m[3];
+
+        filter0.control => self.filter_control[0];
+        filter1.control => self.filter_control[1];
+        filter2.control => self.filter_control[2];
+        filter3.control => self.filter_control[3];
+    }
+
+    // Interrupt
+    master port<Signal> tzcint;
+    // Reset signal
+    slave port<Signal> tzc_reset
+    {
+        behavior setValue(sg::Signal::State st)
+        {
+            if(st == sg::Signal::Set)
+                common_reset();
+        }
+    }
+    // For control registers
+    slave port<PVBus> apbslave_s;
+    // PVBus inputs to filters
+    slave port<PVBus> filter_pvbus_s[4];
+    // PVBus outputs of filters
+    master port<PVBus> filter_pvbus_m[4];
+    // Filter control ports
+    internal slave port<TZFilterControl> filter_control[4]
+    {
+        behavior checkPermission(uint32_t index,
+                                 const pv::TransactionAttributes* attributes_,
+                                 pv::bus_addr_t page_base_, // defined as uint64_t
+                                 bool is_read_,
+                                 pv::RemapRequest& req_,
+                                 bool & abort_on_error_) : bool
+        {
+            ostringstream log;
+            if (diagnostics > 0)
+                log << getInstancePath() << "::checkPermission(filter:" << index << ", page_base:0x" << std::hex << page_base_ << std::dec << (is_read_ ? ", read, " : ", write, ")<<" secure:"<< (attributes_->isNormalWorld()?"false)":"true)");
+
+            bool success = true;
+            abort_on_error_ = false;
+            bool privileged = attributes_->isPrivileged();
+            bool nonsecure = attributes_->isNormalWorld();
+            uint32_t masterid = attributes_->getMasterID();
+            // The value '0' is the Default ID, and is used by masters that does not need to be identified separately from
+            // the reset in the system.
+            uint32_t nsaid = 0;
+            uint32_t bm = (masterid & (~15))>>2;
+            if(bm <= 15)
+            {
+                nsaid = idmap->getIdForBusMaster(bm);
+            }
+
+            // This allows us to revoke all channels associated with the TZC,
+            // if the filter configuration is changed.
+            // This is as coarse-grained as we can be, and may impact performance.
+            // The preferred alternative is to associate a group with the global control
+            // registers, and one group for each region.
+            req_.addRemapDecisionGroup(&tzc_group);
+
+            int32_t result = sanityCheck(index, page_base_);
+
+            if(result == -1) // ERROR - Overlapping
+            {
+                success = false;
+            }
+            else
+            {
+                // Successful match, result is the region number.
+                // Go through the permission checking
+                if(nonsecure) // Normal transaction
+                {
+                    if(is_read_) // Check NSAID_READ
+                    {
+                        // REGION_<x>_ID_ACCESS bit[15:0] nsaid_rd_en
+                        if(addr_regions[result].region_id_access & 1<<nsaid)
+                            success = true;
+                        else
+                            success = false;
+                    }
+                    else // REGION_<x>_ID_ACCESS bit[31:16] nsaid_wr_en
+                    {
+                        if(addr_regions[result].region_id_access & 1<<(nsaid+16))
+                            success = true;
+                        else
+                            success = false;
+                    }
+                }
+                else
+                { // Secure world
+                    if(is_read_)
+                    {
+                        if(addr_regions[result].s_rd_en)
+                            success = true; // Grant the access
+                        else
+                            success = false;
+                    }
+                    else
+                    {
+                        if(addr_regions[result].s_wr_en)
+                            success = true; // Grant the access
+                        else
+                            success = false;
+                    }
+                }
+            }
+
+            if(!success) // Set up fail status registers
+            {
+                if (diagnostics > 0)
+                    message(log.str()+" -> false\n",MSG_WARNING);
+
+                /* If the status flag for the Filter unit in int_status is already set, new region permission */
+                /* check failures in the same filter unit will not update its associated Fail registers */
+                if((INT_STATUS & 1<<index) == 0) // bit is not set
+                {
+                    fail_status[index].fail_addr_low = page_base_ & 0xFFFFFFFF;
+                    fail_status[index].fail_addr_high = page_base_ >> 32;
+                    uint32_t ctrl = 0;
+                    if(privileged)
+                        ctrl |= 1<<20;
+                    if(nonsecure)
+                        ctrl |= 1<<21;
+                    if(is_read_)
+                        ctrl |= 1<<24;
+                    fail_status[index].fail_control = ctrl;
+                    // We use MasterID to represent AXI ARID or AWID
+                    // Since QVN is not supported in the model, therefore vnet bits[27:24] are not set
+                    fail_status[index].fail_id = attributes_->getMasterID();
+
+                    // The bus response OKAY or DECERR is dealt in FilterUnit
+                    switch(ACTION)
+                    {
+                    case 0x0: // b00 = Sets TZCINT LOW and issues an OKAY response
+                    case 0x1: // b01 = Sets TZCINT LOW and issues a DECERR response
+                        if(tzcint.setValue.implemented())
+                            tzcint.setValue(sg::Signal::Clear);
+                        break;
+                    case 0x2: // b10 = Sets TZCINT HIGH and issues an OKAY response
+                    case 0x3: // b11 = Sets TZCINT HIGH and issues a DECERR respnse
+                        if(tzcint.setValue.implemented())
+                            tzcint.setValue(sg::Signal::Set);
+                        break;
+                    }
+                }
+                else // Overrun
+                {
+                    if((INT_STATUS & 1<<(index+16)) == 0) // No overlap happened
+                        INT_STATUS |= 1<<(8+index); // multiple region permission failures
+                }
+            }
+            else
+            {
+                if (diagnostics > 2)
+                    message(log.str() + " -> true\n", MSG_INFO);
+            }
+
+            return success;
+        }
+
+        behavior isEnabled(uint32_t index) : bool
+        {
+            ostringstream log;
+            if (diagnostics > 0)
+            {
+                log << getInstancePath() << "::isEnabled(index:" << index << ")";
+            }
+
+            // Check if the filter is gated
+            bool result = (GATE_KEEPER & 1<<(16+index)) != 0;
+
+            if (diagnostics > 0)
+            {
+                if (result)
+                {
+                    if (diagnostics > 2)
+                    {
+                        message(log.str()+" -> true\n",MSG_INFO);
+                    }
+                }
+                else
+                {
+                    message(log.str()+" -> false\n",MSG_WARNING);
+                }
+            }
+
+            return result;
+        }
+    }
+
+
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32(registerRead(tx.getAddress() & ~3));
+        }
+
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(), tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }
+    }
+
+    // check address regions overlapping
+    // Return:
+    //     -1 ERROR
+    //     0  NO MATCH use background
+    //     x  MATCH    matched region number
+    behavior sanityCheck(uint32_t index, pv::bus_addr_t addr) : int32_t
+    {
+        uint32_t match_counter = 0;
+        int32_t region = -1;  // To indicate the match region
+
+        for(uint32_t i=1; i<num_of_regions; i++) // Check starts from region 1
+        {
+            if(addr_regions[i].filter_en & (1<<index)) // if enabled
+            {
+                uint64_t region_base = addr_regions[i].region_base_low | ((uint64_t)addr_regions[i].region_base_high<<32);
+                uint64_t region_top = addr_regions[i].region_top_low | ((uint64_t)addr_regions[i].region_top_high<<32);
+                if((addr >= region_base) && (addr <= region_top)) // Falling in a address region
+                {
+                    region = i;
+                    match_counter++;
+                }
+            }
+            else
+            {
+                continue;
+            }
+        }
+
+        if(match_counter >= 2) // more than one matched region
+        {
+            INT_STATUS |= 1<<(16+index); // Overlap
+            INT_STATUS |= 1<<index;      // Status
+        }
+        else if(match_counter == 0) // No match, use background region
+        {
+            return 0;
+        }
+
+        return region;
+    }
+
+    behavior common_reset()
+    {
+        message(getInstancePath()+": common_reset starts\n",MSG_INFO);
+        
+        BUILD_CONFIG =  rst_build_config;
+        
+        /*
+         * b00 = 1 filter unit
+         * b01 = 2 filter units
+         * b10 = Reserved
+         * b11 = 4 filter units
+         */
+        num_of_filters = ((BUILD_CONFIG & 0x03000000) >> 24) + 1;
+        /*
+         * b01000 = nine regions
+         * All other values = Reserved
+         */
+        num_of_regions = (BUILD_CONFIG & 0x1F) + 1;
+        /*
+         * b000000 to b011110 = reserved
+         * b011111 = 32 bits
+         *   ...
+         * b111111 = 64 bits
+         */
+        address_width  = ((BUILD_CONFIG & 0x3F00) >> 8) + 1;
+        
+        if (diagnostics>0)
+        {
+            ostringstream BCR_info;
+            BCR_info << getInstancePath() << ":  build config register value 0x"<< std::hex << BUILD_CONFIG<<" "<<std::endl;
+            BCR_info << std::dec << num_of_filters << " filters, " << num_of_regions << " regions, address width " << address_width << std::endl;
+            message(BCR_info.str(),MSG_INFO);
+        }
+        
+        bool adjusted = false;
+        
+        if(num_of_regions != 9)
+        {
+            ostringstream wr_info;
+            wr_info << getInstancePath()<< " has been configured with an invalid number ("<< num_of_regions <<") of regions; using 9 "<<std::endl;
+            message(wr_info.str(),MSG_WARNING);
+            
+            num_of_regions = 9;
+            BUILD_CONFIG &= 0xFFFFFFE0;
+            BUILD_CONFIG |= 8;
+            
+            adjusted = true;
+        }
+        
+        ACTION = rst_action & 0x3;
+        GATE_KEEPER = rst_gate_keeper & 0x000F000F;
+        
+        if (diagnostics>2)
+        {
+            ostringstream gkr_info;
+            gkr_info << getInstancePath()<<"  GATE_KEEPER REGISTER (0x"<< GATE_KEEPER <<")" << std::endl;
+        }
+        
+        // Set the status bits in GATE_KEEPER register
+        GATE_KEEPER &= 0xF;
+        GATE_KEEPER |= (GATE_KEEPER << 16);
+        
+        switch(num_of_filters)
+        {
+        case 1:
+            GATE_KEEPER &= 0x00010001;
+            break;
+        case 2:
+            GATE_KEEPER &= 0x00030003;
+            break;
+        case 4:
+            GATE_KEEPER &= 0x000F000F;
+            break;
+        default:
+            {
+                ostringstream inv_fnum;
+                inv_fnum << getInstancePath()<<"  has been configured with an invalid number ("<< num_of_filters <<") of filters: using 4" << std::endl;
+                message(inv_fnum.str(),MSG_WARNING);
+            }
+            num_of_filters = 4;
+            BUILD_CONFIG &= 0xFCFFFFFF;
+            BUILD_CONFIG |= 3<<24;
+            adjusted = true;
+        }
+        
+        if(adjusted)
+        {
+            ostringstream adj;
+            adj <<getInstancePath()<<": configuration adjusted. New GATE_KEEPER REGISTER 0x"<< std::hex<<GATE_KEEPER;
+            adj << ", new BUILD CONFIG REGISTER " << std::hex << BUILD_CONFIG << std::endl;
+            adj << std::dec << num_of_filters << " filters, " << num_of_regions << " regions, address width " << address_width << std::endl;
+            message(adj.str(),MSG_WARNING);
+        }
+        
+        /* 8 regions + base region, 9 in total */
+        /* Create regions list */
+        for(uint32_t i=0; i<(num_of_regions+1); i++)
+        {
+            AddrRegion region;
+            addr_regions.push_back(region);
+        }
+        
+        /* Create fail status registers list */
+        for(uint32_t i=0; i<num_of_filters; i++)
+        {
+            FailStatus fs;
+            fail_status.push_back(fs);
+        }
+        
+        SPECULATION_CTRL = 0x0;
+        
+        INT_STATUS = 0x0;
+        INT_CLEAR = 0x0;
+        
+        FAIL_ADDRESS_LOW_0 = 0x0;
+        FAIL_ADDRESS_HIGH_0 = 0x0;
+        FAIL_CONTROL_0 = 0x0;
+        FAIL_ID_0 = 0x0;
+        
+        FAIL_ADDRESS_LOW_1 = 0x0;
+        FAIL_ADDRESS_HIGH_1 = 0x0;
+        FAIL_CONTROL_1 = 0x0;
+        FAIL_ID_1 = 0x0;
+
+        FAIL_ADDRESS_LOW_2 = 0x0;
+        FAIL_ADDRESS_HIGH_2 = 0x0;
+        FAIL_CONTROL_2 = 0x0;
+        FAIL_ID_2 = 0x0;
+
+        FAIL_ADDRESS_LOW_3 = 0x0;
+        FAIL_ADDRESS_HIGH_3 = 0x0;
+        FAIL_CONTROL_3 = 0x0;
+        FAIL_ID_3 = 0x0;
+
+        REGION_BASE_LOW_0   = 0x0;
+        REGION_BASE_HIGH_0  = 0x0;
+        REGION_TOP_LOW_0    = 0xFFFFFFFF;
+        REGION_TOP_HIGH_0   = rst_region_top_high_0;
+        REGION_ATTRIBUTES_0 = rst_region_attributes_0;
+        REGION_ID_ACCESS_0  = rst_region_id_access_0;
+        
+        /* Setting up background region */
+        if((REGION_ATTRIBUTES_0 & 0xF) != 0xF)
+        {
+            ostringstream reg0_fail;
+            reg0_fail << getInstancePath() << ": filter enable value requested for region 0 is 0x"<<std::hex<<(REGION_ATTRIBUTES_0 & 0xf)<<"\n";
+            reg0_fail << " but region 0 must be enabled for all filters by default according to the specification\n";
+            REGION_ATTRIBUTES_0 |= 0xF;
+            reg0_fail << " so setting REGION_ATTRIBUTES_0 to 0x"<<std::hex<<REGION_ATTRIBUTES_0<<"\n";
+            message(reg0_fail.str(), MSG_WARNING);
+        }
+        
+        addr_regions[0].filter_en =  REGION_ATTRIBUTES_1 & 0x0000000F; // Region 0 is always enabled, and bits are read-only
+        addr_regions[0].s_wr_en   =  (REGION_ATTRIBUTES_0 & 0x80000000) != 0;
+        addr_regions[0].s_rd_en   =  (REGION_ATTRIBUTES_0 & 0x40000000) != 0;
+        addr_regions[0].region_base_low   = 0x00000000;
+        addr_regions[0].region_base_high  = 0x00000000;
+        addr_regions[0].region_top_low    = 0xFFFFFFFF;
+        addr_regions[0].region_top_high   = REGION_TOP_HIGH_0;
+        addr_regions[0].region_attributes = REGION_ATTRIBUTES_0;
+        addr_regions[0].region_id_access  = REGION_ID_ACCESS_0;
+
+
+        REGION_BASE_LOW_1   = rst_region_base_low_1;
+        REGION_BASE_HIGH_1  = rst_region_base_high_1;
+        REGION_TOP_LOW_1    = rst_region_top_low_1;
+        REGION_TOP_HIGH_1   = rst_region_top_high_1;
+        REGION_ATTRIBUTES_1 = rst_region_attributes_1;
+        REGION_ID_ACCESS_1  = rst_region_id_access_1;
+
+        addr_regions[1].filter_en =   REGION_ATTRIBUTES_1 & 0x0000000F;
+        addr_regions[1].s_wr_en   =  (REGION_ATTRIBUTES_1 & 0x80000000) != 0;
+        addr_regions[1].s_rd_en   =  (REGION_ATTRIBUTES_1 & 0x40000000) != 0;
+        addr_regions[1].region_base_low   = REGION_BASE_LOW_1;
+        addr_regions[1].region_base_high  = REGION_BASE_HIGH_1;
+        addr_regions[1].region_top_low    = REGION_TOP_LOW_1;
+        addr_regions[1].region_top_high   = REGION_TOP_HIGH_1;
+        addr_regions[1].region_attributes = REGION_ATTRIBUTES_1;
+        addr_regions[1].region_id_access  = REGION_ID_ACCESS_1;
+
+        REGION_BASE_LOW_2   = rst_region_base_low_2;
+        REGION_BASE_HIGH_2  = rst_region_base_high_2;
+        REGION_TOP_LOW_2    = rst_region_top_low_2;
+        REGION_TOP_HIGH_2   = rst_region_top_high_2;
+        REGION_ATTRIBUTES_2 = rst_region_attributes_2;
+        REGION_ID_ACCESS_2  = rst_region_id_access_2;
+
+        addr_regions[2].filter_en =   REGION_ATTRIBUTES_2 & 0x0000000F;
+        addr_regions[2].s_wr_en   =  (REGION_ATTRIBUTES_2 & 0x80000000) != 0;
+        addr_regions[2].s_rd_en   =  (REGION_ATTRIBUTES_2 & 0x40000000) != 0;
+        addr_regions[2].region_base_low   = REGION_BASE_LOW_2;
+        addr_regions[2].region_base_high  = REGION_BASE_HIGH_2;
+        addr_regions[2].region_top_low    = REGION_TOP_LOW_2;
+        addr_regions[2].region_top_high   = REGION_TOP_HIGH_2;
+        addr_regions[2].region_attributes = REGION_ATTRIBUTES_2;
+        addr_regions[2].region_id_access  = REGION_ID_ACCESS_2;
+
+
+        REGION_BASE_LOW_3   = rst_region_base_low_3;
+        REGION_BASE_HIGH_3  = rst_region_base_high_3;
+        REGION_TOP_LOW_3    = rst_region_top_low_3;
+        REGION_TOP_HIGH_3   = rst_region_top_high_3;
+        REGION_ATTRIBUTES_3 = rst_region_attributes_3;
+        REGION_ID_ACCESS_3  = rst_region_id_access_3;
+
+        addr_regions[3].filter_en =   REGION_ATTRIBUTES_3 & 0x0000000F;
+        addr_regions[3].s_wr_en   =  (REGION_ATTRIBUTES_3 & 0x80000000) != 0;
+        addr_regions[3].s_rd_en   =  (REGION_ATTRIBUTES_3 & 0x40000000) != 0;
+        addr_regions[3].region_base_low   = REGION_BASE_LOW_3;
+        addr_regions[3].region_base_high  = REGION_BASE_HIGH_3;
+        addr_regions[3].region_top_low    = REGION_TOP_LOW_3;
+        addr_regions[3].region_top_high   = REGION_TOP_HIGH_3;
+        addr_regions[3].region_attributes = REGION_ATTRIBUTES_3;
+        addr_regions[3].region_id_access  = REGION_ID_ACCESS_3;
+
+        REGION_BASE_LOW_4   = rst_region_base_low_4;
+        REGION_BASE_HIGH_4  = rst_region_base_high_4;
+        REGION_TOP_LOW_4    = rst_region_top_low_4;
+        REGION_TOP_HIGH_4   = rst_region_top_high_4;
+        REGION_ATTRIBUTES_4 = rst_region_attributes_4;
+        REGION_ID_ACCESS_4  = rst_region_id_access_4;
+
+        addr_regions[4].filter_en =   REGION_ATTRIBUTES_4 & 0x0000000F;
+        addr_regions[4].s_wr_en   =  (REGION_ATTRIBUTES_4 & 0x80000000) != 0;
+        addr_regions[4].s_rd_en   =  (REGION_ATTRIBUTES_4 & 0x40000000) != 0;
+        addr_regions[4].region_base_low   = REGION_BASE_LOW_4;
+        addr_regions[4].region_base_high  = REGION_BASE_HIGH_4;
+        addr_regions[4].region_top_low    = REGION_TOP_LOW_4;
+        addr_regions[4].region_top_high   = REGION_TOP_HIGH_4;
+        addr_regions[4].region_attributes = REGION_ATTRIBUTES_4;
+        addr_regions[4].region_id_access  = REGION_ID_ACCESS_4;
+
+        REGION_BASE_LOW_5   = rst_region_base_low_5;
+        REGION_BASE_HIGH_5  = rst_region_base_high_5;
+        REGION_TOP_LOW_5    = rst_region_top_low_5;
+        REGION_TOP_HIGH_5   = rst_region_top_high_5;
+        REGION_ATTRIBUTES_5 = rst_region_attributes_5;
+        REGION_ID_ACCESS_5  = rst_region_id_access_5;
+
+        addr_regions[5].filter_en =   REGION_ATTRIBUTES_5 & 0x0000000F;
+        addr_regions[5].s_wr_en   =  (REGION_ATTRIBUTES_5 & 0x80000000) != 0;
+        addr_regions[5].s_rd_en   =  (REGION_ATTRIBUTES_5 & 0x40000000) != 0;
+        addr_regions[5].region_base_low   = REGION_BASE_LOW_5;
+        addr_regions[5].region_base_high  = REGION_BASE_HIGH_5;
+        addr_regions[5].region_top_low    = REGION_TOP_LOW_5;
+        addr_regions[5].region_top_high   = REGION_TOP_HIGH_5;
+        addr_regions[5].region_attributes = REGION_ATTRIBUTES_5;
+        addr_regions[5].region_id_access  = REGION_ID_ACCESS_5;
+
+        REGION_BASE_LOW_6   = rst_region_base_low_6;
+        REGION_BASE_HIGH_6  = rst_region_base_high_6;
+        REGION_TOP_LOW_6    = rst_region_top_low_6;
+        REGION_TOP_HIGH_6   = rst_region_top_high_6;
+        REGION_ATTRIBUTES_6 = rst_region_attributes_6;
+        REGION_ID_ACCESS_6  = rst_region_id_access_6;
+
+        addr_regions[6].filter_en =   REGION_ATTRIBUTES_6 & 0x0000000F;
+        addr_regions[6].s_wr_en   =  (REGION_ATTRIBUTES_6 & 0x80000000) != 0;
+        addr_regions[6].s_rd_en   =  (REGION_ATTRIBUTES_6 & 0x40000000) != 0;
+        addr_regions[6].region_base_low   = REGION_BASE_LOW_6;
+        addr_regions[6].region_base_high  = REGION_BASE_HIGH_6;
+        addr_regions[6].region_top_low    = REGION_TOP_LOW_6;
+        addr_regions[6].region_top_high   = REGION_TOP_HIGH_6;
+        addr_regions[6].region_attributes = REGION_ATTRIBUTES_6;
+        addr_regions[6].region_id_access  = REGION_ID_ACCESS_6;
+
+        REGION_BASE_LOW_7   = rst_region_base_low_7;
+        REGION_BASE_HIGH_7  = rst_region_base_high_7;
+        REGION_TOP_LOW_7    = rst_region_top_low_7;
+        REGION_TOP_HIGH_7   = rst_region_top_high_7;
+        REGION_ATTRIBUTES_7 = rst_region_attributes_7;
+        REGION_ID_ACCESS_7  = rst_region_id_access_7;
+
+        addr_regions[7].filter_en =   REGION_ATTRIBUTES_7 & 0x0000000F;
+        addr_regions[7].s_wr_en   =  (REGION_ATTRIBUTES_7 & 0x80000000) != 0;
+        addr_regions[7].s_rd_en   =  (REGION_ATTRIBUTES_7 & 0x40000000) != 0;
+        addr_regions[7].region_base_low   = REGION_BASE_LOW_7;
+        addr_regions[7].region_base_high  = REGION_BASE_HIGH_7;
+        addr_regions[7].region_top_low    = REGION_TOP_LOW_7;
+        addr_regions[7].region_top_high   = REGION_TOP_HIGH_7;
+        addr_regions[7].region_attributes = REGION_ATTRIBUTES_7;
+        addr_regions[7].region_id_access  = REGION_ID_ACCESS_7;
+
+        REGION_BASE_LOW_8   = rst_region_base_low_8;
+        REGION_BASE_HIGH_8  = rst_region_base_high_8;
+        REGION_TOP_LOW_8    = rst_region_top_low_8;
+        REGION_TOP_HIGH_8   = rst_region_top_high_8;
+        REGION_ATTRIBUTES_8 = rst_region_attributes_8;
+        REGION_ID_ACCESS_8  = rst_region_id_access_8;
+
+        addr_regions[8].filter_en =   REGION_ATTRIBUTES_8 & 0x0000000F;
+        addr_regions[8].s_wr_en   =  (REGION_ATTRIBUTES_8 & 0x80000000) != 0;
+        addr_regions[8].s_rd_en   =  (REGION_ATTRIBUTES_8 & 0x40000000) != 0;
+        addr_regions[8].region_base_low   = REGION_BASE_LOW_8;
+        addr_regions[8].region_base_high  = REGION_BASE_HIGH_8;
+        addr_regions[8].region_top_low    = REGION_TOP_LOW_8;
+        addr_regions[8].region_top_high   = REGION_TOP_HIGH_8;
+        addr_regions[8].region_attributes = REGION_ATTRIBUTES_8;
+        addr_regions[8].region_id_access  = REGION_ID_ACCESS_8;
+
+        PID4 = 0x04;
+        PID5 = 0x00;
+        PID6 = 0x00;
+        PID7 = 0x00;
+        PID0 = 0x60;
+        PID1 = 0xB4;
+        PID2 = 0x1B;
+        PID3 = 0x00;
+
+        ID0 = 0x0D;
+        ID1 = 0xF0;
+        ID2 = 0x05;
+        ID3 = 0xB1;
+
+        /* write and read speculation are enbled by default */
+        write_spec_disable = false;
+        read_spec_disable = false;
+
+        /* Pass the configurations to the filters */
+        for(uint32_t i=0; i<num_of_filters; i++)
+        {
+            if(self.filter_control[i].setConfig.implemented())
+                self.filter_control[i].setConfig(!read_spec_disable, !write_spec_disable, ACTION);
+        }
+
+        if(id_mapping.empty())
+        {
+            message(getInstancePath()+": has empty parameter id_mapping, it is required for correct NSAID checking\n", MSG_WARNING);
+        }
+        else
+        {
+            idmap->configureMapping(id_mapping);
+        }
+        
+        if (diagnostics>2)
+        {
+            message(getInstancePath()+": id_mapping parameter string = "+id_mapping+"\n",MSG_INFO);
+            message(getInstancePath()+": map between MasterID and NSAID is\n"+idmap->getMappingDisplay(), MSG_INFO);
+        }
+    }
+
+    behavior init()
+    {
+        composition.init();
+        idmap = new TZC400_id_mapper(this,getInstancePath());
+        common_reset();
+    }
+
+    behavior terminate()
+    {
+        composition.terminate();
+        delete idmap;
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+
+        common_reset();
+    }
+
+    behavior registerRead(uint32_t addr) : uint32_t
+    {
+        uint32_t data = 0;
+        if((addr>=0x000 && addr<=0x014) || (addr>=0xFD0 && addr<=0xFFC)) // Basic configuration registers
+        {
+            switch(addr)
+            {
+            case 0x000: // BUILD_CONFIG - READ ONLY
+                data = BUILD_CONFIG;
+                break;
+            case 0x004: // ACTION
+                data = ACTION;
+                break;
+            case 0x008: // GATE_KEEPER
+                data = GATE_KEEPER;
+                break;
+            case 0x00C: // SPECULATION_CTRL
+                data = SPECULATION_CTRL;
+                break;
+            case 0x010: // INT_STATUS - READ ONLY
+                data = INT_STATUS;
+                break;
+            case 0x014: // INT_CLEAR
+                message(getInstancePath()+": attempt to read write-only INT_CLEAR register\n",MSG_WARNING);
+                break;
+            case 0xFD0: // PID_4
+                data = PID4;
+                break;
+            case 0xFD4: // PID_5
+                data = PID5;
+                break;
+            case 0xFD8: // PID_6
+                data = PID6;
+                break;
+            case 0xFDC: // PID_7
+                data = PID7;
+                break;
+            case 0xFE0: // PID_0
+                data = PID0;
+                break;
+            case 0xFE4: // PID_1
+                data = PID1;
+                break;
+            case 0xFE8: // PID_2
+                data = PID2;
+                break;
+            case 0xFEC: // PID_3
+                data = PID3;
+                break;
+            case 0xFF0: // COMID_0
+                data = ID0;
+                break;
+            case 0xFF4: // COMID_1
+                data = ID1;
+                break;
+            case 0xFF8: // COMID_2
+                data = ID2;
+                break;
+            case 0xFFC: // COMID_3
+                data = ID3;
+                break;
+            }
+        } else if(addr>=0x020 && addr<=0x05C) {// Fail status registers
+            uint32_t region_index = (addr-0x020)/0x10; // which region
+            uint32_t register_offset = (addr-0x20)%0x10; // which register
+
+            switch(register_offset)
+            {
+            case 0x0:
+                data = fail_status[region_index].fail_addr_low;
+                break;
+            case 0x4:
+                data = fail_status[region_index].fail_addr_high;
+                break;
+            case 0x8:
+                data = fail_status[region_index].fail_control;
+                break;
+            case 0xC:
+                data = fail_status[region_index].fail_id;
+            }
+        } else if(addr>=0x100 && addr<=0x21C) { // Region registers
+            uint32_t region_index = (addr-0x100)/0x20; // which region
+            uint32_t register_offset = (addr-0x100)%0x20; // which register
+
+            switch(register_offset)
+            {
+            case 0x00:
+                data = addr_regions[region_index].region_base_low;
+                break;
+            case 0x04:
+                data = addr_regions[region_index].region_base_high;
+                break;
+            case 0x08:
+                data = addr_regions[region_index].region_top_low|0xFFF;
+                break;
+            case 0x0C:
+                data = addr_regions[region_index].region_top_high|0xFFF;
+                break;
+            case 0x10:
+                data = addr_regions[region_index].region_attributes;
+                break;
+            case 0x14:
+                data = addr_regions[region_index].region_id_access;
+                break;
+            }
+        } else
+        {
+            ostringstream read_addr_err;
+            read_addr_err << getInstancePath() << ": attempt to read from invalid address 0x"<<std::hex<<(uint32_t)addr<<"\n";
+            message(read_addr_err.str(),MSG_WARNING);
+        }
+        return data;
+    }
+
+    behavior registerWrite(uint32_t addr, uint32_t data)
+    {
+        if(addr>=0x000 && addr<=0x014) // Basic configuration registers
+        {
+            switch(addr)
+            {
+            case 0x000: // BUILD_CONFIG - READ ONLY
+                message(getInstancePath()+": attempt to write read-only BUILD_CONFIG register\n",MSG_WARNING);
+                break;
+            case 0x004: // ACTION
+                ACTION = data & 0x3;
+                /* Pass the configurations to the filters */
+                for(uint32_t i=0; i<num_of_filters; i++)
+                {
+                    if(self.filter_control[i].setConfig.implemented())
+                        self.filter_control[i].setConfig(!read_spec_disable, !write_spec_disable, ACTION);
+                }
+                tzc_group.revokeAll();
+                break;
+            case 0x008: // GATE_KEEPER
+                GATE_KEEPER = data & 0xF; // This is a RW register, but the top half (16 bits) of the register is read only
+                GATE_KEEPER |= (GATE_KEEPER & 0xF) << 16; // Set the open status straight way.
+                tzc_group.revokeAll();
+                break;
+            case 0x00C: // SPECULATION_CTRL
+                SPECULATION_CTRL = data & 0x3;
+                write_spec_disable = ((SPECULATION_CTRL & 0x2) == 2);
+                read_spec_disable = ((SPECULATION_CTRL & 0x1) == 1);
+                /* Pass the configurations to the filters */
+                for(uint32_t i=0; i<num_of_filters; i++)
+                {
+                    if(self.filter_control[i].setConfig.implemented())
+                        self.filter_control[i].setConfig(!read_spec_disable, !write_spec_disable, ACTION);
+                }
+                tzc_group.revokeAll();
+                break;
+            case 0x010: // INT_STATUS - READ ONLY
+                message(getInstancePath()+": attempt to write read-only INT_STATUS register\n",MSG_WARNING);
+                break;
+            case 0x014: // INT_CLEAR
+                INT_STATUS &= ~(data & 0xF);       // Clear status bits
+                INT_STATUS &= ~((data & 0xF)<<16); // Clear overlapping bits
+                tzc_group.revokeAll();
+                break;
+            }
+        }
+        else if(addr>=0x020 && addr<=0x05C)   // Fail status registers
+        {
+            ostringstream waf;
+            waf << getInstancePath() << ": attempt to write read-only fail status register at 0x" << std::hex <<addr;
+            message(waf.str()+"\n",MSG_WARNING);
+        }
+        else if(addr>=0x100 && addr<=0x21C)   // Region registers
+        {
+            uint32_t region_index = (addr-0x100)/0x20; // which region
+            uint32_t register_offset = (addr-0x100)%0x20; // which register
+
+            if (region_index == 0 && register_offset < 0x10)
+            {
+                // Region 0 registers are a special case: only 0x10 and 0x14 are writable
+                ostringstream waf;
+                waf << getInstancePath()<<": attempt to write read-only region 0 register at 0x" << std::hex << addr;
+                message(waf.str()+"\n",MSG_WARNING);
+            }
+            else
+            {
+                switch(register_offset)
+                {
+                case 0x00: // Region base low
+                    addr_regions[region_index].region_base_low = data & 0xFFFFF000; // Region size can only be aligned to 4KB
+                    break;
+                case 0x04: // Region base high
+                    addr_regions[region_index].region_base_high = data;
+                    break;
+                case 0x08: // Region top low
+                    addr_regions[region_index].region_top_low = data & 0xFFFFF000; // Region size can only be aligned to 4KB
+                    break;
+                case 0x0C: // Region top high
+                    addr_regions[region_index].region_top_high = data;
+                    break;
+                case 0x10:
+                    addr_regions[region_index].s_wr_en = !!(data & 1<<31);
+                    addr_regions[region_index].s_rd_en = !!(data & 1<<30);
+                    if(region_index > 0) // Filter enable bits[3:0] are read-only for region 0
+                    {
+                        addr_regions[region_index].filter_en = data & 0xF;
+                        addr_regions[region_index].region_attributes = data & 0xC000000F;
+                    }
+                    else
+                    {
+                        addr_regions[region_index].region_attributes = data & 0xC0000000;
+                        if((data & 0xF) != 0) // Try to write to bits[3:0]
+                        {
+                            ostringstream w;
+                            w << getInstancePath()<<": attempt to write to bottom bits of REGION_0_ATTRIBUTE register by writing 0x"<<std::hex<<data<<" to 0x" << std::hex << addr << std::endl;
+                            message(w.str(),MSG_WARNING);
+                        }
+                    }
+                    break;
+                case 0x14:
+                    addr_regions[region_index].region_id_access = data;
+                    addr_regions[region_index].nsaid_rd_en = data & 0x0000FFFF;
+                    addr_regions[region_index].nsaid_wr_en = (data & 0xFFFF0000)>>16;
+                    break;
+                }
+
+                // We changed something in one of the regions: revoke all channels to
+                // let the configuration change take effect.
+                tzc_group.revokeAll();
+            }
+        }
+        else
+        {
+            ostringstream write_invalid_addr;
+            write_invalid_addr << getInstancePath() << ": attempt to write invalid address " << std::hex << addr;
+            message(write_invalid_addr.str(),MSG_WARNING);
+        }
+    }
+
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+
+        return ACCESS_FUNC_OK;
+    }
+}

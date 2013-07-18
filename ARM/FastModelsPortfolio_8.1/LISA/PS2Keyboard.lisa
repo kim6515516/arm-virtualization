@@ -1,0 +1,835 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// Interface component, which takes the keypress/release signals from the
+// Visualisation component and translates them into clocked PS2Data signals
+// which can be routed to a PL050_KMI component.
+
+component PS2Keyboard
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Interface component, which takes the keypress/release signals from the Visualisation component and translates them into clocked PS2Data signals which can be routed to a PL050_KMI component.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes
+    {
+        #define debug_queue    if (!0) ; else printf
+        #define TRACE_KEYBOARD if (!0) ; else printf
+        
+        #include "components/KeyCode.h"
+    }
+    
+    composition
+    {
+        ps2_clocktimer : ClockTimer;
+    }
+    
+    connection
+    {
+        self.clk_in => ps2_clocktimer.clk_in;
+        ps2_clocktimer.timer_callback => self.ps2_timer_callback;
+    }
+    
+    resources
+    {
+        // ps2 resources
+        
+        enum ps2_consts
+        {
+            tx_fifo_max = 128,
+
+            PS2_ACK = 0xfa
+        };
+        
+        uint8_t tx_fifo[tx_fifo_max];
+        uint8_t tx_fifo_level;
+        uint8_t tx_fifo_in;
+        uint8_t tx_fifo_out;
+        
+        bool command_pending; //!< kmi has indicated that there is a command pending
+        bool ok_to_send;      //!< kmi has indicated that it is ok to send data
+
+        uint32_t poll_period;   //!< polling period in usecs (0 = nothing to do)
+        bool   poll_active;   //!< protects timer from being set during a callback
+
+        struct KeyMap
+        {
+            ATKeyCode kc;
+            uint8_t ps2;
+        };
+        
+        uint8_t scancode_set;          // current scan codes
+        uint8_t command_pos;           // command queue index (depth 2)
+        uint8_t command;               // command byte
+        uint8_t lastbyte;              // last byte sent
+
+        uint8_t scancode[3][KC_MAX];
+        uint8_t scancode_ext[3][KC_MAX];
+    }
+
+    // Clock signal to rate at which PS2Data signals are generated.
+    slave port<ClockSignal> clk_in;
+    
+    behaviour init()
+    {
+        composition.init();
+
+        ps2_init();
+        device_init();
+
+        ps2_reset();
+        device_reset();
+    }
+    
+    behaviour reset(int level)
+    {
+        composition.reset(level);
+        ps2_reset();
+        device_reset();
+    }
+    
+    behaviour ps2_init()
+    {
+    }
+    
+    behaviour ps2_reset()
+    {
+        command_pending = false;
+        ok_to_send      = false;
+
+        poll_period = 0;
+        poll_active = false;    
+        
+        clearQueue();
+    }
+    
+    // ps2 device implementation
+    
+    behaviour clearQueue()
+    {
+        tx_fifo_in    = 0;
+        tx_fifo_out   = 0;
+        tx_fifo_level = 0;        
+    }
+    
+    behaviour queueData(uint8_t* buf, uint8_t count)
+    {
+        if (ok_to_send && !ps2_clocktimer.timer_control.isSet()) {
+            ps2_clocktimer.timer_control.set(8); 
+        }
+
+        if (tx_fifo_level+count >= tx_fifo_max)
+        {
+            debug_queue("ps2 queue overflow\n");
+            return;
+        }
+
+        while (tx_fifo_level < tx_fifo_max && count > 0)
+        {
+            tx_fifo[tx_fifo_in++] = *buf++;
+            if (tx_fifo_in == tx_fifo_max)
+                tx_fifo_in = 0;
+            tx_fifo_level++;
+
+            --count;
+        }        
+    }
+    
+    // Generate PS2 signals to be sent to PL050_KMI.
+    master port<PS2Data>     ps2
+    {
+        behaviour setClockData(enum ps2clockdata_state state)
+        {
+            command_pending = (state == PS2_Request_To_Send);
+            ok_to_send = (state == PS2_Ready);
+         
+            if (ok_to_send && tx_fifo_level > 0)
+                poll_period = 8;
+            else if (command_pending)
+                poll_period = 64;
+            else
+                poll_period = 0;
+
+            // Be careful to not play around with the timer if we're in the
+            // timer callback.  The callback will retrigger the timer based
+            // on the value of poll_period.
+            if (!poll_active)
+            {
+                if (poll_period > 0) {
+                    ps2_clocktimer.timer_control.set(poll_period);
+                } else {
+                    ps2_clocktimer.timer_control.cancel();
+                }
+            }            
+        }
+    }
+    
+    internal slave port<TimerCallback> ps2_timer_callback
+    {
+        behavior signal() : uint32_t
+        {
+            poll_active = true;
+
+            if (command_pending) {
+                uint8_t data = ps2.getData();
+                Command(data);
+            }
+            
+            if (ok_to_send && tx_fifo_level > 0) {
+                uint8_t data = tx_fifo[tx_fifo_out];
+                
+                if (++tx_fifo_out == tx_fifo_max) {
+                    tx_fifo_out = 0;
+                }
+
+                --tx_fifo_level;
+
+                ps2.putData(data);
+            }
+
+            poll_active = false;
+
+            // various callbacks will determine the next polling period
+            return poll_period;
+        }
+    }
+    
+    // Keyboard specifics
+    
+    behaviour device_init()
+    {
+        init_keymaps();
+    }
+    
+    behaviour device_reset()
+    {
+        scancode_set = 2;
+        lastbyte = 0;
+        command_pos = 0;
+    }  
+    
+    behaviour reply1(uint8_t data)
+    {
+        queueData(&data, 1);
+    }
+
+    behaviour reply2(uint8_t data1, uint8_t data2)
+    {
+        uint8_t buf[2];
+        buf[0] = data1;
+        buf[1] = data2;
+
+        queueData(buf, 2);
+    }
+
+    behaviour Command(uint8_t data)
+    {
+        // does this flush the transmit queue?
+        clearQueue();
+
+        if (command_pos == 0)
+            command = data;
+
+        switch (command)
+        {
+        case 0xf0:
+            if (command_pos == 0)
+            {
+                reply1(PS2_ACK);
+                command_pos++;
+            }
+            else if (command_pos == 1)
+            {
+                reply1(PS2_ACK);
+                if (data == 0)
+                {
+                    reply1(scancode_set);
+                }
+                else
+                {
+                    scancode_set = data;
+                    if (scancode_set > 3)
+                        scancode_set = 1;
+                }
+                command_pos = 0;
+            }
+        break;
+        case 0xf2: // read id
+            reply2(0xab, 0x83);
+        break;
+        case 0xf3: // repeat rate
+            if (command_pos == 0)
+                command_pos = 1;
+            else
+                command_pos = 0;
+            reply1(PS2_ACK);
+        break;
+        case 0xf4: // enable
+            reply1(PS2_ACK);
+        break;
+        case 0xee: // echo
+            reply1(0xee);
+        break;
+        case 0xed: // leds
+            if (command_pos == 0)
+                command_pos = 1;
+            else
+                command_pos = 0;
+
+            reply1(PS2_ACK);
+        break;
+        case 0xf8: // set make/break
+            reply1(PS2_ACK);
+        break;
+        case 0xff: // reset
+            reply2(PS2_ACK, 0xaa);
+        break;
+        case 0xfe: // resend
+            reply1(lastbyte);
+        break;
+        default:
+            TRACE_KEYBOARD("unknown PS/2 keyboard command %d\n", data);
+            reply1(PS2_ACK);
+            break;
+        }
+    }
+    
+    // Incoming keypress/release signals from Visualisation component.
+    slave port<KeyboardStatus> keyboard
+    {
+        behaviour keyDown(ATKeyCode code)
+        {
+            uint8_t buf[3];
+            uint8_t count = 0;
+
+            uint8_t set = scancode_set-1;
+
+            uint8_t ps2 = scancode[set][code];
+            if (ps2 == 0xe0)
+            {
+                buf[count++] = 0xe0;
+                ps2 = scancode_ext[set][code];
+            }
+
+            if (ps2 != 0)
+                buf[count++] = ps2;
+            else
+                return;
+
+            queueData(buf, count);
+        }
+
+        behaviour keyUp(ATKeyCode code)
+        {
+            uint8_t buf[3];
+            uint8_t count = 0;
+
+            uint8_t set = scancode_set-1;
+
+            uint8_t ps2 = scancode[set][code];
+            if (ps2 == 0xe0)
+            {
+                buf[count++] = 0xe0;
+                ps2 = scancode_ext[set][code];
+            }
+
+            if (ps2 != 0)
+            {
+                if (set == 0)
+                    buf[count++] = ps2+0x80;
+                else
+                {
+                    buf[count++] = 0xf0;
+                    buf[count++] = ps2;
+                }
+            }
+            else
+                return;
+
+            queueData(buf, count);
+        }        
+    }
+    
+    behaviour init_keymaps()
+    {
+        static struct KeyMap scancode1_map[] =
+        {
+            { KC_ESCAPE,  0x01 },
+            { KC_F1,        0x3b },
+            { KC_F2,        0x3c },
+            { KC_F3,        0x3d },
+            { KC_F4,        0x3e },
+            { KC_F5,        0x3f },
+            { KC_F6,        0x40 },
+            { KC_F7,        0x41 },
+            { KC_F8,        0x42 },
+            { KC_F9,        0x43 },
+            { KC_F10,       0x44 },
+            { KC_F11,       0x57 },
+            { KC_F12,       0x58 },
+            { KC_PRINT,   0xe0 },
+            { KC_SCROLL,    0x46 },
+            { KC_BREAK,   0xe0 },
+
+            { KC_GRAVE,   0x29 },
+            { KC_1,     0x02 },
+            { KC_2,     0x03 },
+            { KC_3,     0x04 },
+            { KC_4,     0x05 },
+            { KC_5,     0x06 },
+            { KC_6,     0x07 },
+            { KC_7,     0x08 },
+            { KC_8,     0x09 },
+            { KC_9,     0x0a },
+            { KC_0,     0x0b },
+            { KC_MINUS,   0x0c },
+            { KC_EQUALS,    0x0d },
+            { KC_BACK,  0x0e },
+            
+            { KC_TAB,     0x0f },
+            { KC_Q,     0x10 },
+            { KC_W,     0x11 },
+            { KC_E,     0x12 },
+            { KC_R,     0x13 },
+            { KC_T,     0x14 },
+            { KC_Y,     0x15 },
+            { KC_U,     0x16 },
+            { KC_I,     0x17 },
+            { KC_O,     0x18 },
+            { KC_P,     0x19 },
+            { KC_LBRACKET,0x1a },
+            { KC_RBRACKET,0x1b },
+            { KC_BACKSLASH,0x2b },
+
+            { KC_LCONTROL,0x1d },
+            { KC_A,     0x1e },
+            { KC_S,     0x1f },
+            { KC_D,     0x20 },
+            { KC_F,     0x21 },
+            { KC_G,     0x22 },
+            { KC_H,     0x23 },
+            { KC_J,     0x24 },
+            { KC_K,     0x25 },
+            { KC_L,     0x26 },
+            { KC_SEMICOLON, 0x27 },
+            { KC_APOSTROPHE, 0x28 },
+            { KC_RETURN,    0x1c },
+
+            { KC_LSHIFT,    0x2a },
+            { KC_Z,     0x2c },
+            { KC_X,     0x2d },
+            { KC_C,     0x2e },
+            { KC_V,     0x2f },
+            { KC_B,     0x30 },
+            { KC_N,     0x31 },
+            { KC_M,     0x32 },
+            { KC_COMMA, 0x33 },
+            { KC_PERIOD,    0x34 },
+            { KC_SLASH, 0x35 },
+            { KC_RSHIFT,    0x36 },
+
+            { KC_CAPS,    0x3a },
+            { KC_LALT,  0x38 },
+            { KC_SPACE, 0x39 },
+            { KC_RALT,  0xe0 },
+            { KC_RCONTROL,0xe0 },
+
+            { KC_INSERT,    0xe0 },
+            { KC_HOME,  0xe0 },
+            { KC_PGUP,  0xe0 },
+
+            { KC_DELETE,    0xe0 },
+            { KC_END,       0xe0 },
+            { KC_PGDN,  0xe0 },
+
+            { KC_UP,        0xe0 },
+            { KC_LEFT,  0xe0 },
+            { KC_DOWN,  0xe0 },
+            { KC_RIGHT, 0xe0 },
+            
+            { KC_NUMLOCK, 0x45 },
+            { KC_DIVIDE,    0xe0 },
+            { KC_MULTIPLY,0x37 },
+
+            { KC_NUMPAD7, 0x47 },
+            { KC_NUMPAD8, 0x48 },
+            { KC_NUMPAD9, 0x49 },
+            { KC_SUBTRACT,0x4a },
+
+            { KC_NUMPAD4, 0x4b }, 
+            { KC_NUMPAD5, 0x4c },
+            { KC_NUMPAD6,   0x4d },
+            { KC_ADD,       0x4e },
+
+            { KC_NUMPAD1, 0x4f },
+            { KC_NUMPAD2, 0x50 },
+            { KC_NUMPAD3,   0x51 },
+            { KC_NUMPADENTER, 0xe0 },
+
+            { KC_NUMPAD0, 0x52 },
+            { KC_DECIMAL, 0x53 },
+
+            // multimedia keys not necessarily present
+            { KC_LWIN,    0xe0 },
+            { KC_RWIN,    0xe0 },
+            { KC_POWER,   0xe0 },
+            { KC_SLEEP,   0xe0 },
+            { KC_WAKE,    0xe0 },
+
+            { KC_MAX, 0 }
+        };
+
+        // scancode1 extension (0xe0) map
+        static struct KeyMap scancode1_ext_map[] =
+        {
+            { KC_PRINT,     0x37 },
+            { KC_BREAK,     0x46 },
+            { KC_RALT,      0x38 },
+            { KC_RCONTROL,  0x1d },
+
+            { KC_INSERT,    0x52 },
+            { KC_HOME,      0x47 },
+            { KC_PGUP,      0x49 },
+
+            { KC_DELETE,    0x53 },
+            { KC_END,       0x4f },
+            { KC_PGDN,      0x51 },
+
+            { KC_UP,        0x48 },
+            { KC_LEFT,      0x4b },
+            { KC_DOWN,      0x50 },
+            { KC_RIGHT,     0x4d },
+            { KC_DIVIDE,    0x35 },
+            { KC_NUMPADENTER, 0x1c },
+            { KC_LWIN,      0x5b },
+            { KC_RWIN,      0x5c },
+            { KC_POWER,     0x5e },
+            { KC_SLEEP,     0x5f },
+            { KC_WAKE,      0x63 },
+
+            { KC_MAX, 0 }
+        };
+
+        static struct KeyMap scancode2_map[] =
+        {
+            { KC_ESCAPE,  0x76 },
+            { KC_F1,        0x05 },
+            { KC_F2,        0x06 },
+            { KC_F3,        0x04 },
+            { KC_F4,        0x0c },
+            { KC_F5,        0x03 },
+            { KC_F6,        0x0b },
+            { KC_F7,        0x83 },
+            { KC_F8,        0x0a },
+            { KC_F9,        0x01 },
+            { KC_F10,       0x09 },
+            { KC_F11,       0x78 },
+            { KC_F12,       0x07 },
+            { KC_PRINT,   0xe0 },
+            { KC_SCROLL,    0x7e },
+            { KC_BREAK,   0xe0 },
+
+            { KC_GRAVE,   0xe },
+            { KC_1,     0x16 },
+            { KC_2,     0x1e },
+            { KC_3,     0x26 },
+            { KC_4,     0x25 },
+            { KC_5,     0x2e },
+            { KC_6,     0x36 },
+            { KC_7,       0x3d },
+            { KC_8,     0x3e },
+            { KC_9,     0x46 },
+            { KC_0,     0x45 },
+            { KC_MINUS,   0x4e },
+            { KC_EQUALS,    0x55 },
+            { KC_BACK,  0x66 },
+            
+            { KC_TAB,     0x0d },
+            { KC_Q,     0x15 },
+            { KC_W,     0x1d },
+            { KC_E,     0x24 },
+            { KC_R,     0x2d },
+            { KC_T,     0x2c },
+            { KC_Y,     0x35 },
+            { KC_U,     0x3c },
+            { KC_I,     0x43 },
+            { KC_O,     0x44 },
+            { KC_P,     0x4d },
+            { KC_LBRACKET,0x54 },
+            { KC_RBRACKET,0x5b },
+            { KC_BACKSLASH, 0x61},
+
+            { KC_LCONTROL,0x14 },
+            { KC_A,     0x1c },
+            { KC_S,     0x1b },
+            { KC_D,     0x23 },
+            { KC_F,     0x2b },
+            { KC_G,     0x34 },
+            { KC_H,     0x33 },
+            { KC_J,     0x3b },
+            { KC_K,     0x42 },
+            { KC_L,     0x4b },
+            { KC_SEMICOLON, 0x4c },
+            { KC_APOSTROPHE, 0x52 },
+            { KC_RETURN,    0x5a },
+
+            { KC_LSHIFT,    0x12 },
+            { KC_Z,     0x1a },
+            { KC_X,     0x22 },
+            { KC_C,     0x21 },
+            { KC_V,     0x2a },
+            { KC_B,     0x32 },
+            { KC_N,     0x31 },
+            { KC_M,     0x3a },
+            { KC_COMMA, 0x41 },
+            { KC_PERIOD,    0x49 },
+            { KC_SLASH, 0x4a },
+            { KC_RSHIFT,    0x59 },
+
+            { KC_CAPS,    0x58 },
+            { KC_LALT,  0x11 },
+            { KC_SPACE, 0x29 },
+            { KC_RALT,  0xe0 },
+            { KC_RCONTROL,0xe0 },
+
+            { KC_INSERT,    0xe0 },
+            { KC_HOME,  0xe0 },
+            { KC_PGUP,  0xe0 },
+
+            { KC_DELETE,    0xe0 },
+            { KC_END,       0xe0 },
+            { KC_PGDN,  0xe0 },
+
+            { KC_UP,        0xe0 },
+            { KC_LEFT,  0xe0 },
+            { KC_DOWN,  0xe0 },
+            { KC_RIGHT, 0xe0 },
+            
+            { KC_NUMLOCK, 0x77 },
+            { KC_DIVIDE,    0xe0 },
+            { KC_MULTIPLY,0x7c },
+            { KC_HASH, 0x5d },    
+
+            { KC_NUMPAD7, 0x6c },
+            { KC_NUMPAD8, 0x75 },
+            { KC_NUMPAD9, 0x7d },
+            { KC_SUBTRACT,0x7b },
+
+            { KC_NUMPAD4, 0x6b }, 
+            { KC_NUMPAD5, 0x73 },
+            { KC_NUMPAD6,   0x74 },
+            { KC_ADD,       0x79 },
+
+            { KC_NUMPAD1, 0x69 },
+            { KC_NUMPAD2, 0x72 },
+            { KC_NUMPAD3,   0x7a },
+            { KC_NUMPADENTER, 0xe0 },
+
+            { KC_NUMPAD0, 0x70 },
+            { KC_DECIMAL, 0x71 },
+
+            // multimedia keys not necessarily present
+            { KC_LWIN,    0xe0 },
+            { KC_RWIN,    0xe0 },
+            { KC_POWER,   0xe0 },
+            { KC_SLEEP,   0xe0 },
+            { KC_WAKE,    0xe0 },
+
+            { KC_MAX, 0 }
+        };
+
+        // scancode2 extension (0xe0) map
+        static struct KeyMap scancode2_ext_map[] =
+        {
+            { KC_PRINT,     0x7c },
+            { KC_BREAK,     0x7e },
+            { KC_RALT,      0x11},
+            { KC_RCONTROL,  0x14 },
+
+            { KC_INSERT,    0x70 },
+            { KC_HOME,      0x6c },
+            { KC_PGUP,      0x7d },
+
+            { KC_DELETE,    0x71 },
+            { KC_END,       0x69 },
+            { KC_PGDN,      0x7a },
+
+            { KC_UP,        0x75 },
+            { KC_LEFT,      0x6b },
+            { KC_DOWN,      0x72 },
+            { KC_RIGHT,     0x74 },
+            { KC_DIVIDE,    0x4a },
+            { KC_NUMPADENTER, 0x5a },
+            { KC_LWIN,      0x1f },
+            { KC_RWIN,      0x27 },
+            { KC_POWER,     0x37 },
+            { KC_SLEEP,     0x3f },
+            { KC_WAKE,      0x5e },
+
+            { KC_MAX, 0 }
+        };
+
+        static struct KeyMap scancode3_map[] =
+        {
+            { KC_ESCAPE,  0x08 },
+            { KC_F1,        0x07 },
+            { KC_F2,        0x0f },
+            { KC_F3,        0x17 },
+            { KC_F4,        0x1f },
+            { KC_F5,        0x27 },
+            { KC_F6,        0x2f },
+            { KC_F7,        0x37 },
+            { KC_F8,        0x3f },
+            { KC_F9,        0x47 },
+            { KC_F10,       0x4f },
+            { KC_F11,       0x56 },
+            { KC_F12,       0x5e },
+            { KC_PRINT,     0x57 },
+            { KC_SCROLL,    0x5f },
+            { KC_BREAK,   0x62 },
+
+            { KC_GRAVE,   0xe },
+            { KC_1,     0x16 },
+            { KC_2,     0x1e },
+            { KC_3,     0x26 },
+            { KC_4,     0x25 },
+            { KC_5,     0x2e },
+            { KC_6,     0x36 },
+            { KC_7,       0x3d },
+            { KC_8,     0x3e },
+            { KC_9,     0x46 },
+            { KC_0,     0x45 },
+            { KC_MINUS,   0x4e },
+            { KC_EQUALS,    0x55 },
+            { KC_BACK,  0x66 },
+            
+            { KC_TAB,     0x0d },
+            { KC_Q,     0x15 },
+            { KC_W,     0x1d },
+            { KC_E,     0x24 },
+            { KC_R,     0x2d },
+            { KC_T,     0x2c },
+            { KC_Y,     0x35 },
+            { KC_U,     0x3c },
+            { KC_I,     0x43 },
+            { KC_O,     0x44 },
+            { KC_P,     0x4d },
+            { KC_LBRACKET,0x54 },
+            { KC_RBRACKET,0x5b },
+            { KC_BACKSLASH,0x5c },
+
+            { KC_LCONTROL,0x11 },
+            { KC_A,     0x1c },
+            { KC_S,     0x1b },
+            { KC_D,     0x23 },
+            { KC_F,     0x2b },
+            { KC_G,     0x34 },
+            { KC_H,     0x33 },
+            { KC_J,     0x3b },
+            { KC_K,     0x42 },
+            { KC_L,     0x4b },
+            { KC_SEMICOLON, 0x4c },
+            { KC_APOSTROPHE, 0x52 },
+            { KC_RETURN,    0x5a },
+
+            { KC_LSHIFT,    0x12 },
+            { KC_Z,     0x1a },
+            { KC_X,     0x22 },
+            { KC_C,     0x21 },
+            { KC_V,     0x2a },
+            { KC_B,     0x32 },
+            { KC_N,     0x31 },
+            { KC_M,     0x3a },
+            { KC_COMMA, 0x41 },
+            { KC_PERIOD,    0x49 },
+            { KC_SLASH, 0x4a },
+            { KC_RSHIFT,    0x59 },
+
+            { KC_CAPS,    0x14 },
+            { KC_LALT,  0x19 },
+            { KC_SPACE, 0x29 },
+            { KC_RALT,  0x39 },
+            { KC_RCONTROL,0x58 },
+
+            { KC_INSERT,    0x67 },
+            { KC_HOME,  0x6e },
+            { KC_PGUP,  0x6f },
+
+            { KC_DELETE,    0x64 },
+            { KC_END,       0x65 },
+            { KC_PGDN,  0x6d },
+
+            { KC_UP,        0x6e },
+            { KC_LEFT,  0x61 },
+            { KC_DOWN,  0x60 },
+            { KC_RIGHT, 0x6a },
+            
+            { KC_NUMLOCK, 0x76 },
+            { KC_DIVIDE,    0x77 },
+            { KC_MULTIPLY,0x7e },
+
+            { KC_NUMPAD7, 0x6c },
+            { KC_NUMPAD8, 0x75 },
+            { KC_NUMPAD9, 0x7d },
+            { KC_SUBTRACT,0x84 },
+
+            { KC_NUMPAD4, 0x6b }, 
+            { KC_NUMPAD5, 0x73 },
+            { KC_NUMPAD6,   0x74 },
+            { KC_ADD,       0x7c },
+
+            { KC_NUMPAD1, 0x69 },
+            { KC_NUMPAD2, 0x72 },
+            { KC_NUMPAD3,   0x7a },
+            { KC_NUMPADENTER, 0x79 },
+
+            { KC_NUMPAD0, 0x70 },
+            { KC_DECIMAL, 0x71 },
+
+            // multimedia keys not necessarily present
+            { KC_LWIN,    0x8b },
+            { KC_RWIN,    0x8c },
+            { KC_SLEEP,   0x54 },
+
+            { KC_MAX, 0 }
+        };
+
+        // scancode3 extension (0xe0) map
+        static struct KeyMap scancode3_ext_map[] =
+        {
+            { KC_MAX, 0 }
+        };
+
+        // build the keyboard lookup tables
+        int i;
+
+        for (i=0; i<KC_MAX; ++i)
+        {
+            scancode[0][i] = 0;
+            scancode[1][i] = 0;
+            scancode[2][i] = 0;
+            scancode_ext[0][i] = 0;
+            scancode_ext[1][i] = 0;
+            scancode_ext[2][i] = 0;
+        }
+        for (i=0; scancode1_map[i].kc != KC_MAX; ++i)
+            scancode[0][scancode1_map[i].kc] = scancode1_map[i].ps2;
+        for (i=0; scancode2_map[i].kc != KC_MAX; ++i)
+            scancode[1][scancode2_map[i].kc] = scancode2_map[i].ps2;
+        for (i=0; scancode3_map[i].kc != KC_MAX; ++i)
+            scancode[2][scancode3_map[i].kc] = scancode3_map[i].ps2;
+
+        for (i=0; scancode1_ext_map[i].kc != KC_MAX; ++i)
+            scancode_ext[0][scancode1_ext_map[i].kc] = scancode1_ext_map[i].ps2;
+        for (i=0; scancode2_ext_map[i].kc != KC_MAX; ++i)
+            scancode_ext[1][scancode2_ext_map[i].kc] = scancode2_ext_map[i].ps2;
+        for (i=0; scancode3_ext_map[i].kc != KC_MAX; ++i)
+            scancode_ext[2][scancode3_ext_map[i].kc] = scancode3_ext_map[i].ps2;
+    }
+}

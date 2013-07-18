@@ -1,0 +1,160 @@
+/*
+ * Copyright (C) 2008 ARM Limited. All rights reserved.
+ */
+
+
+extern component ARMCortexR5x2CT
+{
+    properties {
+        executes_software = 1; 
+        version = "8.1.37";
+        component_type = "Core";
+        description = "ARMCortexR5x2CT CPU component";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    resources
+    {
+        PARAMETER { name("GROUP_ID"), type(uint32_t), default(0x0), min(0x0), max(0xF), description("Value read in GROUP ID register field, bits[15:8] of the MPIDR") } GROUP_ID;
+        PARAMETER { name("LOCK_STEP"), type(uint32_t), default(0), description("Affects dual-processor configurations only, and ignored by single-processor configurations") } LOCK_STEP;
+        PARAMETER { name("MICRO_SCU"), type(bool), default(true), description("Controls whether the effects of the MicroSCU are modeled") } MICRO_SCU;
+        PARAMETER { name("INST_ENDIAN"), type(bool), default(true), description("Controls whether the model supports the instruction endianness bit") } INST_ENDIAN;
+        PARAMETER { name("NUM_BREAKPOINTS"), type(uint32_t), default(0x7), description("Controls with how many breakpoint pairs the model has been configured. This only affects the build options registers, because debug is not modeled") } NUM_BREAKPOINTS;
+        PARAMETER { name("NUM_WATCHPOINTS"), type(uint32_t), default(0x7), description("Controls with how many watchpoint pairs the model has been configured. This only affects the build options registers, because debug is not modeled") } NUM_WATCHPOINTS;
+        PARAMETER { name("dcache-state_modelled"), type(bool), default(false), description("Set whether D-cache has stateful implementation") } dcache_state_modelled;
+        PARAMETER { name("icache-state_modelled"), type(bool), default(false), description("Set whether I-cache has stateful implementation") } icache_state_modelled;
+        PARAMETER { name("SLSPLIT"), type(bool), default(false), description("Sets whether the model starts in split mode or locked mode") } slsplit;
+
+        PARAMETER { name("cpu0.vfp-present"), type(bool), default(true), description("Set whether model has VFP support") } cpu0_vfp_present;
+        PARAMETER { name("cpu0.DP_FLOAT"), type(bool), default(true), description("Sets whether double-precision instructions are available") } cpu0_dp_float;
+        PARAMETER { name("cpu0.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu0_CFGEND;
+        PARAMETER { name("cpu0.CFGIE"), type(bool), default(false), description("Set the reset value of the instruction endian bit") } cpu0_CFGIE;
+        PARAMETER { name("cpu0.CFGNMFI"), type(bool), default(false), description("Enable nonmaskable FIQ interrupts on startup") } cpu0_CFGNMFI;
+        PARAMETER { name("cpu0.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu0_TEINIT;
+        PARAMETER { name("cpu0.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu0_VINITHI;
+        PARAMETER { name("cpu0.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset") } cpu0_vfp_enable_at_reset;
+        PARAMETER { name("cpu0.dcache-size"), type(uint32_t), default(0x10000), min(0x4000), max(0x10000), description("Set D-cache size in bytes") } cpu0_dcache_size;
+        PARAMETER { name("cpu0.icache-size"), type(uint32_t), default(0x10000), min(0x4000), max(0x10000), description("Set I-cache size in bytes") } cpu0_icache_size;
+        PARAMETER { name("cpu0.atcm_base"), type(uint32_t), default(0x00000000), min(0), max(0xFFFFFFFF), description("Model-specific. Sets the base address of the ATCM") } cpu0_atcm_base;
+        PARAMETER { name("cpu0.btcm_base"), type(uint32_t), default(0x00800000), min(0), max(0xFFFFFFFF), description("Model-specific. Sets the base address of the BTCM") } cpu0_btcm_base;
+        PARAMETER { name("cpu0.CFGATCMSZ"), type(uint32_t), default(0xE), min(0), max(0xE), description("Sets the size of the ATCM") } cpu0_cfgatcmsz;
+        PARAMETER { name("cpu0.CFGBTCMSZ"), type(uint32_t), default(0xE), min(0), max(0xE), description("Sets the size of the BTCM") } cpu0_cfgbtcmsz;
+        PARAMETER { name("cpu0.NUM_MPU_REGION"), type(uint32_t), default(12), min(0), max(16), description("Sets the number of MPU regions") } cpu0_NUM_MPU_REGION;
+        PARAMETER { name("cpu0.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC Boolean true or false truetraps. Applications that do not use semihosting must set this parameter to False") } cpu0_semihosting_enable;
+        PARAMETER { name("cpu0.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting")  } cpu0_semihosting_ARM_SVC;
+        PARAMETER { name("cpu0.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting")  } cpu0_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu0.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu0_semihosting_cmd_line;
+        PARAMETER { name("cpu0.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base") } cpu0_semihosting_heap_base;
+        PARAMETER { name("cpu0.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap") } cpu0_semihosting_heap_limit;
+        PARAMETER { name("cpu0.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack") } cpu0_semihosting_stack_base;
+        PARAMETER { name("cpu0.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit") } cpu0_semihosting_stack_limit;
+        PARAMETER { name("cpu0.semihosting-cwd"), type(string), default(""), description("Virtual address of CWD")} cpu0_semihosting_cwd;
+        PARAMETER { name("cpu0.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu0_min_sync_level; 
+
+        PARAMETER { name("cpu1.vfp-present"), type(bool), default(true), description("Set whether model has VFP support") } cpu1_vfp_present;
+        PARAMETER { name("cpu1.DP_FLOAT"), type(bool), default(true), description("Sets whether double-precision instructions are available") } cpu1_dp_float;
+        PARAMETER { name("cpu1.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu1_CFGEND;
+        PARAMETER { name("cpu1.CFGIE"), type(bool), default(false), description("Set the reset value of the instruction endian bit") } cpu1_CFGIE;
+        PARAMETER { name("cpu1.CFGNMFI"), type(bool), default(false), description("Enable nonmaskable FIQ interrupts on startup") } cpu1_CFGNMFI;
+        PARAMETER { name("cpu1.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu1_TEINIT;
+        PARAMETER { name("cpu1.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu1_VINITHI;
+        PARAMETER { name("cpu1.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset") } cpu1_vfp_enable_at_reset;
+        PARAMETER { name("cpu1.dcache-size"), type(uint32_t), default(0x10000), min(0x4000), max(0x10000), description("Set D-cache size in bytes") } cpu1_dcache_size;
+        PARAMETER { name("cpu1.icache-size"), type(uint32_t), default(0x10000), min(0x4000), max(0x10000), description("Set I-cache size in bytes") } cpu1_icache_size;
+        PARAMETER { name("cpu1.atcm_base"), type(uint32_t), default(0x00000000), min(0), max(0xFFFFFFFF), description("Model-specific. Sets the base address of the ATCM") } cpu1_atcm_base;
+        PARAMETER { name("cpu1.btcm_base"), type(uint32_t), default(0x00800000), min(0), max(0xFFFFFFFF), description("Model-specific. Sets the base address of the BTCM") } cpu1_btcm_base;
+        PARAMETER { name("cpu1.CFGATCMSZ"), type(uint32_t), default(0xE), min(0), max(0xE), description("Sets the size of the ATCM") } cpu1_cfgatcmsz;
+        PARAMETER { name("cpu1.CFGBTCMSZ"), type(uint32_t), default(0xE), min(0), max(0xE), description("Sets the size of the BTCM") } cpu1_cfgbtcmsz;
+        PARAMETER { name("cpu1.NUM_MPU_REGION"), type(uint32_t), default(12), min(0), max(16), description("Sets the number of MPU regions") } cpu1_NUM_MPU_REGION;
+        PARAMETER { name("cpu1.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC Boolean true or false truetraps. Applications that do not use semihosting must set this parameter to False") } cpu1_semihosting_enable;
+        PARAMETER { name("cpu1.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting")  } cpu1_semihosting_ARM_SVC;
+        PARAMETER { name("cpu1.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting")  } cpu1_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu1.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu1_semihosting_cmd_line;
+        PARAMETER { name("cpu1.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base") } cpu1_semihosting_heap_base;
+        PARAMETER { name("cpu1.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap") } cpu1_semihosting_heap_limit;
+        PARAMETER { name("cpu1.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack") } cpu1_semihosting_stack_base;
+        PARAMETER { name("cpu1.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit") } cpu1_semihosting_stack_limit;
+        PARAMETER { name("cpu1.semihosting-cwd"), type(string), default(""), description("Virtual address of CWD")} cpu1_semihosting_cwd;
+        PARAMETER { name("cpu1.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu1_min_sync_level; 
+    }
+
+    // The clock signal connected to the clk_in port is used to determine
+    // the rate at which the core executes instructions.
+    slave port<ClockSignal> clk_in;
+
+    // The core will generate bus requests on this port.
+    master port<PVBus> pvbus_m;
+
+    // ACP slave port
+    slave port<PVBus> acp_s;
+    
+    // Raising this signal will put the core into reset mode.
+    slave port<Signal> reset[2];
+
+    // This signal indicate if a core is in wfe state
+    // RTL calls this WFEPIPESTOPPED
+    master port<Signal> standbywfe[2];
+
+    // This signal indicates if a core is in WFI state
+    // RTL uses WFIPIPESTOPPED
+    master port<Signal> standbywfi[2];
+
+    // This peer port of event input (and output) is for wakeup from WFE
+    peer port<Signal> event[2];
+
+    // This signal controls of the location of the exception vectors at reset
+    slave port<Signal> vinithi[2];
+
+    // This signal is for EE bit initialisation
+    // This is CFGEE in RTL but cfgend here fastsim consistency reasons.
+    slave port<Signal> cfgend[2];
+
+    // If ATCM is enabled at reset
+    slave port<Signal> initrama[2];
+
+    // If BTCM is enabled at reset
+    slave port<Signal> initramb[2];
+
+    // Location of ATCM at reset
+    slave port<Signal> loczrama[2];
+
+    // Default exception handling state
+    slave port<Signal> teinit[2];
+
+    // ATCM size
+    slave port<Value> cfgatcmsz[2];
+
+    // BTCM Size
+    slave port<Value> cfgbtcmsz[2];
+
+    // Controls non-maskable Fast Interrupts
+    slave port<Signal> cfgnmfi[2];
+
+    // Group ID used for MPIDR.
+    slave port<Value> groupid;
+
+    // This signal drives the CPU's interrupt handling.
+    slave port<Signal> irq[2];
+
+    // This signal drives the CPU's fast-interrupt handling.
+    slave port<Signal> fiq[2];
+
+    // Vic address port from primary VIC
+    slave port<ValueState> vic_addr[2];
+    
+    // Vic acknowledge port to primary VIC
+    master port<Signal> vic_ack[2];
+
+    // Interrupt signal from performance monitoring unit.
+    master port<Signal> pmuirq[2];
+
+    // This port should be connected to one of the two ticks ports
+    // on a 'visualisation' component, in order to display a running
+    // instruction count.
+    master port<InstructionCount> ticks[2];
+
+    // Split Lock Signals contact ARM for documentation.
+    slave port<Signal> slsplit;
+    slave port<Signal> slreset;
+}
+

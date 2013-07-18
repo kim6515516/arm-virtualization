@@ -1,0 +1,262 @@
+/*
+ * Copyright 2007, 2008, 2011 ARM Limited. All rights reserved.
+ */
+
+component LinuxBoot_VEMotherBoard
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Model inspired by the ARM Versatile Express Motherboard";
+    }
+
+    resources
+    {
+       // Default proc_id0 0x0c000000 is for Cortex-A9
+       PARAMETER { description("Processor ID at CoreTile Express Site 1"), type(uint32_t), default(0x0c000000) } proc_id0;
+       PARAMETER { description("Processor ID at CoreTile Express Site 2"), type(uint32_t), default(0xff000000) } proc_id1;
+       PARAMETER { name("daughter_led_count"), description("Number of LEDs that the daughter board has"),
+                   type(uint32_t), default(0), max(32), min(0) } number_of_daughter_leds;
+       PARAMETER { name("daughter_user_switch_count"), description("Number of switches that the daughter board has"),
+                   type(uint32_t), default(0), max(32), min(0) } number_of_daughter_switches;
+
+    }
+    
+    composition
+    {
+        sp805_wdog    : SP805_Watchdog();
+        pl050_kmi1    : PL050_KMI();
+        pl050_kmi0    : PL050_KMI();
+        sp810_sysctrl : SP810_SysCtrl();
+        pl111_clcd    : PL111_CLCD();
+        pl031_rtc     : PL031_RTC();
+        pl011_uart3   : PL011_Uart();
+        pl011_uart2   : PL011_Uart();
+        pl011_uart1   : PL011_Uart();
+        pl011_uart0   : PL011_Uart();
+        pl180_mci     : PL180_MCI();
+        pl041_aaci    : PL041_AACI();
+        ve_sysregs    : VE_SysRegs(sys_proc_id0=proc_id0, sys_proc_id1=proc_id1);
+        smsc_91c111   : SMSC_91C111();
+
+        ps2mouse      : PS2Mouse();
+        ps2keyboard   : PS2Keyboard();
+        mmc           : MMC();
+        dummy_CF      : VE_CompactFlash();
+        dummy_usb     : RAMDevice("size"=0x1000);
+        dummy_ram     : RAMDevice("size"=0x1000);      // 4 kB dummy RAM for SMC CS holes
+        dummy_local_dap_rom: RAMDevice("size"=0x10000); // 64 kB dummy RAM to look like an empty CoreSight debug ROM
+        psram         : RAMDevice("size"=0x800000);
+
+        // 8 MB VRAM. Board aliases this across 32MB
+        vram          : RAMDevice("size"=0x800000); 
+
+        flash1        : IntelStrataFlashJ3("size"=0x4000000);
+        flash0        : IntelStrataFlashJ3("size"=0x4000000);
+        flashloader1  : FlashLoader();
+        flashloader0  : FlashLoader();
+
+        // Clocks
+        clk           : MasterClock();
+        clock24MHz    : ClockDivider("mul"=24000000);
+        clock100Hz    : ClockDivider("mul"=100);
+        clockCLCD     : ClockDivider("mul"=23750000);
+        clock35MHz    : ClockDivider("mul"=35000000);
+        clock50Hz     : ClockDivider("mul"=50);
+
+        cs3_decoder : PVBusDecoder();  // Motherboard Primecells
+        cs2_decoder : PVBusDecoder();  // USB / Ethernet / VRAM
+
+        // I/O
+        terminal_0 : TelnetTerminal();
+        terminal_1 : TelnetTerminal();
+        terminal_2 : TelnetTerminal();
+        terminal_3 : TelnetTerminal();
+        audioout   : AudioOut_SDL();
+        vis        : VEVisualisation("daughter_led_count"=number_of_daughter_leds,"daughter_user_switch_count"=number_of_daughter_switches);
+ 
+        // Ethernet
+        virtualethernetcrossover : VirtualEthernetCrossover();
+        hostbridge               : HostBridge();
+
+        vfs2       : VFS2();
+
+
+    }
+
+    connection
+    {
+        // Clocks 
+        clk.clk_out => pl031_rtc.clock;    // 1Hz
+        clk.clk_out => clock24MHz.clk_in;
+        clk.clk_out => clock35MHz.clk_in;
+        clk.clk_out => clockCLCD.clk_in;
+        clk.clk_out => clock100Hz.clk_in;
+        clk.clk_out => clock50Hz.clk_in;
+        clk.clk_out => self.masterclk;
+        
+        
+        clock24MHz.clk_out => ve_sysregs.clock_24Mhz;
+        clock35MHz.clk_out => self.timer_clock;
+        clock24MHz.clk_out => pl011_uart0.clk_in_ref;
+        clock24MHz.clk_out => pl011_uart1.clk_in_ref;
+        clock24MHz.clk_out => pl011_uart2.clk_in_ref;
+        clock24MHz.clk_out => pl011_uart3.clk_in_ref;
+        clock24MHz.clk_out => ps2keyboard.clk_in;
+        clock24MHz.clk_out => ps2mouse.clk_in;
+        clock24MHz.clk_out => mmc.clk_in;
+        clock24MHz.clk_out => pl041_aaci.clk_in_ref;
+        clock24MHz.clk_out => smsc_91c111.clock;
+        clock24MHz.clk_out => sp805_wdog.clk_in;
+
+        ve_sysregs.clock_CLCD => clockCLCD.rate;
+        clockCLCD.clk_out     => pl111_clcd.clk_in;
+        clock100Hz.clk_out    => ve_sysregs.clock_100Hz;
+
+        sp810_sysctrl.timer_clk_en[0] => self.timer_en[0];
+        sp810_sysctrl.timer_clk_en[1] => self.timer_en[1];
+        sp810_sysctrl.timer_clk_en[2] => self.timer_en[2];
+        sp810_sysctrl.timer_clk_en[3] => self.timer_en[3];
+
+        clock50Hz.clk_out     => vis.clock_50Hz;
+
+
+        // Interrupts
+
+        // Note that that if these interrupts go through a GIC,
+        // (as is usually the case, especially if the core has
+        // an internal GIC) then IRQ pins 0--223 on the GIC will
+        // map onto Shared Peripheral Interrupt IDs 32-255.
+        sp805_wdog.irq_out   => self.interrupts[0];
+        self.timer_irq_in[0] => self.interrupts[2];
+        self.timer_irq_in[1] => self.interrupts[2];
+        self.timer_irq_in[2] => self.interrupts[3];
+        self.timer_irq_in[3] => self.interrupts[3];
+        pl031_rtc.intr       => self.interrupts[4];
+        pl011_uart0.intr     => self.interrupts[5];
+        pl011_uart1.intr     => self.interrupts[6];
+        pl011_uart2.intr     => self.interrupts[7];
+        pl011_uart3.intr     => self.interrupts[8];
+        pl180_mci.MCIINTR[0] => self.interrupts[9];
+        pl180_mci.MCIINTR[1] => self.interrupts[10];
+        pl041_aaci.irq       => self.interrupts[11];
+        pl050_kmi0.intr      => self.interrupts[12];
+        pl050_kmi1.intr      => self.interrupts[13];
+        pl111_clcd.intr      => self.interrupts[14];
+        smsc_91c111.intr     => self.interrupts[15];
+
+        vfs2.intr            => self.interrupts[41];
+
+
+        // I/O connections
+        self.cluster0_ticks      => vis.cluster0_ticks;
+        self.cluster1_ticks      => vis.cluster1_ticks;
+        self.daughter_leds       => vis.daughter_leds;
+        self.daughter_switches   => vis.daughter_user_switches;
+        ve_sysregs.user_switches => vis.user_switches;
+        ve_sysregs.leds          => vis.leds;
+        ve_sysregs.lcd           => vis.lcd;
+        ve_sysregs.cb            => self.CB;
+
+        pl041_aaci.audio => audioout.audio;
+        pl180_mci.mmc_m  => mmc.mmc;
+  
+        mmc.card_present => ve_sysregs.mmc_card_present;
+
+        vis.keyboard    => ps2keyboard.keyboard;
+        vis.mouse       => ps2mouse.mouse;
+        ps2keyboard.ps2  => pl050_kmi0.ps2device;
+        ps2mouse.ps2     => pl050_kmi1.ps2device;
+
+        hostbridge.eth       => virtualethernetcrossover.devb;
+        smsc_91c111.eth  => virtualethernetcrossover.deva;
+
+        pl011_uart0.serial_out => terminal_0.serial;
+        pl011_uart1.serial_out => terminal_1.serial;
+        pl011_uart2.serial_out => terminal_2.serial;
+        pl011_uart3.serial_out => terminal_3.serial;
+
+        flashloader1.flash_device0 => flash1.flashloader;
+        flashloader0.flash_device0 => flash0.flashloader;
+
+        // Display data can be sourced either from the daughterboard's LCD controller,
+        // OR from the motherboard's. It's switched via VE's SysRegs
+        pl111_clcd.display => ve_sysregs.mmb[0];
+        self.mmb_db1       => ve_sysregs.mmb[1];  
+
+
+        // Bus mapping
+  
+        // The model requires all daughtercard SMB ports to be connected
+        self.smb_cs[0] => flash0.pvbus;
+        self.smb_cs[1] => psram.pvbus;  // CS1 (PSRAM)
+        self.smb_cs[2] => cs2_decoder.pvbus_s;
+        self.smb_cs[3] => cs3_decoder.pvbus_s;
+        self.smb_cs[4] => flash1.pvbus;
+        self.smb_cs[5] => dummy_ram.pvbus;  // CS5 connected to dummy memory
+        self.smb_cs[6] => dummy_ram.pvbus;  // CS6 connected to dummy memory
+        self.smb_cs[7] => dummy_ram.pvbus;  // CS7 connected to dummy memory
+
+
+        // Motherboard CLCD sees the CS2 address range
+        pl111_clcd.pvbus_m => self.clcd_pvbus;
+
+        cs2_decoder.pvbus_m_range[0x00000000..0x01ffffff] => vram.pvbus;
+        cs2_decoder.pvbus_m_range[0x02000000..0x02ffffff] => smsc_91c111.pvbus;
+        cs2_decoder.pvbus_m_range[0x03000000..0x03ffffff] => dummy_usb.pvbus;
+        
+        // Reference System VE peripheral map: CS3 is the 'primecell' peripherals
+        cs3_decoder.pvbus_m_range[0x00000000..0x0000ffff] => dummy_local_dap_rom.pvbus;
+        cs3_decoder.pvbus_m_range[0x00010000..0x0001ffff] => ve_sysregs.pvbus;
+        cs3_decoder.pvbus_m_range[0x00020000..0x0002ffff] => sp810_sysctrl.pvbus;
+        // 2wire (PCIe)  0003_0000 .. 0003_ffff
+        cs3_decoder.pvbus_m_range[0x00040000..0x0004ffff] => pl041_aaci.pvbus;
+        cs3_decoder.pvbus_m_range[0x00050000..0x0005ffff] => pl180_mci.pvbus;
+        cs3_decoder.pvbus_m_range[0x00060000..0x0006ffff] => pl050_kmi0.pvbus;
+        cs3_decoder.pvbus_m_range[0x00070000..0x0007ffff] => pl050_kmi1.pvbus;
+        // reserved      0008_0000 .. 0008_ffff
+        cs3_decoder.pvbus_m_range[0x00090000..0x0009ffff] => pl011_uart0.pvbus;
+        cs3_decoder.pvbus_m_range[0x000a0000..0x000affff] => pl011_uart1.pvbus;
+        cs3_decoder.pvbus_m_range[0x000b0000..0x000bffff] => pl011_uart2.pvbus;
+        cs3_decoder.pvbus_m_range[0x000c0000..0x000cffff] => pl011_uart3.pvbus;
+
+        // Mailbox used for VFS driver support on Linux -- reserved on real hardware.
+        cs3_decoder.pvbus_m_range[0x000d0000..0x000dffff] => vfs2.pvbus_s; 
+        // reserved      000e_0000 .. 000e_ffff
+        cs3_decoder.pvbus_m_range[0x000f0000..0x000fffff] => sp805_wdog.pvbus_s;
+        // reserved      0010_0000 .. 0010_ffff
+        cs3_decoder.pvbus_m_range[0x00110000..0x0011ffff] => self.timer_pvbus;
+        cs3_decoder.pvbus_m_range[0x00120000..0x0012ffff] => self.timer_pvbus;
+        // reserved      0013_0000 .. 0013_ffff
+        // reserved      0014_0000 .. 0014_ffff
+        // reserved      0015_0000 .. 0015_ffff
+        // 2wire (DVI)   0016_0000 .. 0016_ffff
+        cs3_decoder.pvbus_m_range[0x00170000..0x0017ffff] => pl031_rtc.pvbus;
+        // reserved      0018_0000 .. 0018_ffff
+        // reserved      0019_0000 .. 0019_ffff
+        cs3_decoder.pvbus_m_range[0x001a0000..0x001affff] => dummy_CF.pvbus;
+        // reserved      001b_0000 .. 001b_ffff
+        // reserved      001c_0000 .. 001c_ffff
+        // reserved      001d_0000 .. 001d_ffff
+        // reserved      001e_0000 .. 001e_ffff
+        cs3_decoder.pvbus_m_range[0x001f0000..0x001fffff] => pl111_clcd.pvbus;
+    }
+
+    master port<ClockSignal>  masterclk;
+    master port<Signal>       interrupts[48];
+    master port<VECBProtocol> CB[2];       
+    master port<PVBus>        clcd_pvbus;
+    
+    slave port<LCD>              mmb_db1;
+    slave port<PVBus>            smb_cs[8];
+    slave port<InstructionCount> cluster0_ticks[4];
+    slave port<InstructionCount> cluster1_ticks[4];  
+    slave port<ValueState>       daughter_leds;
+    slave port<ValueState>       daughter_switches;
+
+    master port<ClockSignal> timer_clock;
+    master port<ClockRateControl> timer_en[4];
+    master port<PVBus> timer_pvbus;
+    slave port<Signal> timer_irq_in[4];
+}

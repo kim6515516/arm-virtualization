@@ -1,0 +1,132 @@
+/*
+ * Copyright (C) 2010 ARM Limited. All rights reserved.
+ */
+
+protocol VGICReportingProtocol
+{
+    optional slave behaviour logWarnings( const char* buffer_ ) : void;
+    optional slave behaviour logErrors( const char* buffer_ ) : void;
+    optional slave behaviour logFatal( const char* buffer_ ) : void;
+
+    // Enable outputs on the behaviours above, returns the old value.
+    // bit[0] -- log warnings enabled
+    // bit[1] -- log errors enabled
+    // bit[2] -- log fatal enabled
+    optional master behaviour setEnables( uint32_t new_enable_ ) : uint32_t;
+}
+
+
+///
+/// This is a work-around to a LISA problem where we don't publish the CADI
+/// interface of the VGIC_Component but do want the trace sources.  The trace
+/// sources can be artificially exported onto another sg::ComponentTrace by
+/// using this interface and not exported to the VGIC_Component CADI interface.
+///
+/// In order to use this port you _must_ set the parameter export_trace_to_cadi
+/// to false, otherwise the model will abort at run-time.
+///
+protocol VGICComponentTraceExport
+{
+    optional slave behaviour exportTrace(/*sg::ComponentTrace*/void*) : void;
+}
+
+extern component VGIC_Component
+{
+    properties {
+        executes_software = 0;
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "VGIC Component";
+        hidden = true;
+    }
+
+
+    resources
+    {
+        PARAMETER { name("number-of-ints"), description("number of interrupt pins"), type(uint32_t),  default(224),   min(0),  max(998)   } number_of_ints;
+        PARAMETER { name("number-of-lrs"), description("number of list registers"), type(uint32_t),  default(64),   min(1),  max(64)   } number_of_lrs;
+        PARAMETER { name("number-of-cores"), description("number of core interfaces to present"), type(uint32_t), default(8), min(1), max(8) } number_of_cores;
+        PARAMETER { name("core-impl-id"), description("Implemention ID to present for the cores"), type(uint32_t), default(0x3902043B) } core_impl_id;
+        PARAMETER { name("vgic-version"), description("Version number of the VGIC interface"), type(uint32_t), default(11), min(1), max(0xFF) } vgic_version;
+        PARAMETER { name("vgic-style"), description("The style of the VGIC that is implemented"), type(string), default("generic"), runtime(false) } vgic_style;
+        PARAMETER { name("ppi_bitmask_present"), description("A bit mask of the PPIs present, bit[16] is ppi16..ppi31."), type(uint32_t), default(0xFe000000), runtime(false) } ppi_bitmask_present;
+        PARAMETER { name("ppi_bitmask_level_sensitive"), description("A bit mask of which PPIs are level sensitive, bit[16] is ppi16..ppi31."), type(uint32_t), default(0xFE000000), runtime(false) } ppi_bitmask_level_sensitive;
+
+        PARAMETER {
+            name("cpu_interface_offset"),
+            description("Offset of CPU interface within VGIC."),
+            type( uint32_t ),
+            default( 0x0 ),
+            runtime(false)
+        } cpu_interface_offset;
+        PARAMETER {
+            name("hyp_interface_offset"),
+            description("Offset of Hypervisor interface within VGIC."),
+            type( uint32_t ),
+            default( 0x0 ),
+            runtime(false)
+        } hyp_interface_offset;
+        PARAMETER {
+            name("vcpu_interface_offset"),
+            description("Offset of Virtual CPU interface within VGIC."),
+            type( uint32_t ),
+            default( 0x0 ),
+            runtime(false)
+        } vcpu_interface_offset;
+        PARAMETER {
+            name("dist_interface_offset"),
+            description("Offset of Distributor interface within VGIC."),
+            type( uint32_t ),
+            default( 0x0 ),
+            runtime(false)
+        } dist_interface_offset;
+
+        PARAMETER { name("export_trace_to_cadi"), description("If you are going to use the export_trace port then you should set this to false, otherwise the trace interface will be constructed before you have a chance to call exportTrace"), type(bool), default(true), runtime(false) } export_trace_to_cadi;
+    }
+
+    master port<VGICReportingProtocol>     reporting_interface;
+
+    // If you intend to use this then you _must_ set export_trace_to_cadi to
+    // false.
+    slave port<VGICComponentTraceExport>   export_trace;
+
+    slave port<PVDevice>  cpu_if[/*VGIC_MAX_CPUS*/ 8];
+    slave port<PVDevice>  distributor_if[/*VGIC_MAX_CPUS*/ 8];
+    slave port<PVDevice>  vcpu_if_vm[/*VGIC_MAX_CPUS*/ 8];
+    slave port<PVDevice>  vcpu_if_hyp[/*VGIC_MAX_CPUS*/ 8];
+
+    slave port<Signal>  fiq_in[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  irq_in[/*VGIC_MAX_CPUS*/ 8];
+
+    slave port<Signal>  ppi16[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi17[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi18[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi19[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi20[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi21[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi22[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi23[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi24[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi25[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi26[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi27[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi28[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi29[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi30[/*VGIC_MAX_CPUS*/ 8];
+    slave port<Signal>  ppi31[/*VGIC_MAX_CPUS*/ 8];
+
+    slave port<Signal>  spi[/*VGIC_MAX_SPIS*/988];
+
+    slave port<Signal>  reset_signal;
+    slave port<Signal>  cfgsdisable;
+
+    master port<Signal> fiq_out[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> irq_out[/*VGIC_MAX_CPUS*/ 8];
+
+    master port<Signal> wakeup_irq[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> wakeup_fiq[/*VGIC_MAX_CPUS*/ 8];
+
+    master port<Signal> virq[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> vfiq[/*VGIC_MAX_CPUS*/ 8];
+
+}

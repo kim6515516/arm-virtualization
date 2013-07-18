@@ -1,0 +1,6770 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    EBCortexA9MPx4CoreTile.sgcanvas
+#//  Created: Thu Sep  3 15:44:02 2009
+#//  By: Fast Models  System Canvas 5.1.009  (Aug 28 2009)
+#//
+# *  Do NOT modify this file. It is for internal use by System Canvas only.
+#//
+#//  Copyright (c) 2004-2008 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "clockdivider"
+        (
+            x = 270;
+            y = 130;
+            width = 101;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 110;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = -60;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "connector"
+        (
+            x = 60;
+            y = 110;
+            width = 161;
+            height = 119;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_bus"
+                (
+                x = 150;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "connector"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 82;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "intr_num"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "reset_board"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_coretile"
+                (
+                x = 150;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "sysreg_overrides"
+                (
+                x = 0;
+                y = 102;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "core"
+        (
+            x = 280;
+            y = 220;
+            width = 231;
+            height = 201;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "acp_s"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "cfgend"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "cfgend[0]"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "cfgend[1]"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "cfgend[2]"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "cfgend[3]"
+                (
+                x = 0;
+                y = 82;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "cfgnmfi"
+                (
+                x = 0;
+                y = 72;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "cfgnmfi[0]"
+                (
+                x = 0;
+                y = 102;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cfgnmfi[1]"
+                (
+                x = 0;
+                y = 122;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cfgnmfi[2]"
+                (
+                x = 0;
+                y = 142;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cfgnmfi[3]"
+                (
+                x = 0;
+                y = 162;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cfgsdisable"
+                (
+                x = 0;
+                y = 182;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_in"
+                (
+                x = 260;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clusterid"
+                (
+                x = 0;
+                y = 242;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "cp15sdisable"
+                (
+                x = 0;
+                y = 242;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "cp15sdisable[0]"
+                (
+                x = 0;
+                y = 262;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "cp15sdisable[1]"
+                (
+                x = 0;
+                y = 282;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "cp15sdisable[2]"
+                (
+                x = 0;
+                y = 302;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "cp15sdisable[3]"
+                (
+                x = 0;
+                y = 322;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "event"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "filteren"
+                (
+                x = 0;
+                y = 342;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "filterend"
+                (
+                x = 0;
+                y = 362;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "filterstart"
+                (
+                x = 0;
+                y = 382;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "fiq"
+                (
+                x = 10;
+                y = 142;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "fiq[0]"
+                (
+                x = 0;
+                y = 402;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "fiq[1]"
+                (
+                x = 0;
+                y = 422;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "fiq[2]"
+                (
+                x = 0;
+                y = 442;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "fiq[3]"
+                (
+                x = 0;
+                y = 462;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints"
+                (
+                x = 10;
+                y = 32;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ints[0]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[1]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[2]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[3]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[4]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[5]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[6]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[7]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[8]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[9]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[10]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[11]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[12]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[13]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[14]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[15]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[16]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[17]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[18]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[19]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[20]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[21]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[22]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[23]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[24]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[25]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[26]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[27]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[28]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[29]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[30]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[31]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[32]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[33]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[34]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[35]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[36]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[37]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[38]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[39]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[40]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[41]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[42]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[43]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[44]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[45]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[46]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[47]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[48]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[49]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[50]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[51]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[52]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[53]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[54]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[55]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[56]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[57]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[58]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[59]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[60]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[61]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[62]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[63]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[64]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[65]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[66]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[67]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[68]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[69]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[70]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[71]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[72]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[73]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[74]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[75]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[76]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[77]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[78]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[79]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[80]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[81]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[82]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[83]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[84]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[85]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[86]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[87]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[88]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[89]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[90]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[91]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[92]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[93]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[94]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[95]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[96]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[97]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[98]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[99]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[100]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[101]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[102]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[103]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[104]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[105]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[106]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[107]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[108]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[109]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[110]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[111]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[112]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[113]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[114]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[115]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[116]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[117]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[118]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[119]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[120]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[121]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[122]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[123]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[124]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[125]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[126]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[127]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[128]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[129]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[130]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[131]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[132]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[133]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[134]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[135]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[136]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[137]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[138]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[139]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[140]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[141]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[142]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[143]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[144]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[145]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[146]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[147]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[148]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[149]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[150]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[151]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[152]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[153]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[154]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[155]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[156]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[157]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[158]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[159]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[160]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[161]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[162]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[163]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[164]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[165]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[166]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[167]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[168]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[169]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[170]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[171]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[172]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[173]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[174]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[175]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[176]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[177]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[178]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[179]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[180]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[181]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[182]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[183]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[184]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[185]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[186]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[187]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[188]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[189]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[190]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[191]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[192]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[193]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[194]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[195]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[196]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[197]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[198]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[199]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[200]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[201]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[202]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[203]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[204]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[205]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[206]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[207]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[208]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[209]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[210]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[211]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[212]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[213]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[214]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[215]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[216]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[217]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[218]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[219]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[220]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[221]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[222]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ints[223]"
+                (
+                x = 0;
+                y = 502;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq"
+                (
+                x = 0;
+                y = 122;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "irq[0]"
+                (
+                x = 0;
+                y = 522;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[1]"
+                (
+                x = 0;
+                y = 542;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[2]"
+                (
+                x = 0;
+                y = 562;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[3]"
+                (
+                x = 0;
+                y = 582;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "periphbase"
+                (
+                x = 0;
+                y = 602;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "periphclk_in"
+                (
+                x = 250;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "periphreset"
+                (
+                x = 0;
+                y = 642;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pmuirq"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pmuirq[0]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "pmuirq[1]"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "pmuirq[2]"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "pmuirq[3]"
+                (
+                x = 0;
+                y = 82;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "pvbus_m0"
+                (
+                x = 260;
+                y = 163;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_m1"
+                (
+                x = 0;
+                y = 122;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pwrctli"
+                (
+                x = 0;
+                y = 656;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "pwrctli[0]"
+                (
+                x = 0;
+                y = 483;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "pwrctli[1]"
+                (
+                x = 0;
+                y = 503;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "pwrctli[2]"
+                (
+                x = 0;
+                y = 523;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "pwrctli[3]"
+                (
+                x = 0;
+                y = 543;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "pwrctlo"
+                (
+                x = 0;
+                y = 136;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "pwrctlo[0]"
+                (
+                x = 0;
+                y = 142;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "pwrctlo[1]"
+                (
+                x = 0;
+                y = 162;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "pwrctlo[2]"
+                (
+                x = 0;
+                y = 182;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "pwrctlo[3]"
+                (
+                x = 0;
+                y = 202;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "reset"
+                (
+                x = 220;
+                y = 132;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "reset[0]"
+                (
+                x = 0;
+                y = 742;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "reset[1]"
+                (
+                x = 0;
+                y = 762;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "reset[2]"
+                (
+                x = 0;
+                y = 782;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "reset[3]"
+                (
+                x = 0;
+                y = 802;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "scureset"
+                (
+                x = 0;
+                y = 822;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "smpnamp"
+                (
+                x = 0;
+                y = 216;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "smpnamp[0]"
+                (
+                x = 0;
+                y = 222;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "smpnamp[1]"
+                (
+                x = 0;
+                y = 242;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "smpnamp[2]"
+                (
+                x = 0;
+                y = 262;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "smpnamp[3]"
+                (
+                x = 0;
+                y = 282;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "standbywfe"
+                (
+                x = 0;
+                y = 282;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "standbywfe[0]"
+                (
+                x = 0;
+                y = 302;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "standbywfe[1]"
+                (
+                x = 0;
+                y = 322;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "standbywfe[2]"
+                (
+                x = 0;
+                y = 342;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "standbywfe[3]"
+                (
+                x = 0;
+                y = 362;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "standbywfi"
+                (
+                x = 0;
+                y = 362;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "standbywfi[0]"
+                (
+                x = 0;
+                y = 382;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "standbywfi[1]"
+                (
+                x = 0;
+                y = 402;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "standbywfi[2]"
+                (
+                x = 0;
+                y = 422;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "standbywfi[3]"
+                (
+                x = 0;
+                y = 442;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "teinit"
+                (
+                x = 0;
+                y = 836;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "teinit[0]"
+                (
+                x = 0;
+                y = 563;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "teinit[1]"
+                (
+                x = 0;
+                y = 583;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "teinit[2]"
+                (
+                x = 0;
+                y = 603;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "teinit[3]"
+                (
+                x = 0;
+                y = 623;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "ticks"
+                (
+                x = 230;
+                y = 102;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ticks[0]"
+                (
+                x = 0;
+                y = 462;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ticks[1]"
+                (
+                x = 0;
+                y = 482;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ticks[2]"
+                (
+                x = 0;
+                y = 502;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "ticks[3]"
+                (
+                x = 0;
+                y = 522;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "vinithi"
+                (
+                x = 160;
+                y = 142;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "vinithi[0]"
+                (
+                x = 0;
+                y = 922;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "vinithi[1]"
+                (
+                x = 0;
+                y = 942;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "vinithi[2]"
+                (
+                x = 0;
+                y = 962;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "vinithi[3]"
+                (
+                x = 0;
+                y = 982;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "wdreset"
+                (
+                x = 0;
+                y = 982;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "wdreset[0]"
+                (
+                x = 0;
+                y = 643;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "wdreset[1]"
+                (
+                x = 0;
+                y = 663;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "wdreset[2]"
+                (
+                x = 0;
+                y = 683;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "wdreset[3]"
+                (
+                x = 0;
+                y = 703;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "wdresetreq"
+                (
+                x = 0;
+                y = 476;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "wdresetreq[0]"
+                (
+                x = 0;
+                y = 482;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "wdresetreq[1]"
+                (
+                x = 0;
+                y = 502;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "wdresetreq[2]"
+                (
+                x = 0;
+                y = 522;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "wdresetreq[3]"
+                (
+                x = 0;
+                y = 542;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+            )
+        )
+        instance "eb_intmapper"
+        (
+            x = 60;
+            y = 230;
+            width = 161;
+            height = 62;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "fiq"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_num"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq[0]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[1]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[2]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[3]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[4]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[5]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[6]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[7]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[8]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[9]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[10]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[11]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[12]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[13]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[14]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[15]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[16]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[17]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[18]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[19]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[20]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[21]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[22]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[23]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[24]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[25]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[26]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[27]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[28]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[29]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[30]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[31]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[32]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[33]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[34]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[35]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[36]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[37]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[38]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[39]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[40]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[41]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[42]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[43]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[44]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[45]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[46]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[47]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[48]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[49]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[50]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[51]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[52]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[53]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[54]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[55]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[56]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[57]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[58]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[59]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[60]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[61]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[62]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[63]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[64]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[65]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[66]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[67]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[68]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[69]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[70]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[71]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[72]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[73]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[74]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[75]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[76]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[77]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[78]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[79]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[80]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[81]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[82]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[83]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[84]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[85]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[86]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[87]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[88]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[89]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[90]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[91]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[92]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[93]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[94]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[95]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[96]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[97]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[98]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[99]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[100]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[101]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[102]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[103]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[104]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[105]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[106]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[107]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[108]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[109]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[110]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[111]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[112]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[113]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[114]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[115]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[116]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[117]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[118]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[119]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[120]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[121]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[122]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[123]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[124]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[125]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[126]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[127]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[128]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[129]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[130]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[131]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[132]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[133]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[134]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[135]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[136]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[137]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[138]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[139]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[140]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[141]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[142]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[143]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[144]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[145]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[146]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[147]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[148]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[149]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[150]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[151]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[152]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[153]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[154]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[155]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[156]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[157]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[158]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[159]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[160]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[161]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[162]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[163]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[164]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[165]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[166]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[167]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[168]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[169]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[170]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[171]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[172]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[173]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[174]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[175]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[176]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[177]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[178]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[179]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[180]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[181]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[182]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[183]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[184]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[185]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[186]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[187]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[188]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[189]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[190]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[191]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[192]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[193]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[194]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[195]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[196]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[197]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[198]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[199]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[200]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[201]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[202]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[203]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[204]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[205]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[206]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[207]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[208]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[209]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[210]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[211]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[212]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[213]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[214]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[215]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[216]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[217]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[218]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[219]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[220]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[221]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[222]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "irq[223]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+            )
+        )
+        instance "ebcortexa9_sysregs"
+        (
+            x = 310;
+            y = 620;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "reset_core"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_core[0]"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "reset_core[1]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "reset_core[2]"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "reset_core[3]"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "reset_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_out"
+                (
+                x = 0;
+                y = 23;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "sysreg_overrides"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "periph_clockdivider"
+        (
+            x = 390;
+            y = 130;
+            width = 121;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 160;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl310_l2cc"
+        (
+            x = 60;
+            y = 310;
+            width = 171;
+            height = 181;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "DECERRINTR"
+                (
+                x = 180;
+                y = 102;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ECNTRINTR"
+                (
+                x = -10;
+                y = 143;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ERRRDINTR"
+                (
+                x = 10;
+                y = 123;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ERRRTINTR"
+                (
+                x = 20;
+                y = 23;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ERRWDINTR"
+                (
+                x = 20;
+                y = 103;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ERRWTINTR"
+                (
+                x = 0;
+                y = 83;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "L2CCINTR"
+                (
+                x = 150;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "PARRDINTR"
+                (
+                x = 0;
+                y = 63;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "PARRTINTR"
+                (
+                x = 20;
+                y = 43;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "SLVERRINTR"
+                (
+                x = 160;
+                y = 82;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_m"
+                (
+                x = -10;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 180;
+                y = 142;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "pvbusdecoder"
+        (
+            x = 310;
+            y = 430;
+            width = 151;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m_range"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 160;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "fvp_gic_fiq"
+        (
+            x = 60;
+            y = 510;
+            width = 171;
+            height = 99;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "fiq"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_num"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_core"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_distributor"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "fvp_gic_irq"
+        (
+            x = 310;
+            y = 510;
+            width = 171;
+            height = 99;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "fiq"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_num"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_core"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_distributor"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+    )
+    ports
+    (
+        define "hdr"
+        (
+            x = -40;
+            y = 130;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "ticks"
+        (
+            x = 560;
+            y = 340;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+    )
+    connections
+    (
+        define "clockdivider.clk_out=>core.clk_in"
+        (
+            point
+            (
+                x = 380;
+                y = 160;
+                automatic = false;
+            )
+            point
+            (
+                x = 380;
+                y = 210;
+                automatic = false;
+            )
+            point
+            (
+                x = 515;
+                y = 210;
+                automatic = false;
+            )
+            point
+            (
+                x = 515;
+                y = 250;
+                automatic = true;
+            )
+        )
+        define "clockdivider.clk_out=>periph_clockdivider.clk_in"
+        (
+        )
+        define "connector.clk_bus=>clockdivider.clk_in"
+        (
+        )
+        define "connector.intr=>eb_intmapper.int_in"
+        (
+            point
+            (
+                x = 50;
+                y = 220;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 260;
+                automatic = true;
+            )
+        )
+        define "connector.intr_num=>eb_intmapper.int_num"
+        (
+            point
+            (
+                x = 40;
+                y = 200;
+                automatic = true;
+            )
+            point
+            (
+                x = 40;
+                y = 280;
+                automatic = true;
+            )
+        )
+        define "connector.reset_coretile=>core.reset"
+        (
+            point
+            (
+                x = 236;
+                y = 200;
+                automatic = true;
+            )
+            point
+            (
+                x = 236;
+                y = 200;
+                automatic = true;
+            )
+            point
+            (
+                x = 530;
+                y = 200;
+                automatic = true;
+            )
+            point
+            (
+                x = 530;
+                y = 380;
+                automatic = true;
+            )
+        )
+        define "connector.reset_coretile=>ebcortexa9_sysregs.reset_in"
+        (
+            point
+            (
+                x = 270;
+                y = 200;
+                automatic = true;
+            )
+            point
+            (
+                x = 270;
+                y = 650;
+                automatic = true;
+            )
+        )
+        define "connector.sysreg_overrides=>ebcortexa9_sysregs.sysreg_overrides"
+        (
+            point
+            (
+                x = 250;
+                y = 240;
+                automatic = false;
+            )
+            point
+            (
+                x = 250;
+                y = 670;
+                automatic = false;
+            )
+        )
+        define "core.pvbus_m0=>pvbusdecoder.pvbus_s"
+        (
+            point
+            (
+                x = 520;
+                y = 411;
+                automatic = true;
+            )
+            point
+            (
+                x = 520;
+                y = 480;
+                automatic = true;
+            )
+        )
+        define "eb_intmapper.irq=>core.ints"
+        (
+        )
+        define "ebcortexa9_sysregs.reset_out=>connector.reset_board"
+        (
+            point
+            (
+                x = 490;
+                y = 671;
+                automatic = true;
+            )
+            point
+            (
+                x = 490;
+                y = 690;
+                automatic = false;
+            )
+            point
+            (
+                x = 20;
+                y = 690;
+                automatic = false;
+            )
+            point
+            (
+                x = 20;
+                y = 160;
+                automatic = false;
+            )
+        )
+        define "periph_clockdivider.clk_out=>core.periphclk_in"
+        (
+            point
+            (
+                x = 520;
+                y = 170;
+                automatic = true;
+            )
+            point
+            (
+                x = 520;
+                y = 270;
+                automatic = true;
+            )
+        )
+        define "pl310_l2cc.pvbus_m=>connector.pvbus"
+        (
+            point
+            (
+                x = 30;
+                y = 340;
+                automatic = false;
+            )
+            point
+            (
+                x = 30;
+                y = 180;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>pl310_l2cc.pvbus_s"
+        (
+        )
+        define "pvbusdecoder.pvbus_m_range=>fvp_gic_fiq.pvbus_core"
+        (
+            point
+            (
+                x = 300;
+                y = 480;
+                automatic = true;
+            )
+            point
+            (
+                x = 300;
+                y = 500;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 500;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 580;
+                automatic = true;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>fvp_gic_fiq.pvbus_distributor"
+        (
+            point
+            (
+                x = 300;
+                y = 480;
+                automatic = true;
+            )
+            point
+            (
+                x = 300;
+                y = 500;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 500;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 600;
+                automatic = true;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>fvp_gic_irq.pvbus_core"
+        (
+            point
+            (
+                x = 300;
+                y = 480;
+                automatic = true;
+            )
+            point
+            (
+                x = 300;
+                y = 580;
+                automatic = true;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>fvp_gic_irq.pvbus_distributor"
+        (
+            point
+            (
+                x = 300;
+                y = 480;
+                automatic = true;
+            )
+            point
+            (
+                x = 300;
+                y = 600;
+                automatic = true;
+            )
+        )
+    )
+    portmaps
+    (
+        define "connector.connector=>self.hdr"
+        (
+        )
+        define "core.ticks=>self.ticks"
+        (
+        )
+        define "core.ticks[0]=>self.ticks"
+        (
+            point
+            (
+                x = 540;
+                y = 710;
+                automatic = true;
+            )
+            point
+            (
+                x = 540;
+                y = 350;
+                automatic = true;
+            )
+        )
+    )
+    labels
+    (
+        instance "Label 0"
+        (
+            text  = "The Core: ARMCortexA9MPx4";
+            x = 260;
+            y = 100;
+            width = 161;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -1;
+            background_color = -12760746;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 1"
+        (
+            text  = "";
+            x = 260;
+            y = 120;
+            width = 261;
+            height = 381;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -10851457;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 2"
+        (
+            text  = "Core Tile Connector";
+            x = 40;
+            y = 80;
+            width = 131;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 3"
+        (
+            text  = "";
+            x = 40;
+            y = 100;
+            width = 201;
+            height = 191;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 4"
+        (
+            text  = "";
+            x = 250;
+            y = -20;
+            width = 261;
+            height = 111;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 5"
+        (
+            text  = "Cortex-A9_MPx4 Core Tile\10This subsystem is included in the FVP_EB_Cortex-A9_MPx4.lisa top-level system.";
+            x = 260;
+            y = -10;
+            width = 235;
+            height = 91;
+            font_family  = "Helvetica [Adobe]";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -5254664;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 4;
+            draw_below = true;
+        )
+        instance "Label 6"
+        (
+            text  = "";
+            x = 40;
+            y = 300;
+            width = 221;
+            height = 201;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -10851457;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+    )
+)

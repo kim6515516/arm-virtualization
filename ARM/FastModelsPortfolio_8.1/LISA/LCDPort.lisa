@@ -1,0 +1,36 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// Port type used to connect all the signals from a core module to the
+// Integrator base board.
+
+protocol LCD
+{
+    includes
+    {
+        #include "components/Visualisation.h"
+    }
+
+    properties {
+        version = "8.1.37";
+        description = "LCD protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    // Lock the raster region, ready for rendering onto.
+    behavior lock() : const VisRasterLayout *;
+
+    // Unlock the raster region, ready to update.
+    behavior unlock();
+
+    // Update part of the render region onto the screen.
+    behavior update(int x, int y, unsigned int w, unsigned int h);
+
+    // Set the preferred pixel size and bitdepth of the LCD panel.
+    behavior setPreferredLayout(unsigned int width, unsigned int height,
+                                unsigned int depth);
+}
+

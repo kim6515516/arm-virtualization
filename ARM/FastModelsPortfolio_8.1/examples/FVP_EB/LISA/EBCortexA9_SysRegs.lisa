@@ -1,0 +1,211 @@
+/*
+ * Copyright 2009 ARM Limited. All rights reserved.
+ */
+
+// The model of EB CortexA9 system registers
+
+component EBCortexA9_SysRegs
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "EB CortexA9 specific system registers";
+        documentation_file = "../../../#DUI0423#";
+    }
+    
+    includes
+    {
+        #define EBA9SYSREG_TRACE if (!0) ; else printf
+    }
+    
+    resources
+    {
+        REGISTER { description("Controls the software reset level (RW)"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x40) } SYS_RESETCTL;
+        REGISTER { description("Configure the attached core tiles (RW)"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x74) } SYS_PLDCTL1;
+        REGISTER { description("Configure the attached core tiles (RW)"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x78) } SYS_PLDCTL2;
+
+        bool is_locked;
+    }
+
+    // Output reset signals
+    master port<Signal> reset_core[4];
+    master port<Signal> reset_out; // DE454669 avoids separate reset ports for power, clock config and system reset level 
+
+    slave port<EBSysRegs> sysreg_overrides
+    {
+        behavior read(uint32_t addr, uint32_t *data) : bool
+        {
+            switch(addr) {
+            case 0x40: // SYS_RESETCTL
+                *data = SYS_RESETCTL;
+                EBA9SYSREG_TRACE("EBA9SYSREG: SYS_RESETCTL -> %x\n", *data);
+                break;
+            case 0x74: // SYS_PLDCTL1
+                *data = SYS_PLDCTL1;
+                EBA9SYSREG_TRACE("EBA9SYSREG: SYS_PLDCTL1 -> %x\n", *data);
+                break;
+            case 0x78: // SYS_PLDCTL2
+                *data = SYS_PLDCTL2;
+                EBA9SYSREG_TRACE("EBA9SYSREG: SYS_PLDCTL2 -> %x\n", *data);
+                break;
+            default:
+                // Let the generic EB sysregs handle anything else
+                return false;
+            }
+            return true;
+        }
+
+        behavior write(uint32_t addr, uint32_t data) : bool
+        {
+            switch (addr)
+            {
+            case 0x20: // SYS_LOCK
+                // We only snoop writes to SYS_LOCK, so we can tell whether regs are locked or not
+                is_locked = ((data & 0xffff) != 0xA05F);
+                // we have not handled this register -- let generic code deal with it
+                return false;
+            
+            case 0x40: // SYS_RESETCTL
+                EBA9SYSREG_TRACE("EBA9SYSREG: SYS_RESETCTL <- %x\n", data);
+                if (is_locked)
+                {
+                    return true;
+                }
+                
+                SYS_RESETCTL = data & 0x000000f7;
+                if (SYS_RESETCTL & 0x4)
+                {
+                    uint32_t LOCAL_SYS_PLDCTL1 = SYS_PLDCTL1;
+                    uint32_t nCPURESET = LOCAL_SYS_PLDCTL1 >> 6;
+                    EBA9SYSREG_TRACE("EBA9SYSREG: SYS_PLDCTL1: %x\n", LOCAL_SYS_PLDCTL1);
+                    EBA9SYSREG_TRACE("EBA9SYSREG: nCPURESET: %x\n", nCPURESET);
+                    for (int i = 0; i < 4; ++i)
+                    {
+                        if(nCPURESET & (1 << i))
+                        {
+                            if(reset_core[i].setValue.implemented())
+                            {
+                                EBA9SYSREG_TRACE("EBA9SYSREG: cpu %d reset\n", i);
+                                reset_core[i].setValue(sg::Signal::Set);
+                            }
+                        }
+                    }
+                    
+                    switch (SYS_RESETCTL & 0x3)
+                    {
+                    case 0: // POWER
+                        EBA9SYSREG_TRACE("EBA9SYSREG: power level reset\n");
+                        if(reset_out.setValue.implemented())
+                        {
+                            reset_out.setValue(sg::Signal::Set);
+                        }
+                        break;
+
+                    case 1: // CLOCK CONFIG
+                        EBA9SYSREG_TRACE("EBA9SYSREG: clock_config level reset\n");
+                        if(reset_out.setValue.implemented())
+                        {
+                            reset_out.setValue(sg::Signal::Set);
+                        }
+                        break;
+                    
+                    case 2: // SYSTEM RESET
+                    case 3:
+                        EBA9SYSREG_TRACE("EBA9SYSREG: system level reset\n");
+                        if(reset_out.setValue.implemented())
+                        {
+                            reset_out.setValue(sg::Signal::Set);
+                        }
+                        break;
+                    }
+
+                    for (int i = 0; i < 4; ++i)
+                    {
+                        if(nCPURESET & (1 << i))
+                        {
+                            if(reset_core[i].setValue.implemented())
+                            {
+                                EBA9SYSREG_TRACE("EBA9SYSREG: cpu %d reset\n", i);
+                                reset_core[i].setValue(sg::Signal::Clear);
+                            }
+                        }
+                    }
+                    if(reset_out.setValue.implemented())
+                    {
+                        reset_out.setValue(sg::Signal::Clear);
+                    }
+                }
+                break;
+            case 0x74: // SYS_PLDCTL 1
+                if (is_locked)
+                {
+                    return true;
+                }
+                SYS_PLDCTL1 = data & 0x000003c0;
+                {
+                    uint32_t nCPURESET = SYS_PLDCTL1 >> 6;
+                    EBA9SYSREG_TRACE("EBA9SYSREG: SYS_PLDCTL1 <- %x\n", SYS_PLDCTL1);
+                    EBA9SYSREG_TRACE("EBA9SYSREG: nCPURESET <- %x\n", nCPURESET);
+                    for (int i = 0; i < 4; ++i)
+                    {
+                        EBA9SYSREG_TRACE("EBA9SYSREG: cpu %d reset <- %x\n", i, ((nCPURESET & (1 << i)) == 0));
+                        if(reset_core[i].setValue.implemented())
+                            reset_core[i].setValue((nCPURESET & (1 << i)) ? sg::Signal::Clear : sg::Signal::Set);
+                    }
+                }
+                break;
+            case 0x78: // SYS_PLDCTL 2
+                EBA9SYSREG_TRACE("EBA9SYSREG: SYS_PLDCTL2 <- %x\n", data);
+                if (is_locked)
+                {
+                    return true;
+                }
+                SYS_PLDCTL2 = data;
+                break;
+            default:
+                // Let the generic EB sysregs handle it
+                return false;
+            }
+            // Register read handled
+            return true;
+        }
+    }    
+
+    // reset signal
+    slave port<Signal> reset_in
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+        }
+    }
+
+    behavior init()
+    {
+    }
+    
+    behavior reset(int level)
+    {
+        EBA9SYSREG_TRACE("EBA9SYSREG: reset\n");
+        SYS_RESETCTL = 0x000000f0;
+        SYS_PLDCTL1  = 0x000003c0;
+        SYS_PLDCTL2  = 0x00000000;
+        is_locked = true;
+    }
+
+    // debugger register access support
+    behaviour debug_read(CASIU32 reg_id, CASIU64* datap, bool side_effects) : CADIReturn_t
+    {
+        uint32_t data = 0;
+        sysreg_overrides.read(reg_id, &data);
+        *datap = data;
+        return eslapi::CADI_STATUS_OK;
+    }
+
+    behaviour debug_write(CASIU32 reg_id, const CASIU64* datap, bool side_effects) : CADIReturn_t
+    {
+        sysreg_overrides.write(reg_id, (uint32_t)*datap);
+
+        return eslapi::CADI_STATUS_OK;
+    }
+}

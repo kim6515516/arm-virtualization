@@ -1,0 +1,232 @@
+/*!
+ * \file    MMC_Protocol.lisa
+ * \brief   Protocol definition for communication between MMC controller and cards
+ * \date    (C) Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// The MMC_Protocol is used to connect an MMC controller and a card
+// Currently, only MMC Mode communications are allow, on a point-point basis.
+// [SPI is not supported, nor are multiple cards on the MMC bus]
+
+
+protocol MMC_Protocol
+{
+    properties {
+        version = "8.1.37";
+        description = "Generic Multimedia card protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        typedef enum {
+            // Basic and Read stream commands (Class 0 & Class 1)
+            MMC_GO_IDLE_STATE        = 0,
+            MMC_SEND_OP_COND         = 1,
+            MMC_ALL_SEND_CID         = 2,
+            MMC_SET_RELATIVE_ADDR    = 3,
+            MMC_SET_DSR              = 4,
+            MMC_CMD5                 = 5, // reserved
+            MMC_SWITCH               = 6,
+            MMC_SELDESL_CARD         = 7,
+            MMC_SEND_EXT_CSD         = 8,
+            MMC_SEND_CSD             = 9,
+            MMC_SEND_CID             = 10,
+            MMC_READ_DAT_UNTIL_STOP  = 11,
+            MMC_STOP_TRANSMISSION    = 12,
+            MMC_SEND_STATUS          = 13,
+            MMC_BUSTEST_R            = 14,
+            MMC_GO_INACTIVE_STATE    = 15,
+            MMC_BUSTEST_W            = 19,
+
+            // Block oriented read commands (Class 2)
+            MMC_SET_BLOCKLEN         = 16,
+            MMC_READ_SINGLE_BLOCK    = 17,
+            MMC_READ_MULTIPLE_BLOCK  = 18,
+
+            // Stream write commands (Class 3)
+            MMC_WRITE_DAT_UNTIL_STOP = 20,
+            MMC_CMD21                = 21, // reserved
+            MMC_CMD22                = 22, // reserved
+
+            // Block oriented write commands (Class 4)
+            MMC_SET_BLOCK_COUNT      = 23,
+            MMC_WRITE_BLOCK          = 24,
+            MMC_WRITE_MULTIPLE_BLOCK = 25,
+            MMC_PROGRAM_CID          = 26,
+            MMC_PROGRAM_CSD          = 27,
+
+            // Block oriented write protection commands (Class 6)
+            MMC_SET_WRITE_PROT       = 28,
+            MMC_CLR_WRITE_PROT       = 29,
+            MMC_SEND_WRITE_PROT      = 30,
+            MMC_CMD31                = 31, // reserved
+
+            // Erase commands (Class 5)
+            MMC_CMD32                = 32, // reserved & unused to preserve
+            MMC_CMD33                = 33, // backwards compatibility
+            MMC_CMD34                = 34, // with older MMC versions
+            MMC_ERASE_GROUP_START    = 35,
+            MMC_ERASE_GROUP_END      = 36,
+            MMC_CMD37                = 37, // reserved - as above
+            MMC_ERASE                = 38,
+
+            // I/O mode commands (Class 9)
+            MMC_FAST_IO              = 39,
+            MMC_GO_IRQ_STATE         = 40,
+            MMC_CMD41                = 41, // reserved
+
+            // Lock card (Class 7)
+            MMC_LOCK_UNLOCK          = 42,
+            MMC_CMD43                = 43, // reserved
+            MMC_CMD44                = 44, // reserved
+            MMC_CMD45                = 45, // reserved
+            MMC_CMD46                = 46, // reserved
+            MMC_CMD47                = 47, // reserved
+            MMC_CMD48                = 48, // reserved
+            MMC_CMD49                = 49, // reserved
+            MMC_CMD50                = 50, // reserved
+            MMC_CMD51                = 51, // reserved
+            MMC_CMD52                = 52, // reserved
+            MMC_CMD53                = 53, // reserved
+            MMC_CMD54                = 54, // reserved
+
+            // Application specific commands (Class 8)
+            MMC_APP_CMD              = 55,
+            MMC_GEN_CMD              = 56,
+            MMC_CMD57                = 57, // reserved
+            MMC_CMD58                = 58, // reserved
+            MMC_CMD59                = 59, // reserved
+            MMC_CMD60                = 60, // reserved by manufacturer
+            MMC_CMD61                = 61, // as above
+            MMC_CMD62                = 62, // as above
+            MMC_CMD63                = 63, // as above
+        } mmc_cmd_t;
+
+        // The response can be
+        // - R1:       (mirrored command and status)
+        // - R2:       CID / CSD
+        // - R3:       OCR register
+        // - R4 or R5: RCA
+        // ... or none
+        typedef enum {
+            MMC_RNONE   = 0,
+            MMC_R32     = 32,  // 32-bit response
+            MMC_R128    = 128, // CSR or CID (128-bit)
+            MMC_RERROR  = 255,
+        } mmc_resp_t;
+
+        // Other response information:
+
+        // The OCR is returned as a uint32_t:
+        //   - bit     31 Power up status [0=Busy, 1=Ready]
+        //   - bits 30:24 reserved
+        //   - bits  8:23 [1 | 0] for each voltage from 2.0 to 3.6
+        //                in 0.1v increments. E.g. bit 8=1 means the
+        //                card supports 2.0-2.1v, bit 23: 3.5-3.6v
+        //   - bits  7: 0 reserved
+        typedef uint32_t mmc_ocr_resp_t;  // r3
+
+        // The status bits are currently defined with the card implementation
+        // (Though they're pretty generic)
+        typedef uint32_t mmc_status_t;    // r1
+
+        // Response type for the Card ID and the Card Specific Data Registers
+        // Generic for transport - actual formats will depend on the card
+        typedef struct {
+            uint32_t   cxd[4];           // 128 bits of card ID.
+        } mmc_cxd_resp_t;                // r2
+
+
+        // RCA (relative card address register)
+        // (note this is 16 bits on the hardware - we zero the MSBs)
+        typedef uint32_t mmc_rca_t;
+
+        // DSR (driver stage register)
+        // (note this is 16 bits on the hardware - we zero the MSBs)
+        typedef uint32_t mmc_dsr_t;
+
+        // This is what a SWITCH argument looks like
+        // Note SWITCH (CMD6) is not supported by MMC 3.3, but is by 4.x,
+        // and SD 1.1, SD 2.0.
+        typedef struct {
+            uint32_t res1:5;   // bits 31:26 are reserved
+            uint32_t access:2; // bits 25:24
+            uint32_t index:8;  // bits 23:16
+            uint32_t value:8;  // bits 15:8
+            uint32_t res2:5;   // bits  7:3
+            uint32_t cmd:3;    // bits  2:0
+        } switch_arg_t;
+    }
+
+
+    // Controller can send the slave a command, with an optional
+    // 32-bit argument.
+    // The master MUST send in a void pointer to 128 bits of data
+    // The slave will respond with a response type, and fill in up to 128
+    // bits with data.
+    // The master may check the response type matches expectations, but
+    // note this shouldn't be necessary.
+    // CRC is not implemented, and start / stop bits are unnecessary at
+    // this level.
+    // Note this behavior is *not* re-entrant by current  design.
+    slave behaviour cmd(mmc_cmd_t cmd, uint32_t arg, void *resp) : mmc_resp_t;
+
+    //
+    // Data interface
+    // NOTE: Currently, only block mode transfers are expected
+    //
+
+    // Read behaviours [Card -> Controller direction]
+    //
+    // After the controller has issued a block / multiple block read command,
+    // the card will call the controller's Rx method, with the first block
+    // When the controller has digested the block (i.e. when it is able to
+    // accept another block), it should inform the slave with an Rx_rdy()
+    // call.
+    //
+    // The slave may not provide a block immediately - it may wait
+    // until the controller is ready AND simulated transfer rate
+    // limits have been satisfied. (This is important so as not to
+    // swamp the simulation with a large transfer at the expense of
+    // all other simulation activity.)
+    //
+    // Master may signal that it was not able to accept the given block
+    // by returning false from Rx(). This is effectively a protocol error,
+    // and the card may retransmit the block later, or fail.
+
+    master behaviour Rx(const uint8_t *block, uint32_t len) : bool;
+    slave  behaviour Rx_rdy(void);
+
+    // Write behaviours [Controller -> Card direction]
+    //
+    // In order to minimize the number of times written data are copied,
+    // the following protocol is somewhat counter-intuitive.
+    // The basic premise is that an MMC controller usually contains a
+    // rather small data FIFO, which is filled either by the simulated CPU,
+    // or more frequently by DMA. The DMA typically occurs word by word.
+    // An efficient approach is therefore to construct the controller
+    // such that it may write straight into a buffer of stored card data.
+    //
+    // When the write command is issued, the card calls the master
+    // with a pointer to the block that needs to be written. The master
+    // can then fill the block, calling Tx_done when the block has
+    // been transferred. The card is again responsible for throttling
+    // to a simulated transfer rate, and will respond at some time in
+    // the future by providing another block to be written by calling
+    // the controller's Tx function.
+    //
+    // This approach has some shortcomings:
+    //   - Some timing and controller behavioral accuracy is sacrificed
+    //   - Controller may need to buffer data prior to a block
+    //     being provided (if it can't prevent data coming into its
+    //     FIFO).
+    master behavior Tx(uint8_t *block, uint32_t len) : bool;
+    slave behaviour Tx_done(void);
+
+
+    // Not strictly a part of the MMC protocol, and somewhat poor
+    // style: assuming the slave will implement a behavior that will
+    // return a string for a given command
+    slave behavior cmd_name(mmc_cmd_t cmd) : const char *;
+}

@@ -1,0 +1,56 @@
+//
+// v7_VGIC_Configuration_Protocol
+//
+// v7_VGIC implements the v7 VGIC architecture, however, there is some
+// implementation-defined mapping to get the core number from the AXI ID (or
+// MasterID in FastSim world) to the core interface number.
+//
+// Copyright 2010 ARM Limited. All rights reserved.
+//
+protocol v7_VGIC_Configuration_Protocol
+{
+
+    properties {
+        version = "8.1.37";
+        description = "v7_VGIC configuration protocol";
+    }
+
+    slave behaviour getNumberOfCores() : unsigned;
+
+    // Call this as many times as you need to in order to set the mappings.  All
+    // calls with the same arguments are idempotent.  The most recent call for a
+    // specific master id wins.
+    //
+    // Unfortunately the VGIC has to be told independently about the maximum
+    // number of CPUs that exist as the GIC has to be initialised before the
+    // components can talk to each other :-(.
+    //
+    // Return false if the arguments are incorrect.
+    //
+    // Normally this should be performed during reset().
+    //
+    // (master_if_of_transaction & master_id_mask_) == master_id_ should be unique
+    // for any particular master_id sent.
+    //
+    // inout_cluster_number_ and inout_cpu_number_in_cluster_ is used to work out
+    // how to connect the 8 PPI interfaces and the 8 sets of in/out IRQ/VIRQ/FIQ/VFIQ
+    // ports to interface numbers.
+    // The value:
+    //        N = (inout_cluster_number_ * 4 + inout_cpu_number_in_cluster_)
+    // maps the ports ppiN/irq_*[N]/virq_*[N]/fiq_*[N]/vfiq_*[N]
+    // to cpu_interface_number_.  This format is used so that if you only have
+    // two clusters then it is partitioned by cluster number and that core's id
+    // in that cluster and where the ports are _not_ rewired depending on
+    // the number of cores.  If you are _not_ in this situation then simply
+    // setting inout_cluster_number_ to zero and using inout_cpu_number_in_cluster_
+    // as the N to connect port N to cpu_interface_number_ is the best thing to
+    // do.
+    //
+    slave behaviour setMasterIdToCoreNumberMapping(
+        uint32_t master_id_,
+        uint32_t master_id_mask_,
+        unsigned cpu_interface_number_,
+        unsigned inout_cluster_number_,
+        unsigned inout_cpu_number_in_cluster_
+        ) : bool;
+}

@@ -1,0 +1,682 @@
+========================================================================
+Fast Models Portfolio 8.1 Release Notes
+========================================================================
+
+Detailed documentation can be found in the 'doc' subfolder for Fast Models
+Tools and the 'Docs' subfolder for the Fast Models Portfolio.
+
+
+A significant number of the examples in the Fast Models Portfolio
+8.1 make use of images containing 3rd-party IP. These have
+been split out into a separate 'Third Party IP' package that can be
+downloaded from:
+  * Connect:
+    http://connect.arm.com
+    http://silver.arm.com
+
+Not installing these images will mean that any examples that require
+dhrystone or the Linux images will not be functional, as well as any
+example using OSCI System C 2.2 and TLM 2.0.
+
+
+--------------------------------------------------------------------
+Enhancements and Changes in the Fast Models Portfolio 8.1 Release
+--------------------------------------------------------------------
+
+Fast Models 8.1 includes the following enhancements/changes since
+8.0:
+
+* MMU-400
+  Fast Models 8.1 includes the model for the MMU-400 (System MMU) at Beta status.
+  This model is functionally complete and has been unit tested. It requires further
+  system software testing to reach full Release status. As with all models, please
+  report any issues found via support-esl@arm.com.
+
+  The MMU-400 is a System Memory Management Unit. An SMMU translates addresses,
+  transaction attributes and applies permission checking on client device transactions
+  from the upstream port, and presents them on the downstream. The purpose of this
+  is to make the upstream devices more easily virtualizable.
+
+  The SMMU Architecture expects that an incoming transaction be labelled by a "StreamId"
+  and an "SSD_Index" or "SSD". It is up to the SoC designer to form these numbers based on
+  the specific needs of the SoC.
+
+  The (SSD_Index/SSD, StreamId) pair is used to map a transaction to a security world
+  (secure or non-secure) and a translation context that holds the information necessary
+  to perform the translation. Thus all transactions labelled with the same
+  (SSD_Index/SSD,StreamId) are indistinguishable.
+
+  SSD_Index is used indirectly to obtain the security world of the transaction via
+  a mapping table (SMMU_SSDRn) in the SMMU, whilst SSD directly encodes the security
+  state of the transaction. NOTE that the security state of the transaction is independent
+  of the Normal/Secure attribute on the transaction itself and should not be confused.
+
+  In the case of the MMU-400, which can only perform stage 2 translations, the
+  secure transactions can never be routed to a translation context and instead can either
+  only be faulted or bypass the address translation and only have a limited attribute-only
+  transformation applied.
+
+  In a real hardware SoC, then the StreamId and the SSD_Index are usually formed by
+  side-band signals on the bus or by something like AXI routing ids. Models
+  do not have direct correspondance to these signals and instead one must label
+  transactions coming from a device.
+
+  Transactions have a 'master_id' field, which can be set by a master.
+  Many masters simply use zero and those that do, often do not allow you to
+  configure their use.
+
+  The component MMU_400 uses the top 16 bits of the 32 bit master_id as a 'label'.
+  It has parameters such as:
+
+  label0_read_stream_id
+  label0_read_ssd
+  label0_write_stream_id
+  label0_write_ssd
+  ...
+  These are used to map a label N in the top 16 bits of the master_id to a particular
+  StreamID and SSD_Index/SSD. N is limited to 0..31. NOTE that the read and write
+  transactions can have different StreamIds and SSD_Indexes/SSDs.
+
+  If the MMU_400 is configured to use SSD_Indexes then the parameter
+  label{N}_{read/write}_ssd is the index, otherwise it is 0/1 for secure
+  and non-secure respectively.
+
+  To place the 'labels' in the master_id then a Labeller component is supplied
+  that should be placed under each upstream device or bus-segment that the SoC
+  wishes to distinguish. The Labeller is a very simple component and if it doesn't
+  satisfy the SoC needs, then examining the LISA code should show you how to create
+  a more complicated labelling component that meets your needs.
+
+  The MMU_400 component is a wrapper round the component MMU_400_BASE,
+  which if the SoC identifies transactions in a more complicated way than
+  can be easily expressed by the MMU_400 component, then one can write a
+  new wrapper for MMU_400_BASE and implement your own identification scheme.
+  The code for the MMU_400 component shows how to do this, in particular one
+  should replace the 'identify' behavior with the one specific to the SoC.
+
+* Python debug scripting
+    The ‘fm.debug’ Python module allows you to:
+        - Configure and instantiate a model from a CADI library
+        - Connect to a remote CADI simulation
+        - Debug the simulation:
+          - Load applications
+          - Add and remove breakpoints
+          - Run/stop/step the execution
+          - Read and write registers
+          - Read and write memory
+
+  It is not currently possible to reliably step a single core in a multicore
+  system using the fm.debug Python module.
+  (SDDKW-22316)
+
+  The fm.debug Python module requires an install of Python 2.7.x.
+  On Linux the Python interpeter must be compiled using gcc 4.4.4 or later
+  (SDDKW-22401)
+
+* Linux Virtio block device
+  Virtio block device and virtio support for A-class VFP_VE platforms.
+  The portfolio now includes a VirtioBlockDevice component which implements
+  a block device controlled by the virtio MMIO protocol. This may be
+  connected to the newly added virtio slave port on several of the A-class
+  cores including the Cortex-A9MP, Cortex-A7, Cortex-A15 and AEMv8.
+
+* Support for SystemC V2.3
+  Fast Models can now generate Exported Virtual Systems using implementations
+  of the SystemC 2.3 standard. Fast Models has been tested with the reference
+  implementation of SystemC 2.3 from Accellera. We do not ship the headers and
+  binaries for SystemC 2.3 in the Third Party IP package at this time in order
+  to use SystemC 2.3 support a runtime must be sourced from Accellera or your
+  SystemC vendor.
+
+* CADI Virtual to Physical address translation
+  CADIAddrComplete_t CADI::VirtualToPhysical(CADIAddrComplete_t vaddr) function is
+  implemented. This funtion will provide the physical address that is
+  associated with a virtual address.
+
+  This CADI function accepts a CADIAddrComplete_t instance as the parameter and returns
+  a CADIAddrComplete_t instance as the result. The success of the query is indicated by
+  the memory space field(addr.location.space) in CADIAddrComplete_t structure.
+
+  If the query fails, CADI_MEM_SPACE_NOTSUPPORTED is returned, otherwise the memory
+  space passed in is returned. The current implementation is intrusive. In other words,
+  internal TLB status will be disrupted by the query.
+
+* Timing Annotation
+  This release introduces support for TLM 2.0 Timing as defined in the SystemC
+  specifications available here: http://www.accellera.org/downloads/standards/systemc.
+
+    The release provides:
+      - Timing information on b_transport() calls for outgoing D-side bus transactions, that is
+        from Fast Models to SystemC and back (via the PVBus to AMBA-PV bridges).
+        Incoming bus transactions (via AMBA-PV to PVBus bridges) and DMI latencies will
+        be addressed in a later release.
+      - Quantum Keeping in the Fast Models with the addition of the sg::QuantumKeeper
+        interface to the Scheduler API.
+      - Preliminary support for Cycle Per Instruction (CPI) parameter on individual cores:
+        cpi_mul, cpi_div, to account for I-side path latencies (limited to Cortex-A15).
+      - Preliminary support for automatic synchronisation when:
+        - a core is about to go to sleep (due to WFE/WFI).
+        - initiating non-DMI memory accesses.
+        - raising externally visible signals (limited to WFE/WFI related signals).
+
+  As Timing Annotation can have a performance impact it is switchable through the
+  use of an environment variable, FASTSIM_DISABLE_TA.
+
+      - FASTSIM_DISABLE_TA=1 (default), Timing Annotation is OFF
+      - FASTSIM_DISABLE_TA=0, Timing Annotation is ON
+      - make SIMGENFLAGS=-DFM_SCX_ENABLE_TA, Timing Annotation is ON for
+        SystemC Export platforms.
+
+  The Fast Models release planned for Q4 2013 further builds on this capability.
+
+* Sleep on WFI and Sleep on WFE is enabled by default
+  The way the model implements low power states such as WFE and WFI has been
+  changed to improve performance. The change means that cores which are WFE
+  or WFI will not consume host CPU resource.
+  This causes a change in the CADI stepping behavior. Previously the model could
+  respond to step request while in WFI or WFE, now the step request will not
+  complete until the model exits from WFI or WFE. Please contact ARM support if
+  you require more details about the effects this may have on your flows.
+
+
+* Real Time Simulation Models (RTSM) renamed to Fixed Virtual Platforms (FVP)
+  With Fast Models 8.1 and later releases the example platforms and pre-compiled
+  models previously known as RTSM will be named Fixed Virtual Platforms (FVP).
+  This change is to provide better correspondence between the name and the
+  function of the examples as well as being in line with naming practices in
+  the broader industry.  The functionality of the platforms and examples do
+  not change in any way.
+
+      - Within the FastModelsPortfolio/examples folder, the RTSM_* folders are
+        now named FVP_*.
+      - Project names in those folders are renamed from RTSM_* to FVP_*.
+
+--------------------------------------------------------------------
+Deprecated in the Fast Models Portfolio 8.1 Release
+--------------------------------------------------------------------
+
+* Windows XP and Red Hat Enterprise Linux 4 Platform support will be
+  removed from the next release of Fast Models.
+
+* 32 bit Red Hat Enterprise Linux 5 Platform support will be removed
+  from the next release of Fast Models.
+
+* SystemC Single Instantiation will be completely removed in a future
+  release of Fast Models.
+
+--------------------------------------------------------------------
+Removed in the Fast Models Portfolio 8.1 Release
+--------------------------------------------------------------------
+
+* SystemC Single Instance examples have been removed. SystemC Multiple Instance
+  is the default.
+* The AEMv7 CT Model and example platforms have been removed. Please contact
+  ARM for details.
+
+-------------------------------------------
+Platform requirements for Microsoft Windows
+-------------------------------------------
+
+When running Microsoft Windows XP or Microsoft Windows 7 it is
+recommended to use machines with at least 2GB RAM, and preferably at
+least 4GB for best performance. A 2GHz, or faster, Intel Core2Duo,
+or similar performing, processor is recommended.
+
+Operating system:
+Microsoft Windows XP 32 Bit SP2 or SP3.
+Microsoft Windows 7 32 bit RTM or SP1, Professional or Enterprise editions.
+Microsoft Windows 7 64 bit RTM or SP1, Professional or Enterprise editions.
+
+Compiler:
+Microsoft Visual Studio 2008 with Service Pack 1 and the Microsoft
+Visual Studio 2008 Service Pack 1 ATL Security Update.
+
+or
+
+Microsoft Visual Studio 2010 with Service Pack 1.
+
+Runtime Libraries:
+Fast Models Portfolio does not contain the Microsoft Visual Studio
+2008 SP1 or Microsoft Visual Studio 2010 SP1 runtime libraries.
+
+The Fast Models tools require the Microsoft Visual Studio 2008 SP1
+runtime libraries to be installed. These must be downloaded from
+Microsoft.
+
+Models built with Microsoft Visual Studio 2008 SP1 or Microsoft Visual
+Studio 2010 SP1 require the Microsoft Visual Studio 2008/2010 SP1
+Redistributable Package to be installed in order to run.
+
+64-bit host model support:
+In order to build 64-bit host models on Microsoft Windows, a host
+platform with a 64-bit CPU and a 64-bit version of Microsoft Windows
+is required, note that Microsoft Windows XP 64 is not
+supported. Microsoft Visual Studio 2008 SP1 and the Microsoft Visual
+Studio 2008 Service Pack 1 ATL Security Update or Microsoft Visual
+Studio 2010 SP1 is required.
+
+Additional project configurations are available for most recently
+created System Canvas projects and selected updated example
+projects. To build for a Microsoft Windows host choose either
+'Win64-Debug-VC2008', 'Win64-Release-VC2008', 'Win64-Debug-VC2010', or
+'Win64-Release-VC2010'.
+
+Please email support-esl@arm.com with any comments.
+
+To view the documentation, Adobe Acrobat reader (Version 8 or higher)
+needs to be installed on the system.
+
+
+-------------------------------
+Platform requirements for Linux
+-------------------------------
+
+When running on Linux it is recommended to use machines with at least 2GB RAM,
+and preferably at least 4GB for best performance. A 2GHz, or faster, Intel Core2Duo,
+or similar performing, processor is recommended.
+
+Operating system:
+Red Hat Enterprise Linux 4 (on either 32 or 64 bit architecture)
+Red Hat Enterprise Linux 5 (on either 32 or 64 bit architecture)
+Red Hat Enterprise Linux 6 (on either 32 or 64 bit architecture)
+
+Compiler:
+
+When building models for 32bit hosts, Fast Models 8.1 for Linux
+supports the following compilers:
+ - gcc 4.1.2 (built against at least binutils 2.17)
+ - gcc 4.4.4
+
+When building models for 64bit hosts, Fast Models 8.1 for Linux
+supports the following compilers:
+ - gcc 4.1.2 (built against at least binutils 2.17)
+ - gcc 4.4.4
+
+64-bit host model support:
+In order to build 64-bit host models on Linux a host platform with a
+64-bit CPU and a 64 bit version of RedHat Enterprise Linux version 4
+or above is required. GCC 4.1.2 or upwards is required.
+
+Additional project configurations are available for most recently
+created System Canvas projects and selected updated example
+projects. To build for a Linux 64-bit host, start System Canvas and
+change the 'Active Project Configuration' to one of the
+'Linux64-Release-GCC' configurations, then rebuild the project.
+
+To view the documentation, Adobe Acrobat reader (Version 8 or higher) needs to
+be installed on the system.
+
+
+----------------------------
+Licence management utilities
+----------------------------
+
+If you are using floating licenses, you must use FLEXnet license
+management utilities version 9.2 or higher. FLEXnet 10.8 license
+management utilities are available as an optional installable
+component in the product installer.
+
+Use the highest version of the license management utilities provided with
+any ARM tools you are using. It is recommended to setup the user
+environment running applications of the Fast Models product only for one
+armlmd license server, because spreading Fast Models license features
+over different servers could result in license denials for certain features.
+
+For more instructions on installing licenses please consult the ARM
+online documentation:
+* How do I install my floating license?
+    http://infocenter.arm.com/help/topic/com.arm.doc.faqs/ka3861.html
+* How do I install my node locked license?
+    http://infocenter.arm.com/help/topic/com.arm.doc.faqs/ka3510.html
+* FLEXnet for ARM® Tools License Management Guide v4.3
+    http://infocenter.arm.com/help/topic/com.arm.doc.dui0209-/index.html
+
+
+------------------
+Installation Notes
+------------------
+
+* Microsoft Windows XP
+* Microsoft Windows 7
+
+The installer detects if it is being run on Windows Windows 7
+and automatically copies the examples to the user home directory
+"ARM\FastModelsPortfolio_8.1\examples"
+It is necessary to load examples into the System Canvas tool
+from this new location if you wish to make changes that can be saved.
+
+By default Microsoft Windows 7 does not provide an executable telnet
+client. For instructions on how to deal with this, please see the Fast
+Models Reference Manual section 5.
+
+* Linux
+
+Once you have installed the Fast Models package, it is
+necessary to source the following script (dependent on shell) to
+setup up the appropriate environment variables. This should ideally
+be included such that it is sourced into the user's environment when they
+log in.
+    bash/sh: . <install_directory>/FastModelTools_8.1/source_all.sh
+    csh: source <install_directory>/FastModelTools_8.1/source_all.csh
+
+* TPIP
+
+The Third-Party IP package (TPIP) must be installed after the Fast Models
+package.
+
+
+----------------------------
+Using the MPS platform model
+----------------------------
+
+* Loading and running the platform
+
+The platform model comes with a pre-built flash image that contains a
+slightly modified version of the MPS BootMonitor and the MPS SelfTests.
+The platform has a parameter for the name of the file that is loaded
+into the flash on startup. In order to use the flash image this parameter
+needs to be set properly:
+
+Examples:
+  with a relative path:
+    coretile.fname=mps_flash.bin
+  with an absolute path on Microsoft Windows assuming the default installation
+  directory:
+    coretile.fname="C:\Program Files\ARM\FastModelPortfolio_8.1\examples\FVP_MPS\mps_flash.bin"
+  with an absolute path on Linux assuming the default installation
+  directory:
+    coretile.fname="/home/username/ARM/FastModelPortfolio_8.1/examples/FVP_MPS/mps_flash.bin"
+
+The BootMonitor can be used to start images from flash.
+  * To enter the flash menu type "flash"
+  * To list the available images then type "list images"
+  * To run an image type e.g. "run selftest_mpb_ESL"
+
+When running the MPS SelfTests, the following tests are expected to fail
+on the MPS platform model:
+   * 1.1 Audio Loopback
+     Reason: no loopback simulated
+   * 10 USB
+     Reason: USB not supported
+
+
+-------------------------------------------
+Using the ARM Profiler with Fast Models 8.1
+-------------------------------------------
+
+Fast Models version 8.1 supports ARM Profiler version 2.1, as
+shipped in ARM RealView Development Studio 4.0 SP2, and later. It does not
+support the use of ARM Profiler 2.0 or earlier, which was shipped in ARM
+RealView Development Studio 4.0 and 4.0 SP1.
+
+If you currently have ARM Profiler 2.0 and wish to use the ARM Profiler with
+Fast Models 8.1, it will be necessary to upgrade to ARM RVDS 4.0
+SP2.  Please contact ARM support for further details.
+
+
+--------------------------------------
+Using TAP / TUN-based Model Networking
+--------------------------------------
+
+Fast Models version 6.0 added a new model-to-host networking implementation
+based on TAP/TUN. This has a number of advantages compared to the previous
+version:
+  * Only requires root / administrator access at install time.
+  * No longer requires nicserver.
+
+Installation instructions for Model Networking can be found in the Fast Models
+Reference Manual, sections 5.4.45, 5.6.3, and 5.6.4.
+
+However, due to the different implementation and configuration methods, you
+may encounter some issues during installation:
+
+1. Symptom: The model networking worked after the first time setup, then
+   stop working after reboot.
+
+   Solution: This is typically caused by /dev/net/tun not having correct access
+   permissions. To fix this, set the correct permission to the device by
+   executing "chmod 666 /dev/net/tun" as root. To preserve the change across
+   reboots, the udev rules of the tap device need to be modified:
+
+   Open /etc/udev/rules.d/50-udev.rules as root, find the line
+   KERNEL=="tun",                  NAME="net/%k"
+
+   Check if it has MODE="0666" at the end of the line. If not, append
+   MODE="0666" to the line:
+
+   KERNEL=="tun",                  NAME="net/%k", MODE="0666"
+
+
+2. Symptom: Model Networking installs correctly, however when a model is
+   started, the model cannot receive any packets.
+
+   Solution: This is typically caused by the firewall on the host machine.
+   Disable the firewall, or add tap device to "trusted devices". Please refer
+   to your vendor's documentation manual for how to do this.
+
+
+------------------
+Outstanding Issues
+------------------
+
+* CT model issues:
+
+- Models only support some types of memory breakpoints. Currently the
+  error message returned if an unsupported type is used may not clearly
+  indicate that the breakpoint type is unsupported.
+  (TA-662969/SDDKW-4722)
+
+- CADI calls not supported by Fast Models. The following methods are
+  not supported by Fast Models:
+
+  CADI:
+    Parameter API
+        CADIGetParameters()
+        CADIGetParameterInfo()
+        CADIGetParameterValues()
+        CADISetParameters()
+    Register API
+        CADIGetCommitedPCs()
+    Memory API
+        CADIMemGetOverlays()
+    Virtual Memory API
+        PhysicalToVirtual()
+    Cache API
+        CADIGetCacheInfo()
+        CADICacheRead()
+        CADICacheWrite()
+    Execution API
+        CADIExecLoadApplication()
+        CADIExecUnloadApplication()
+        CADIExecGetLoadedApplications()
+        CADIExecAssertException()
+        CADIExecGetPipeStages()
+        CADIExecGetPipeStageFields()
+        CADIGetCycleCount()
+
+  CADIDisassembler:
+        GetSourceReferenceForAddress()
+        GetAddressForSourceReference()
+        GetInstructionType()
+
+  CADIDisassemblerCB:
+        ReceiveSourceReference()
+
+  CADIProfiler:
+
+  (TA-684124/SDDKW-5033)
+
+- CADI methods deprecated for use in Fast Models 8.1:
+
+    CADICallbackObj
+        appliOpen()
+        appliClose()
+        cycleTick()
+        killInterface()
+  (TA-684124/SDDKW-5033)
+
+
+- When attempting to debug an ISIM system, if you launch Model Debugger from
+  System Canvas and then specify an application to load this causes an error in
+  Model Debugger (Error using application...), and the model and application
+  fail to load.
+
+  Workaround: Launch Model Debugger without specifying an application, and
+  then load the application from within Model Debugger itself using
+  File -> Load Application Code.
+  (SDDKW-10295)
+
+- The GIC-400 model has the following limitations:
+  - Reads and writes to the
+    GICD_ISACTIVERn/GICD_ICACTIVERn/GICD_ISPENDRn/GICD_ICPENDRn may
+    not work as expected unless there is a configured target in
+    GICD_ICFGRm.
+  - Some of the interaction of GICD_CTLR.EnableGrpX and level
+    sensitive interrupts may not work entirely correctly.
+  - The signals nIRQOUT/nFIQOUT are not modelled.
+  - All interrupts are modelled with positive logic, rather than the
+    negative logic used in the hardware.  Hence all signal pins have
+    their 'n' prefix dropped.
+  (SDDKW-13075)
+
+
+- There is a limitation in the ACE cache models in Cortex-A15 and
+  Cortex-A7, and the ACE support in the CCI-400: these functional
+  models only handle processing a single transaction at a time.  Under
+  normal use this won't cause any problems, because the simulation
+  will process each transaction to completion before allowing any
+  master to generate another transaction.
+
+  This is one situation in which this might fail:
+
+  - If a SystemC bus slave calls wait() while it is processing a
+    transaction, it may allow another master to issue a transaction
+    that passes through the CCI-400 or the Cortex-A15/Cortex-A7
+    caches.  This could happen if a SystemC bus master running in
+    another thread is connected to one of the ACE-lite ports on the
+    CCI-400.
+    (SDDKW-12826)
+
+  Contact ARM for further details if these restrictions are likely to
+  cause problems.
+
+- simulation freezes when stepping a core that is halted by setting
+  the halt_core register.
+  (TA-528092/SDDKW-19689)
+
+- A15 bus transactions are not bus accurate.
+  (TA-520481/SDDKW-19001)
+
+- CADI and MTI names for CP15 registers are different.
+  (TA-514407/SDDKW-16762)
+
+- Reset value for MIR register in smsc_91c111 ethernet controller.
+  is incorrect
+  (TA-512419/SDDKW-16123)
+
+- A15 does not emit MTI BUS_READ_ACCESS and BUS_WRITE_ACCESS events.
+  (TA-523210/SDDKW-14090)
+
+- MPCore does not abort when accessing abort-able regions of the
+  private memory region.
+  (TA-492286/SDDKW-12033)
+
+- MxScript documentation does not match behavior when fopen fails.
+  (TA-535839/SDDKW-20634)
+
+- A15 and A7 should not be able to set different cache state modeling
+  for L1 and L2.
+  (TA-535157/SDDKW-20636)
+
+- It is illegal to call CADI from the simulation thread and SCADI should
+  be used however this is not currently enforced by returning errors when
+  it is attempted and doing it will cause incorrect model behavior.
+  (TA-538325/SDDKW-20936)
+
+- PVBus Fan out is not supported and a bus decoder is required in order
+  to do this.
+  (TA-539679/SDDKW-21066)
+
+- Tarmac Trace plugin with big-endian and loadstore-display-width
+  parameter set to value less than 0x8, generates wrong output.
+  (TA-540283/SDDKW-21067)
+
+- A15/A7 cores hang in WFI if number of interrupts for v7_vgic
+  component is not set to a value which is a multiple of 32.
+  (TA-540736/SDDKW-21271)
+
+- If loadstore-display-width paramter for bigendian AEMv8 is set to 4,
+  the trace plugin generates wrong output.
+  (TA-540283/SDDKW-21067)
+
+- setting HCR.TIDCP bit does not trap L2CTLR accesses.
+  (TA-535206/SDDKW-20531)
+
+- M3 drives sysresetreq before end_of_elaboration.
+  (TA-514237/SDDKW-16716)
+
+- Models will not hit in any cache when the cache is disabled even
+  in a core's TRM state.
+  (TA-535119/SDDKW-20563)
+
+* Model Trace Interface (MTI)
+
+- The PRELOAD_DATA trace source is not currently implemented for
+  AArch64 PRFM instructions.
+  (TA-542719/SDDKW-21485)
+
+- Memory trace does not report partially completed store transactions.
+  (TA-514708,511779,512235/SDDKW-17325)
+
+* Model generation issues:
+
+- System Generator does not generate code correctly for memory mapped LISA
+   Register.
+  (TA-539677/SDDKW-20955)
+
+* Networking
+
+- The default firewall configuration on Redhat Enterprise Linux 5
+  blocks transmission of packets across the bridge device created as
+  part of the Fast Models TAP networking solution. This will lead to a
+  loss of host network connectivity if TAP based networking is
+  configured on a host with the firewall active. This can be worked
+  around by disabling the firewall. If the models are to be used in an
+  environment where it is not possible to disable the firewall, then
+  additional firewall rules will be required to allow
+  transmission. The following iptables commands should configure the
+  firewall to allow packets across the bridge device.
+
+  1) iptables -I FORWARD -m physdev --physdev-is-bridged -j ACCEPT
+  2) service iptables save
+  3) service iptables restart
+  (SDDKW-14139)
+
+- If Dynamic DNS is being used to by the host such that suitable
+  records are inserted into DNS if the host is managed via DHCP
+  installing TAP networking may cause failure to register in the
+  DNS. This happens due to the DHCP client being rerun after the
+  physical device is attached to the bridge device. At this point the
+  correct hostname is not passed in the DHCP request. There is no
+  workaround for this issue at this time.
+  (SDDKW-14140)
+
+- Most WiFi adaptors do not implement the required support for TAP
+  networking to work. There is no workaround for this problem.
+  (SDDKW-14142)
+
+* SystemC Export
+
+- AMBAPV2PVBus and AMBAPVACE2PVBus bridges: is_dmi_allowed() erroneously
+  returns false for the first transaction to pages which support DMI. After
+  DMI has been requested for a page or for the second access to a page
+  supporting DMI, is_dmi_allowed() returns the correct value.
+
+Date:  2013/06/18 13:52:38 GMT
+Build: 8.1:41
+
+Confidential
+
+==============================================================================
+END
+==============================================================================

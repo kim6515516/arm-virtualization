@@ -1,0 +1,17 @@
+/*
+ * Copyright 2009 ARM Limited. All rights reserved.
+ */
+
+// VE Configuration Bus (CB) Protocol 
+
+protocol VECBProtocol
+{
+    properties {
+        version = "8.1.37";
+        description = "VE configuration Bus protocol";
+    }
+
+    // Return true if the read/write has been handled
+    slave behavior read(const uint8_t function, const uint16_t device, uint32_t *data) : bool;
+    slave behavior write(const uint8_t function, const uint16_t device, const uint32_t data) : bool;
+}

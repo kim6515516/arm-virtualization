@@ -1,0 +1,772 @@
+/*
+ * PVBus2AMBAPVACE.lisa - PVBus to AMBA-PV ACE protocol converter.
+ *
+ * Copyright 2007-2013 ARM Limited.
+ * All rights reserved.
+ */
+
+/* This version of the PVBus to AMBA-PV bridge enables to pass back all the
+ * coherency information (from ACP).
+ *
+ * WARNING!     This version makes use of a private and undocumented API that
+ *              is not intended to be supported and will definitely change
+ *              in future releases. */
+
+component PVBus2AMBAPVACE {
+
+    properties { 
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "PVBus to AMBA-PV ACE protocol converter";
+        loadfile_extension = "";
+        has_cadi = 1;
+        executes_software = 0;
+        is_single_stepped = 0;
+        dso_safe = 0;
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes {
+
+        /* WARNING! API not intended to be supported and will definitely
+         * change in future releases. */
+        #include <pv/PVMemoryAttributes.h>
+        #include <pv/PVBus.h>
+
+        #include "components/VirtualDVMNode.h"
+
+        // This function returns false if there is something connected
+        // to upstream that doesn't implement ACE functionality.
+        template <typename P>
+        bool valid_upstream_port_for_ace(P &upstream) {
+            // Check whether an upstream connections is not ACE-enabled.
+            if (upstream.discoverUpstreamParentDVMNodes.implemented() ||
+                upstream.busMapChanging.implemented() ||
+                upstream.busMapChanged.implemented())
+            {
+                // Something is connected: confirm that it implements ACE.
+                return (upstream.aceSnoopRequest.implemented());
+            }
+            // No upstream connection
+            return false;
+        }
+    }
+
+    resources {
+
+        // Limit size of memory region, defaulting to 48-bit
+        PARAMETER { name("size"), description("Maximum size of memory region"),
+                    type(uint64_t), default(0x1000000000000) } max_size;
+
+        PARAMETER { name("global-monitor"), description("Enable built-in global monitor"),
+                    type(bool), default(false) } global_monitor;
+
+        VirtualDVMNode<false>*  dvm_node;
+    }
+
+    // Connection in from PVBus master
+    slave port<PVBus> pvbus_s;
+
+    // Master AMBAPVACE port out to SystemC world
+    master port<AMBAPVACE> amba_pv_ace_m
+    {
+        // Invalidates a DMI access
+        behavior invalidate_direct_mem_ptr(int socket_id,
+                                           sc_dt::uint64 start_range,
+                                           sc_dt::uint64 end_range)
+        {
+            pv::bus_addr_t base, limit;
+
+            // Align address range to 4K min and limit to 'max_size'
+            base  = start_range & ~pv::bus_addr_t(0xFFF);
+            limit = (end_range | 0xFFF) + 1;
+            assert(limit > base);
+            if (limit > (base + max_size))
+               limit = base + max_size;
+
+            // Configure access back to DEVICE, so that next request will call
+            // read/write() behaviour 
+            // Secure and non-secure PVBusSlaves have to be configured
+            control_ns.setAccess(base, limit,
+                                 pv::ACCESSTYPE_RW, pv::ACCESSMODE_DEVICE);
+
+            control_s.setAccess(base, limit,
+                                pv::ACCESSTYPE_RW, pv::ACCESSMODE_DEVICE);
+        }
+
+        // Blocking upstream transaction
+        behavior b_snoop(int socket_id,
+                         amba_pv::amba_pv_transaction & trans,
+                         sc_core::sc_time & t)
+        {
+            translate_snoop(trans, false);
+        }
+
+        // Upstream debug transaction
+        behavior snoop_dbg(int socket_id,
+                           amba_pv::amba_pv_transaction & trans) : unsigned int
+        {
+            translate_snoop(trans, true);
+
+            return 0;
+        }
+    }
+
+    internal port<PVBusSlaveControl> control_ns;
+    internal port<PVBusSlaveControl> control_s;
+
+    internal port<PVDevice> device
+    {
+        // Translate a PVBus read transaction into a TLM read transaction
+        behavior read(pv::ReadTransaction tx): pv::Tx_Result
+        {
+            // handle prefetch-only (DMI) requests
+            if (tx.getPayload() && tx.getPayload()->isPrefetchOnly())
+                return send_tlm_dmi_request(&tx, tlm::TLM_READ_COMMAND) ? tx.readComplete() : tx.wontPrefetch();
+            
+            pv::Tx_Result result = send_tlm_transaction(&tx, tlm::TLM_READ_COMMAND, false);
+
+            // Only errors set the result
+            if (result.isUndefined())
+            {
+               result = tx.readComplete();
+
+               if (tx.getBurstLength()>1)
+                  tx.allBeatsCompletedInOneOperation(result);
+            }
+
+            return result;
+        }
+
+        // Translate a PVBus write transaction into a TLM write transaction
+        behavior write(pv::WriteTransaction tx): pv::Tx_Result
+        {
+            // handle prefetch-only (DMI) requests
+            if (tx.getPayload() && tx.getPayload()->isPrefetchOnly())
+                return send_tlm_dmi_request(&tx, tlm::TLM_WRITE_COMMAND) ? tx.writeComplete() : tx.wontPrefetch();
+            
+            pv::Tx_Result result = send_tlm_transaction(&tx, tlm::TLM_WRITE_COMMAND, false);
+
+            // Only errors set the result
+            if (result.isUndefined())
+            {
+               result = tx.writeComplete();
+
+               if (tx.getBurstLength()>1)
+                  tx.allBeatsCompletedInOneOperation(result);
+            }
+
+            return result;
+        }
+
+        // Translate a PVBus debug read transaction into a TLM debug read transaction
+        behavior debugRead(pv::ReadTransaction tx): pv::Tx_Result
+        {
+            pv::Tx_Result result = send_tlm_transaction(&tx, tlm::TLM_READ_COMMAND, true);
+
+            // Only errors set the result
+            if (result.isUndefined())
+            {
+               result = tx.readComplete();
+
+               if (tx.getBurstLength()>1)
+                  tx.allBeatsCompletedInOneOperation(result);
+            }
+
+            return result;
+        }
+
+        // Translate a PVBus debug write transaction into a TLM debug write transaction
+        behavior debugWrite(pv::WriteTransaction tx): pv::Tx_Result
+        {
+            pv::Tx_Result result = send_tlm_transaction(&tx, tlm::TLM_WRITE_COMMAND, true);
+
+            // Only errors set the result
+            if (result.isUndefined())
+            {
+               result = tx.writeComplete();
+
+               if (tx.getBurstLength()>1)
+                  tx.allBeatsCompletedInOneOperation(result);
+            }
+
+            return result;
+        }
+    }
+
+    behaviour is_to_normal_memory(amba_pv::amba_pv_extension* ex) : bool
+    {
+       amba_pv::amba_pv_domain_t domain = ex->get_domain();
+
+       return ((domain == amba_pv::AMBA_PV_INNER_SHAREABLE) ||
+               (domain == amba_pv::AMBA_PV_OUTER_SHAREABLE)) &&
+              ( ex->is_modifiable() || ex->is_read_allocate() || ex->is_write_allocate() );
+    }
+
+    // Translate PVBus Transaction attributes into AMBA-PV attributes
+    behaviour build_amba_pv_extension(const pv::Transaction*       tx,
+                                      amba_pv::amba_pv_extension*  ex,
+                                      bool                         is_read)
+    {
+        const pv::MemoryAttributes* attr = tx->getMemoryAttributes();
+        if (attr != 0)
+        {
+            ex->set_id(attr->getMasterID());
+
+            // Set AxCACHE
+            ex->set_bufferable(attr->isOuterBufferable());
+            ex->set_modifiable(attr->isOuterCacheable());
+            ex->set_read_allocate(attr->isOuterReadAllocatable());
+            ex->set_write_allocate(attr->isOuterWriteAllocatable());
+
+            // Set AxDOMAIN
+            ex->set_domain(amba_pv::amba_pv_domain_t(attr->getShareability()));
+        }
+
+        // Set AxPROT
+        ex->set_privileged(tx->isPrivileged());
+        ex->set_non_secure(tx->isNonSecure());
+        ex->set_instruction(tx->isInstruction());
+
+        // Set AxLOCK
+        ex->set_exclusive(tx->isExclusive());
+        
+        pv::Payload* payload = tx->getPayload();
+        if (payload)
+        {
+            // Set AxSNOOP
+            if (payload->get_ace_operation() == ACE::Default)
+            {
+                // Translate  an ACE::Default transaction into a specific ACE transaction
+
+                if (is_to_normal_memory(ex))
+                {
+                    ex->set_snoop(is_read ? amba_pv::AMBA_PV_READ_ONCE : amba_pv::AMBA_PV_WRITE_UNIQUE);
+                }
+                else
+                {
+                    // DV/SO or nsh-NC/C are all no-snoop transactions
+                    ex->set_snoop(is_read ? amba_pv::AMBA_PV_READ_NO_SNOOP : amba_pv::AMBA_PV_WRITE_NO_SNOOP);
+                }
+            }
+            else
+            {
+               ex->set_snoop(amba_pv::amba_pv_snoop_t(payload->get_ace_AxSNOOP()));
+            }
+
+            // Set AxBAR
+            ex->set_bar(amba_pv::amba_pv_bar_t(payload->get_ace_AxBAR()));
+        }
+
+        // Set AxBURST
+        if ((! payload) || (! payload->isPrefetchOnly()))
+        {
+            ex->set_size(tx->getAccessByteWidth());
+            ex->set_length(tx->getTransactionByteSize() / tx->getAccessByteWidth());
+        }
+    }
+
+    // Forward a DMI request from PVBus to SystemC
+    // return true if DMI request was successful
+    behaviour send_tlm_dmi_request(pv::Transaction*    tx,
+                                   tlm::tlm_command    command) : bool 
+    {
+        amba_pv::amba_pv_transaction  trans;
+        amba_pv::amba_pv_extension    ex(1, NULL);
+        tlm::tlm_dmi dmi_data;
+        bool dmi_ok = false;
+
+        // Setup the TLM generic payload...
+        trans.set_command(command);
+        trans.set_address(tx->getAddress());
+        // Setup the AMBA-PV TLM extension
+        build_amba_pv_extension(tx, &ex, command == tlm::TLM_READ_COMMAND);
+
+        // issue TLM DMI request
+        trans.set_extension(&ex);
+        try
+        {
+            dmi_ok = amba_pv_ace_m.get_direct_mem_ptr(0, trans, dmi_data);
+        }
+        catch(...)
+        {
+            trans.clear_extension(&ex);
+            throw;
+        }
+        trans.clear_extension(&ex);
+
+        pv::bus_range_t original_range = pv::range_begin_end_incl(dmi_data.get_start_address(), dmi_data.get_end_address());
+
+        // we have to round the answer to 4k page boundaries: this creates these possible scenarios:
+        // - dmi_ok = true and address in inner_range: return inner_range as dmi_ok = true
+        // - dmi_ok = true and address not in inner_range: return 4k page around address as dmi_ok = false (deny DMI request although TLM DMI was granted, corner case for partially DMI covered 4k pages)
+        // - dmi_ok = false and address in inner_range: return inner_range as dmi_ok = false
+        // - dmi_ok = false and address not in inner_range: return 4k page around address as dmi_ok = false and additionaly override dmi_data.get_granted_access() to READ_WRITE (kill DMI hint for the other access, corner case for partially DMI covered 4k pages)
+        pv::bus_range_t inner_range = original_range;
+        inner_range.reduce_to_contained_power_of_two_granule(4096);
+        pv::bus_range_t effective_range;
+        if (inner_range.contains(tx->getAddress()))
+        {
+            // normal case: we are inside the fully covered 4k aligned region
+            // (this is valid for dmi_ok = true and false)
+            effective_range = inner_range;
+        }
+        else
+        {
+            // corner case: requested address is on a 4k page which is only partially covered by DMI:
+            // deny DMI request for this 4k page for READ and WRITE regadless of the actual TLM response
+            dmi_ok = false;
+            effective_range = pv::range_begin_end_incl(tx->getAddress(), tx->getAddress());
+            effective_range.expand_to_cover_power_of_two_granule(4096);
+            dmi_data.allow_read_write();
+        }
+        unsigned char *dmi_ptr = dmi_ok ? dmi_data.get_dmi_ptr() : 0;
+
+        // Put a cap on the region size
+        if (effective_range.full() || (effective_range.size() > max_size))
+            effective_range.end_incl = effective_range.begin + (max_size & ~0xfff);
+
+        // Adjust the DMI pointer according to the recalculated base
+        if ((effective_range.begin > dmi_data.get_start_address()) && (dmi_ptr != 0))
+            dmi_ptr += (effective_range.begin - dmi_data.get_start_address());
+        
+        // convert SystemC DMI response to PVBus
+        if (dmi_data.is_read_allowed())
+        {
+            pv::PrefetchRange<pv::AccessRead> range (dmi_ptr, effective_range);
+            tx->getPayload()->setPrefetchRange(range);
+        }
+        if (dmi_data.is_write_allowed())
+        {
+            pv::PrefetchRange<pv::AccessWrite> range(dmi_ptr, effective_range);
+            tx->getPayload()->setPrefetchRange(range);
+        }
+        if (!dmi_ok)
+        {
+            // If we requested READ and TLM did not reject WRITE or if we requested WRITE and TLM did not reject READ we store this hint in
+            // the payload so we can potentially convert this back into a TLM response in the AMBAPV2PVBus bridge.
+            if (((command == tlm::TLM_READ_COMMAND) && dmi_data.is_write_allowed()) ||
+                ((command == tlm::TLM_WRITE_COMMAND) && dmi_data.is_read_allowed()))
+                tx->getPayload()->setPrefetchIsDeniedForOtherAccessHint();
+        }
+        
+        if (dmi_ok)
+        {
+            // feed DMI data into PVBusSlave
+            if (dmi_data.is_read_write_allowed())
+            {
+                // read/write
+                if (tx->isNonSecure())
+                {
+                    control_ns.setAccess(effective_range.begin, effective_range.end_incl + 1, pv::ACCESSTYPE_RW, pv::ACCESSMODE_MEMORY);
+                    control_ns.provideReadWriteStorage(effective_range.begin, effective_range.end_incl + 1, dmi_ptr);
+                }
+                else
+                {
+                    control_s.setAccess(effective_range.begin, effective_range.end_incl + 1, pv::ACCESSTYPE_RW, pv::ACCESSMODE_MEMORY);
+                    control_s.provideReadWriteStorage(effective_range.begin, effective_range.end_incl + 1, dmi_ptr);
+                }
+            }
+            else if (dmi_data.is_read_allowed())
+            {
+                // read-only
+                if (tx->isNonSecure())
+                {
+                    control_ns.setAccess(effective_range.begin, effective_range.end_incl + 1, pv::ACCESSTYPE_READ, pv::ACCESSMODE_MEMORY);
+                    control_ns.provideReadStorage(effective_range.begin, effective_range.end_incl + 1, dmi_ptr);
+                }
+                else
+                {
+                    control_s.setAccess(effective_range.begin, effective_range.end_incl + 1, pv::ACCESSTYPE_READ, pv::ACCESSMODE_MEMORY);
+                    control_s.provideReadStorage(effective_range.begin, effective_range.end_incl + 1, dmi_ptr);
+                }
+            } 
+            else if (dmi_data.is_write_allowed())
+            {
+                // write-only
+                if (tx->isNonSecure())
+                {
+                    control_ns.setAccess(effective_range.begin, effective_range.end_incl + 1, pv::ACCESSTYPE_WRITE, pv::ACCESSMODE_MEMORY);
+                    control_ns.provideWriteStorage(effective_range.begin, effective_range.end_incl + 1, dmi_ptr);
+                }
+                else
+                {
+                    control_s.setAccess(effective_range.begin, effective_range.end_incl + 1, pv::ACCESSTYPE_WRITE, pv::ACCESSMODE_MEMORY);
+                    control_s.provideWriteStorage(effective_range.begin, effective_range.end_incl + 1, dmi_ptr);
+                }
+            } 
+        }
+
+        return dmi_ok;
+    }
+    
+    // Translate a PVBus transaction into an AMBA-PV TLM transaction
+    behaviour send_tlm_transaction(pv::Transaction*    tx,
+                                   tlm::tlm_command    command,
+                                   bool                debug) : pv::Tx_Result
+    {
+        amba_pv::amba_pv_transaction  trans;
+        amba_pv::amba_pv_extension    ex(tx->getAccessByteWidth(), NULL);
+        pv::Tx_Result                 result;
+
+        // Setup the TLM generic payload...
+        if (tx->isWithoutData())
+        {
+            // ACE Clean, Make, Evict
+            trans.set_command(tlm::TLM_IGNORE_COMMAND);
+        }
+        else
+        {
+            trans.set_command(command);
+        }
+        trans.set_address(tx->getAddress());
+        trans.set_data_ptr((unsigned char*)tx->referenceDataValue());
+        trans.set_data_length(tx->getTransactionByteSize());
+        trans.set_streaming_width(trans.get_data_length()); // Not a streaming transaction
+
+        // Setup the AMBA-PV TLM extension
+        build_amba_pv_extension(tx, &ex, !trans.is_write() );
+
+        // Send transaction into the SystemC world
+        trans.set_extension(&ex);
+        try
+        {
+            if (debug)
+            {
+                if (amba_pv_ace_m.transport_dbg(0, trans) != trans.get_data_length())
+                {
+                    result = tx->generateAbort();
+                }
+            }
+            else
+            {
+                // WARNING! API not intended to be supported and will definitely change.
+                sc_core::sc_time t(getCurrentLocalTime(), sc_core::SC_SEC);
+
+                amba_pv_ace_m.b_transport(0, trans, t);
+
+                // WARNING! API not intended to be supported and will definitely change.
+                setCurrentLocalTime(t.to_seconds());
+            }
+        }
+        catch(...)
+        {
+            trans.clear_extension(&ex);
+            throw;
+        }
+        trans.clear_extension(&ex);
+
+        // Handle response...
+        if (debug)
+            return result;
+        switch(ex.get_resp())
+        {
+        case amba_pv::AMBA_PV_SLVERR: return tx->generateSlaveAbort();
+        case amba_pv::AMBA_PV_DECERR: return tx->generateDecodeAbort();
+
+        case amba_pv::AMBA_PV_OKAY:
+            if (ex.is_exclusive())
+                return tx->generateExclusiveAbort();
+            break;
+
+        case amba_pv::AMBA_PV_EXOKAY:
+            break;
+        }
+
+        if (!trans.is_write())
+        {
+            ACE::ace_rresp_t rresp;
+
+            if (ex.is_pass_dirty())
+                rresp.setPassDirty();
+
+            if (ex.is_shared())
+                rresp.removeUnique();
+
+            tx->getPayload()->set_rresp(rresp);
+        }
+
+        // Request DMI pointer if allowed...
+        if (!debug && trans.is_dmi_allowed())
+        {
+            trans.set_address(tx->getAddress());
+            trans.set_extension(&ex);
+            try
+            {
+                get_direct_mem_ptr(trans, ex.is_non_secure());
+            }
+            catch(...)
+            {
+                trans.clear_extension(&ex);
+                throw;
+            }
+            trans.clear_extension(&ex);
+        }
+
+        return result;
+    }
+
+    // Translate upstream snoop request
+    behaviour translate_snoop(amba_pv::amba_pv_transaction& trans,
+                              bool is_debug)
+    {
+        // No DMI allowed
+        trans.set_dmi_allowed(false);
+
+        // Retrieve AMBA-PV extension
+        amba_pv::amba_pv_extension* ex = 0;
+        trans.get_extension(ex);
+        if (ex == 0)
+        {
+            trans.set_response_status(tlm::TLM_GENERIC_ERROR_RESPONSE);
+            return;
+        }
+
+        // Filter DVM messages into the DVM network
+        if (!is_debug && (ex->get_snoop() == amba_pv::AMBA_PV_DVM_MESSAGE))
+        {
+            if (dvm_node->insertDVMMessage(DVM::id_t(1),
+                                           ex->get_dvm_transaction(),
+                                           ex->get_dvm_additional_address()) == DVM::ok)
+                ex->set_okay();
+            else
+                ex->set_slverr();
+            return;
+        }
+
+        pv::range_t<uint64_t>   ns_addr_range;
+        ns_addr_range.begin    = trans.get_address();
+        ns_addr_range.end_incl = ns_addr_range.begin + trans.get_data_length() - 1;
+        if (ex->is_non_secure())
+        {
+            ns_addr_range.begin    |= uint64_t(1) << 63;
+            ns_addr_range.end_incl |= uint64_t(1) << 63;
+        }
+
+        ACE::ace_operation_t op = ACE::ace_operation_from_ARSNOOP(unsigned(ex->get_snoop()),
+                                                                  unsigned(amba_pv::AMBA_PV_INNER_SHAREABLE),
+                                                                  unsigned(amba_pv::AMBA_PV_RESPECT_BARRIER));
+
+        ACE::SnoopRequest   snoop_request;
+
+        // Note: ACE does not transport a domain field for snoop accesses. It is transported here transparently to allow linting within Fast Models.  
+        // AMBA-PV ACE masters should ignore the domain value (except for linting) and slaves which do not have
+        // domain information available should set this to amba_pv::AMBA_PV_SYSTEM which should prevent all linting.
+        snoop_request.init(ns_addr_range,
+                           op,
+                           trans.get_data_ptr(),
+                           ACE::adomain_t(ex->get_domain()),
+                           op);
+
+        // Send snoop upstream
+        if (is_debug)
+            pvbus_s.debugACESnoopRequest(&snoop_request);
+        else
+            pvbus_s.aceSnoopRequest(&snoop_request);
+
+        // Translate snoop response (CRRESP)
+        ACE::ace_crresp_t snoop_response = snoop_request.get_crresp();
+
+        ex->set_snoop_data_transfer(snoop_response.isDataTransfer());
+        ex->set_snoop_error(snoop_response.isError());
+        ex->set_pass_dirty(snoop_response.isPassDirty());
+        ex->set_shared(snoop_response.isShared());
+        ex->set_snoop_was_unique(snoop_response.isWasUnique());
+    }
+
+
+    //  Requests DMI access
+    behavior get_direct_mem_ptr(amba_pv::amba_pv_transaction& trans, bool non_secure)
+    {
+        tlm::tlm_dmi dmi;
+
+        if (!amba_pv_ace_m.get_direct_mem_ptr(0, trans, dmi))
+            return;
+
+        // DMI pointer available...
+        pv::bus_addr_t  base, limit;
+        pv::accessType  access_type;
+
+        // Retrieve address range and access type
+        base  = (dmi.get_start_address() + 0xFFF) & ~pv::bus_addr_t(0xFFF);
+        limit = (dmi.get_end_address() + 1) & ~pv::bus_addr_t(0xFFF);
+        if (limit <= base)
+            return;
+
+        switch(dmi.get_granted_access())
+        {
+        case tlm::tlm_dmi::DMI_ACCESS_READ_WRITE:
+            access_type = pv::ACCESSTYPE_RW;
+            break;
+
+        case tlm::tlm_dmi::DMI_ACCESS_READ:
+            access_type = pv::ACCESSTYPE_READ;
+            break;
+
+        case tlm::tlm_dmi::DMI_ACCESS_WRITE:
+            access_type = pv::ACCESSTYPE_WRITE;
+            break;
+
+        case tlm::tlm_dmi::DMI_ACCESS_NONE:
+        default:
+            return;
+        }
+
+        // Put a cap on the region size
+        if (limit > (base + max_size))
+        {
+            limit = base + max_size;
+            limit = (limit + 1) & ~pv::bus_addr_t(0xFFF);
+            if (limit <= base)
+                return;
+        }
+
+        // Adjust the DMI pointer according to the recalculated base
+        unsigned char *dmi_ptr = dmi.get_dmi_ptr();
+
+        if (base > dmi.get_start_address())
+            dmi_ptr += (base - dmi.get_start_address());
+
+
+        // Pass DMI pointer back to PVBusSlave, so that next request will
+        // use the pointer directly w/o calling read/write() behaviour 
+
+        if (non_secure)
+        {
+            // Setup DMI pointer for Non-Secure world
+            control_ns.setAccess(base, limit, access_type, pv::ACCESSMODE_MEMORY);
+
+            if (dmi.is_read_write_allowed())
+                control_ns.provideReadWriteStorage(base, limit, dmi_ptr);
+            else if (dmi.is_write_allowed())
+                control_ns.provideWriteStorage(base, limit, dmi_ptr);
+            else
+                control_ns.provideReadStorage(base, limit, dmi_ptr);
+        }
+        else
+        {
+            // Setup DMI pointer for Secure world
+            control_s.setAccess(base, limit, access_type, pv::ACCESSMODE_MEMORY);
+
+            if (dmi.is_read_write_allowed())
+                control_s.provideReadWriteStorage(base, limit, dmi_ptr);
+            else if (dmi.is_write_allowed())
+                control_s.provideWriteStorage(base, limit, dmi_ptr);
+            else
+                control_s.provideReadStorage(base, limit, dmi_ptr);
+        }
+    }
+
+    internal slave port<DVMMessage> downstream_dvm
+    {
+        // Send a downstream DVM message via TLM
+        behaviour send(DVM::Message* message_) : DVM::error_response_t
+        {
+            uint64_t                      transaction;
+            uint64_t                      additional_address;
+            amba_pv::amba_pv_extension    ex(1, NULL);
+            amba_pv::amba_pv_transaction  trans;
+
+            ex.set_modifiable();
+            ex.set_snoop(amba_pv::AMBA_PV_DVM_MESSAGE);
+            ex.set_domain(amba_pv::AMBA_PV_OUTER_SHAREABLE);
+
+            transaction = message_->encodeAxADDR(additional_address);
+            ex.set_dvm_transaction(transaction);
+
+             // Only set the additional address if indicated by the transaction AxADDR[0]
+            if (transaction & (1<<0))
+            {
+               ex.set_dvm_additional_address(additional_address);
+            }
+
+            trans.set_extension(&ex);
+            try
+            {
+                // WARNING! API not intended to be supported and will definitely change.
+                sc_core::sc_time t(getCurrentLocalTime(), sc_core::SC_SEC);
+
+                amba_pv_ace_m.b_transport(0, trans, t);
+
+                // WARNING! API not intended to be supported and will definitely change.
+                setCurrentLocalTime(t.to_seconds());
+            }
+            catch (...)
+            {
+                trans.clear_extension(&ex);
+                throw;
+            }
+            trans.clear_extension(&ex);
+
+            if (!ex.is_okay())
+                return DVM::error;
+
+            return DVM::ok;
+        }
+    }
+
+    behavior init
+    {
+        composition.init();
+
+        pv::slave_config_t  slave_config;
+
+        slave_config.acceptACE_CleanShared_CleanInvalid_MakeInvalid();
+        slave_config.acceptACE_CleanUnique_MakeUnique();
+        slave_config.acceptEvict();
+        slave_config.acceptMemoryBarriers();
+
+        if (!global_monitor)
+        {
+            slave_config.acceptExclusiveTransactions();
+        }
+
+        slave_config.acceptPrefetchOnly();
+
+        control_s.configure(&slave_config);
+        control_ns.configure(&slave_config);
+
+        dvm_node = new VirtualDVMNode<false>(downstream_dvm.getAbstractInterface(),
+                                             getHierarchicalName());
+        dvm_node->initUpstreamPort(pvbus_s, DVM::id_t(1));
+    }
+
+    behavior reset(int level_)
+    {
+        composition.reset(level_);
+
+        // Check that we haven't been wired incorrectly to non-ACE masters.
+        if (!valid_upstream_port_for_ace(pvbus_s))
+        {
+            message(std::string("Connection error: a non-ACE bus master is connected to ") +
+                    pvbus_s.getHierarchicalName(),
+                    MSG_FATAL_ERROR);
+        }
+
+        // During reset() we build the DVM groups.
+        dvm_node->reset();
+
+        // Expose the ports.  This will make a transaction
+        // to them to ask them about themselves.
+        dvm_node->resetUpstreamPort(pvbus_s, 1<<0);
+    }
+
+    composition
+    {
+        bus_slave_s:  PVBusSlave(size = max_size);  // Secure world slave
+        bus_slave_ns: PVBusSlave(size = max_size);  // Non-Secure world slave
+        tz_switch:    TZSwitch();                   // Switch to route Non-Secure
+                                                    // Secure separately
+    }
+
+    connection
+    {
+        self.pvbus_s => tz_switch.pvbus_input;
+        tz_switch.pvbus_port_a => bus_slave_s.pvbus_s;
+        tz_switch.pvbus_port_b => bus_slave_ns.pvbus_s;
+        bus_slave_s.device => self.device;
+        self.control_s => bus_slave_s.control;
+        bus_slave_ns.device => self.device;
+        self.control_ns => bus_slave_ns.control;
+    }
+}

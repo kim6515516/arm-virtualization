@@ -1,0 +1,31 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// Protocols used to propagate 64-bit integer values between components.
+// The Value protocol allows a master to send a 64-bit unsigned value to a slave.
+// The ValueState protocol allows a master to retrieve the current value
+// from a slave. 
+// In TZMA, this protocol is used to drive the internal master port control_s;
+// which is connected to control the  pvbusrange_0.control_64.
+
+protocol Value_64
+{
+    properties { 
+        version = "8.1.37";
+        description = "Value_64 Protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    optional behavior setValue(uint64_t value)
+    {
+        // Default behavior does nothing
+    }
+}
+
+protocol ValueState_64
+{
+    behavior setValue(uint64_t value);
+    behavior getValue() : uint64_t;
+}

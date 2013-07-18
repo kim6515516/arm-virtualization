@@ -1,0 +1,158 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component MPS_DUT
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "MPS DUT";
+    }
+
+    resources
+    {
+    }
+
+    composition
+    {
+        clk100Hz : ClockDivider("mul"=100,"div"=1);
+        dut_characterlcd : MPS_CharacterLCD();
+        clk1p : ClockDivider("mul"=50000000,"div"=1);
+        mmc : MMC();
+        usb : MPS_USB();
+        ethernet : MPS_ETHERNET();
+        flexray : MPS_FLEXRAY();
+        can : MPS_CAN();
+        lin : MPS_LIN();
+        i2c_ADCDAC : MPS_I2C();
+        SMC : RAMDevice("size"=0x40000000);
+        dut_sysregs : MPS_DUTSysRegs("percfg_value"=0x1);
+        DMC : RAMDevice("size"=0x40000000);
+        clk4p : ClockDivider("mul"=25263000,"div"=1);
+        pl111_clcd : PL111_CLCD();
+        pl031_rtc : PL031_RTC();
+        clk1Hz : ClockDivider("div"=1);
+        sp805 : SP805_Watchdog();
+        mpbinterruptforwarder : MPSInterruptForwarder();
+        clk13p : ClockDivider("mul"=12288000,"div"=1);
+        pl041 : PL041_AACI();
+        pl180_mci : PL180_MCI();
+        clk1MHz : ClockDivider("mul"=1000000,"div"=1);
+        sp804_1 : SP804_Timer();
+        sp804_0 : SP804_Timer();
+        uart2 : PL011_Uart("clock_rate"=25000000,"baud_rate"=115200,"uart_enable"=0);
+        pvbusdecoder : PVBusDecoder();
+        uart1 : PL011_Uart("clock_rate"=25000000,"baud_rate"=115200,"uart_enable"=0);
+        uart0 : PL011_Uart("clock_rate"=25000000,"baud_rate"=115200,"uart_enable"=0);
+        clk25MHz : ClockDivider("mul"=25000000,"div"=1)
+    }
+    connection
+    {
+    self.clk_in_master => clk25MHz.clk_in;
+    clk25MHz.clk_out => uart0.clk_in_ref;
+    clk25MHz.clk_out => uart1.clk_in_ref;
+    clk25MHz.clk_out => uart2.clk_in_ref;
+    uart2.serial_out => self.terminal[2];
+    uart1.serial_out => self.terminal[1];
+    uart0.serial_out => self.terminal[0];
+    self.pvbus_s => pvbusdecoder.pvbus_s;
+    clk1MHz.clk_out => sp804_0.clock;
+    clk1MHz.clk_out => sp804_1.clock;
+    self.clk_in_master => clk1MHz.clk_in;
+    self.clk_in_master => clk13p.clk_in;
+    clk13p.clk_out => pl041.clk_in_ref;
+    pl041.audio => self.aaci_audio_out;
+    pl041.irq => mpbinterruptforwarder.int_in[10];
+    sp804_0.irq_out0 => mpbinterruptforwarder.int_in[2];
+    sp804_0.irq_out1 => mpbinterruptforwarder.int_in[2];
+    sp804_1.irq_out1 => mpbinterruptforwarder.int_in[3];
+    uart0.intr => mpbinterruptforwarder.int_in[6];
+    uart1.intr => mpbinterruptforwarder.int_in[7];
+    uart2.intr => mpbinterruptforwarder.int_in[8];
+    self.clk_in_master => clk1Hz.clk_in;
+    clk1Hz.clk_out => sp805.clk_in;
+    pl031_rtc.intr => mpbinterruptforwarder.int_in[1];
+    clk1Hz.clk_out => pl031_rtc.clock;
+    mpbinterruptforwarder.int_num => self.int_num;
+    mpbinterruptforwarder.int_out => self.int_out;
+    sp804_1.irq_out0 => mpbinterruptforwarder.int_in[3];
+    clk4p.clk_out => pl111_clcd.clk_in;
+    self.clk_in_master => clk4p.clk_in;
+    pl111_clcd.display => self.display;
+    pl111_clcd.intr => mpbinterruptforwarder.int_in[11];
+    dut_sysregs.user_switches => self.user_switches;
+    dut_sysregs.leds => self.leds;
+    dut_sysregs.leds_7seg => self.leds_7seg;
+    pl180_mci.mmc_m => mmc.mmc;
+    pl180_mci.MCIINTR[0] => mpbinterruptforwarder.int_in[4];
+    pl180_mci.MCIINTR[1] => mpbinterruptforwarder.int_in[5];
+    self.clk_in_master => clk1p.clk_in;
+    dut_characterlcd.display => self.display_char_lcd;
+    pvbusdecoder.pvbus_m_range[0x4000c000..0x4000cfff] => dut_characterlcd.pvbus;
+    pvbusdecoder.pvbus_m_range[0x40000000..0x40000fff] => sp805.pvbus_s;
+    pvbusdecoder.pvbus_m_range[0x40001000..0x40001fff] => pl031_rtc.pvbus;
+    pvbusdecoder.pvbus_m_range[0x40002000..0x40002fff] => sp804_0.pvbus;
+    pvbusdecoder.pvbus_m_range[0x40003000..0x40003fff] => sp804_1.pvbus;
+    pvbusdecoder.pvbus_m_range[0x40004000..0x40004fff] => dut_sysregs.pvbus;
+    pvbusdecoder.pvbus_m_range[0x40005000..0x40005fff] => pl180_mci.pvbus;
+    pvbusdecoder.pvbus_m_range[0x40006000..0x40006fff] => uart0.pvbus;
+    pvbusdecoder.pvbus_m_range[0x40007000..0x40007fff] => uart1.pvbus;
+    pvbusdecoder.pvbus_m_range[0x40008000..0x40008fff] => uart2.pvbus;
+    pvbusdecoder.pvbus_m_range[0x4000a000..0x4000afff] => pl041.pvbus;
+    pvbusdecoder.pvbus_m_range[0x4000b000..0x4000bfff] => i2c_ADCDAC.pvbus;
+    pvbusdecoder.pvbus_m_range[0x4ffb0000..0x4ffbffff] => flexray.pvbus;
+    pvbusdecoder.pvbus_m_range[0x4ffc0000..0x4ffcffff] => can.pvbus;
+    pvbusdecoder.pvbus_m_range[0x4fff0000..0x4fffffff] => pl111_clcd.pvbus;
+    pvbusdecoder.pvbus_m_range[0x4ffd0000..0x4ffdffff] => lin.pvbus;
+    pvbusdecoder.pvbus_m_range[0x4ffe0000..0x4ffeffff] => ethernet.pvbus;
+    pvbusdecoder.pvbus_m_range[0x60000000..0x9fffffff] => DMC.pvbus;
+    pvbusdecoder.pvbus_m_range[0xa0000000..0xa03fffff] => SMC.pvbus;
+    pvbusdecoder.pvbus_m_range[0xa0000000..0xa001ffff] => usb.pvbus;
+    clk25MHz.clk_out => mmc.clk_in;
+    clk1p.clk_out => dut_characterlcd.clock;
+    dut_characterlcd.intr => mpbinterruptforwarder.int_in[15];
+    dut_sysregs.percfg => self.percfg;
+    clk25MHz.clk_out => dut_sysregs.clk_in_25mhz;
+    self.clk_in_master => clk100Hz.clk_in;
+    clk100Hz.clk_out => dut_sysregs.clk_in_100hz;
+    pl111_clcd.pvbus_m => pvbusdecoder.pvbus_s;
+    }
+    slave port<ClockSignal> clk_in_master;
+    master port<SerialData> terminal[3];
+    slave port<PVBus> pvbus_s
+    {
+        behavior read(pv::ReadTransaction tx):pv::Tx_Result
+        {
+            // TODO: place your code here
+            return (pv::Tx_Result) 0;
+       }
+
+        behavior write(pv::WriteTransaction tx):pv::Tx_Result
+        {
+            // TODO: place your code here
+            return (pv::Tx_Result) 0;
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return pvbus_s.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return pvbus_s.write(tx);
+        }        
+    }
+    master port<AudioControl> aaci_audio_out;
+    master port<ValueState> int_num;
+    master port<Signal> int_out;
+    master port<LCD> display;
+    master port<ValueState> leds;
+    master port<ValueState> leds_7seg;
+    master port<ValueState> user_switches;
+    master port<CharacterLCD> display_char_lcd;
+    master port<ValueState> percfg;
+}

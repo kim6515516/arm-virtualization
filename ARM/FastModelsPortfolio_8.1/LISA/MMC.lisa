@@ -1,0 +1,1412 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// LISA Implementation of a MultiMedia Card -like device
+
+// Note: This is a partial implementation of an MMC-like device,
+// designed with open information. It provides basic block-level
+// access to back-end storage
+
+
+component MMC
+{
+properties
+{
+    version = "8.1.37";
+    component_type = "Peripheral";
+    description = "Generic Multimedia Card";
+    documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+}
+
+
+includes
+{
+#define MMC_TRACE          if (!0) ; else printf
+#define MMC_DEBUG_TIMER    if (!0) ; else printf
+#define MMC_DEBUG          if (!0) ; else printf
+#define MMC_DEBUG_VERBOSE  if (!0) ; else printf
+#define MMC_DEBUG_READ     if (!0) ; else printf
+#define MMC_DEBUG_WRITE    if (!0) ; else printf
+#define MMC_ERROR          if (!0) ; else printf
+#define MMC_UNSUPPORTED    if (!0) ; else printf
+
+//#define DEFAULT_BLKBITS       (9)
+#define DEFAULT_BLKBITS       (11)
+
+#include "hostconf/zinttypes.h"
+#include "components/BackingStore.h"
+
+
+    /*
+     * Notation of following status bits is ST_[T]_[CC]_NAME
+     * Where [T] is the Type
+     *  - E - Error bit
+     *  - S - Status bit
+     *  - E - Detected & set for response
+     *  - X - Detected & set during execution
+     * Where [CC] is the Clear Condition
+     *  - A - Depends on current card state
+     *  - B - Always related to the previous command. Reception
+     *        of a valid command will clear it (with a delay of
+     *        one command).
+     *  - C - Clear on read
+     */
+
+    // Command argument was out of the allowed range for the card
+#define ST_ER_C_OUT_OF_RANGE        (1 << 31)
+
+    // Misaligned address (not matching the block length) was used in command
+#define ST_ERX_C_ADDRESS_ERROR      (1 << 30)
+
+    // Transferred block length is not allowed for the card, or the number
+    // of transferred bytes does not match the block length.
+#define ST_ER_C_BLOCK_LEN_ERROR     (1 << 29)
+
+    // Error in the sequence of erase commands occurred
+#define ST_ER_C_ERASE_SEQ_ERROR     (1 << 28)
+
+    // Invalid selection of write blocks for erase occurred
+#define ST_EX_C_ERASE_PARAM         (1 << 27)
+
+    // Attempt to program a write-protected block
+#define ST_ERX_C_WP_VIOLATION       (1 << 26)
+
+#define ST_SX_A_CARD_LOCKED         (1 << 25)
+#define ST_ERX_C_LOCK_UNLOCK_FAILED (1 << 24)
+
+    // CRC check of previous command failed
+#define ST_ER_B_COM_CRC_ERROR       (1 << 23)
+
+    // Command not legal for the card state
+#define ST_ER_B_ILLEGAL_COMMAND     (1 << 22)
+
+#define ST_EX_C_CARD_ECC_FAILED     (1 << 21)
+#define ST_ERX_C_CC_ERROR           (1 << 20)
+
+    // Unknown error
+#define ST_ERX_C_ERROR              (1 << 19)
+
+    // We don't set these
+#define ST_EX_C_UNDERRUN            (1 << 18)
+#define ST_EX_C_OVERRUN             (1 << 17)
+
+    // - CID Register has been written and cannot be over written.
+    // - CSD read-only section does not match the card content.
+    // - Attempt made to reverse copy (set as original) or permanent WP
+    //   (unprotected) bits.
+#define ST_ERX_C_CID_CSD_OVERWRITE  (1 << 16)
+
+    // Only partial address space was erased due to existing write
+    // protected blocks.
+#define ST_SX_C_WP_ERASE_SKIP       (1 << 15)
+
+    // Command executed without using ECC
+#define ST_SX_A_CARD_ECC_DISABLED  (1 << 14)
+
+    // Erase sequence was cleared before command execution because an out
+    // of sequence erase command was received.
+#define ST_SR_C_ERASE_RESET         (1 << 13)
+
+    // See card_state_t below
+#define ST_SX_B_CURRENT_STATE_SHIFT (9)
+#define ST_SX_B_CURRENT_STATE       (0xf << ST_SX_B_CURRENT_STATE_SHIFT)
+
+    // State of buffer-empty signaling on bus
+#define ST_SX_A_READY_FOR_DATA      (1 << 8)
+
+    // Not supported
+#define ST_SR_C_APP_CMD             (1 << 5)
+
+    // Bits that always reflect current state are:
+    // ST_SX_A_READY_FOR_DATA, ST_SX_A_CARD_ECC_DISABLED, ST_SX_A_CARD_LOCKED
+
+    // Bits that reflect state from the previous command
+    // ST_SX_B_CURRENT_STATE, ST_ER_B_ILLEGAL_COMMAND, ST_ER_B_COM_CRC_ERROR
+
+#define ST__C_BITS (ST_SR_C_APP_CMD | ST_SR_C_ERASE_RESET | ST_SX_C_WP_ERASE_SKIP | \
+        ST_ERX_C_CID_CSD_OVERWRITE | ST_EX_C_OVERRUN | ST_EX_C_UNDERRUN | \
+        ST_ERX_C_ERROR | ST_ERX_C_CC_ERROR | ST_EX_C_CARD_ECC_FAILED | \
+        ST_ERX_C_LOCK_UNLOCK_FAILED | ST_ERX_C_WP_VIOLATION | ST_EX_C_ERASE_PARAM | \
+        ST_ER_C_ERASE_SEQ_ERROR | ST_ER_C_BLOCK_LEN_ERROR | \
+        ST_ERX_C_ADDRESS_ERROR | ST_ER_C_OUT_OF_RANGE)
+
+
+    // 4-bit field in status, codes 9-15 reserved
+    typedef enum {
+        MMCS_IDLE       = 0,
+        MMCS_READY      = 1,
+        MMCS_ID         = 2,
+        MMCS_STANDBY    = 3,
+        MMCS_TRANSFER   = 4,    // Ready to transfer
+        MMCS_DATA       = 5,    // Transmitting
+        MMCS_RECEIVE    = 6,
+        MMCS_PROGRAM    = 7,
+        MMCS_DISABLED   = 8,
+    } card_state_t;
+
+    // Our CID storage type (MMC version 3.1)
+    typedef struct {
+        // 128 bits of card ID.
+        uint8_t    manfid;       // [127:120]
+        uint16_t   oemid;        // [119:104]
+        char       prod_name[6]; // [103: 56]
+        uint8_t    prod_rev;     // [ 55: 48]
+        uint32_t   serial;       // [ 47: 16]
+        uint8_t    month:4;      // [ 15: 12]             (BCD)
+        uint8_t    year:4;       // [ 11:  8] 1997+year   (in BCD)
+        uint8_t    res;          // bottom byte is unused (or 7:1 is CRC?)
+    } mmc_cid_t;
+
+    // CSD Struct version (used in CSD csd_v)
+#define CSD_VER_1_0  0
+#define CSD_VER_1_1  1
+#define CSD_VER_1_2  2
+#define CSD_EXT_CSD  3
+
+    // Spec version defines (used in CSD mmca_v)
+#define MMCA_VERSION_1_0  0
+#define MMCA_VERSION_1_2  0
+#define MMCA_VERSION_1_4  1
+#define MMCA_VERSION_2_x  2
+#define MMCA_VERSION_3_x  3
+#define MMCA_VERSION_4_x  4
+
+    // Card command class definitions (as per CSD's cmdclass)
+#define CCC_BASIC        (1<<0)    /* CMD0,1,2,3,4,7,9,10,12,13,15 */
+#define CCC_READ         (1<<1)    /* CMD11 */
+#define CCC_BLOCK_READ   (1<<2)    /* CMD16,17,18 */
+#define CCC_WRITE        (1<<3)    /* CMD20 */
+#define CCC_BLOCK_WRITE  (1<<4)    /* CMD16,23,24,25,26,27 */
+#define CCC_ERASE        (1<<5)    /* CMD32,33,34,35,36,37,38,39 */
+#define CCC_WRITE_PROT   (1<<6)    /* CMD28,29,30 */
+#define CCC_LOCK         (1<<7)    /* CMD16,42 */
+#define CCC_APP          (1<<8)    /* CMD55,56,57 */
+#define CCC_IO_MODE      (1<<9)    /* CMD5,39,40,52,53 */
+#define CCC_SWITCH       (1<<10)   /* CMD6,34,35,36,37,50 */
+
+
+    // Note this structure is different between SD and MMC
+    // We've represented MMC CSD 1.2 here
+    // Storage (and response) type for the CSD Register
+    typedef struct {
+        // 128 bits of Card-Specific Data (CSD) [127:96] [95:64] [63:32] [31:0]
+#if 0
+        uint32_t   csd_v      :2;   // [127:126] - version of the CSD structure (1.1)
+        uint32_t   mmca_v     :4;   // [125:122] - MMC Spec version
+        uint32_t   w0_res1    :2;   // [121:119] - unused. That's the top byte
+        uint32_t   tacc_ns_m  :4;   // [118:115] - data time out in ns (mant)
+        uint32_t   tacc_ns_e  :3;   // [114:112] - data time out in ns (exp)
+        uint32_t   tacc_clks  :8;   // [111:104] - data time out in clocks
+        uint32_t   w0_res2    :2;   // [103:102] - unused.
+        uint32_t   max_dtr_m  :4;   // [101:99 ] - Data Transfer Rate (mant)
+        uint32_t   max_dtr_e  :3;   // [ 98:96 ] - (exp)
+
+        uint32_t   cmdclass   :12;  // [ 95:84 ] - command class bits
+        uint32_t   read_blkbits:4;  // [ 83:80 ] - log2(read block size) (e.g. 9)
+        uint32_t   read_partial:1;  // [    79 ] - ???
+        uint32_t   write_misal:1;   // [    78 ] - ???
+        uint32_t   read_misal :1;   // [    77 ] - ???
+        uint32_t   w1_res1    :1;   // [    76 ] - apparently unused
+        uint32_t   capacity_m2:12;  // [ 75:64 ] - capacity (mant) [(1+m)<<(e+2)]
+
+        uint32_t   capacity_m1:2;   // [ 63:62 ] - straddles word boundary
+        uint32_t   w2_res1    :12;  // [ 61:50 ] - unused
+        uint32_t   capacity_e :3;   // [ 49:47 ] - capacity (exp)
+        uint32_t   w2_res2    :15;  // [ 46:32 ] - unused
+
+        uint32_t   w3_res1    :3;   // [ 31:29 ] - unused
+        uint32_t   r2w        :3;   // [ 28:26 ] - factor used to scale timeout for write
+        uint32_t   write_blkbits:4; // [ 25:22 ] - log2(write block size)
+        uint32_t   write_partial:1; // [    21 ] - support for partial block write?
+        uint32_t   w3_res2    :21;  // [ 20:0  ] - that's all folks
+#endif
+    } mmc_csd_t;
+
+    // Hitachi spec says this should be arg >> 16 (but we're coding the controller too!)
+#define ARG_RCA(a) (a >> 16)
+
+    typedef struct {
+        std::string img_file;       // the filename of the MMC image
+    } mmc_conf_t;
+
+}
+
+composition
+{
+    // Create a timer subcomponent to count ticks for us.
+    timer : ClockTimer;
+}
+
+connection
+{
+    // Connect up the timer subcomponent.
+    self.clk_in => timer.clk_in;
+    timer.timer_callback => self.timer_callback_handler;
+}
+
+resources
+{
+    // Some MMC Card defaults
+    const static uint32_t DEFAULT_BLOCKLEN = 512;
+    const static uint32_t DEFAULT_BLOCKCOUNT = 0x80; // max to transfer
+
+    // debugger visible registers. These registers aren't memory mapped,
+    // but read by MMC command / responses
+    REGISTER { description("Operating Conditions Register"),
+        reg_number(0x000),
+        display_format("hex"), bitwidth(32)              } OCR_REG;
+
+    REGISTER { description("Card ID bits 127:96"),
+        reg_number(0x004),
+        display_format("hex"), bitwidth(32)              } CID_REG0;
+    REGISTER { description("Card ID bits 95:64"),
+        reg_number(0x005),
+        display_format("hex"), bitwidth(32)              } CID_REG1;
+    REGISTER { description("Card ID bits 63:32"),
+        reg_number(0x006),
+        display_format("hex"), bitwidth(32)              } CID_REG2;
+    REGISTER { description("Card ID bits 31:0"),
+        reg_number(0x007),
+        display_format("hex"), bitwidth(32)              } CID_REG3;
+
+    REGISTER { description("Card Specific Data bits 127:96"),
+        reg_number(0x008),
+        display_format("hex"), bitwidth(32)              } CSD_REG0;
+    REGISTER { description("Card Specific Data bits 95:64"),
+        reg_number(0x009),
+        display_format("hex"), bitwidth(32)              } CSD_REG1;
+    REGISTER { description("Card Specific Data bits 63:32"),
+        reg_number(0x00a),
+        display_format("hex"), bitwidth(32)              } CSD_REG2;
+    REGISTER { description("Card Specific Data bits 31:0"),
+        reg_number(0x00b),
+        display_format("hex"), bitwidth(32)              } CSD_REG3;
+
+    REGISTER { description("Relative Card Address Register"),
+        reg_number(0x00c),
+        display_format("hex"), bitwidth(16)              } RCA_REG;
+
+    REGISTER { description("Driver Stage Register"),
+        reg_number(0x00d),
+        display_format("hex"), bitwidth(16)              } DSR_REG;
+
+    REGISTER { description("Block length"),
+        reg_number(0x00e),
+        display_format("hex"), bitwidth(32)              } BLOCKLEN_REG;
+
+    REGISTER { description("Card Status"),
+        reg_number(0x00f),
+        display_format("hex"), bitwidth(32)              } STATUS_REG;
+
+    REGISTER { description("Block Count"),
+        reg_number(0x010),
+        display_format("hex"), bitwidth(32)              } BLOCK_COUNT_REG;
+
+    // Parameters
+
+    PARAMETER { description("MMCard filename"),
+        type(string), default("mmc.dat")                } p_mmc_file;
+
+    PARAMETER { description("Card ID Product Name (6 chars)"),
+        type(string), default("ARMmmc")                 } p_prodName;
+    PARAMETER { description("Card ID Product Revision"),
+        type(int), default(0x01)                        } p_prodRev;
+    PARAMETER { description("Card ID Manufacturer ID"),
+        type(int), default(0x02) /* Sandisk */          } p_manid;
+    PARAMETER { description("Card ID OEM ID"),
+        type(int), default(0x0000)                      } p_OEMid;
+    PARAMETER { description("Card Serial Number"),
+        type(int), default(0xca4d0001)                  } p_sernum;
+    PARAMETER { description("Don't simulate MMC block access delays"),
+        type(bool), default(true)                       } p_fast_access;
+
+    // Internal state
+    card_state_t  cstate;
+    card_state_t  old_state;
+
+    BackingStore *mmc_store;
+    uint64_t      mmc_capacity;
+
+    // send / receive state
+    uint32_t    multiple_blocks;        // are we in a read/write multiple blocks mode?
+    uint8_t    *data_pointer;           // data pointer in backing store
+    uint32_t    block_address;          // the current block address
+} // end resources
+
+
+behavior CheckForBackingStoreError()
+{
+    int32_t err = mmc_store->getLastError();
+    if (err)
+    {
+        message((err > 0) ? MSG_INFO : MSG_WARNING
+                , "%s: %s\n", getInstanceName().c_str(), mmc_store->getLastErrorMessage());
+    }
+}
+/********************
+ * Behavior Section
+ ********************/
+behavior init()
+{
+    composition.init();
+    mmc_store = new BackingStore(p_mmc_file.c_str(), getInstanceName().c_str());
+    if (!mmc_store)
+    {
+        message(MSG_WARNING, "%s: MMC backingstore could not be instantiated.\n"
+                , getInstanceName().c_str());
+    }
+    else
+    {
+        CheckForBackingStoreError();
+    }
+
+    if (!get_capacity(NULL, NULL))
+    {
+        // Backing file's too small
+        delete mmc_store;
+        mmc_store = NULL;
+    }
+    common_reset();
+    
+    if (card_present.setValue.implemented())
+        card_present.setValue(mmc_store ? sg::Signal::Set : sg::Signal::Clear);
+
+    if (is_write_protected())
+    {
+        message(MSG_INFO, "%s: write protected card.\n", getInstanceName().c_str());
+    }
+}
+
+behavior terminate()
+{
+    if (mmc_store)
+    {
+        delete mmc_store;
+    }
+    composition.terminate();
+}
+
+
+behavior reset(int level)
+{
+    composition.reset(level);
+    common_reset();
+}
+
+behaviour common_reset()
+{
+    cstate   = MMCS_IDLE;
+    OCR_REG  = 0x00ffff80 ;   // Basically allow any operating voltage
+
+    BLOCKLEN_REG = DEFAULT_BLOCKLEN;
+    BLOCK_COUNT_REG = DEFAULT_BLOCKCOUNT;
+
+    uint32_t cxd[4];
+    init_csd_r(&cxd[0]);
+    update_csd(&cxd[0]);
+
+    init_cid_r(&cxd[0]);
+    update_cid(&cxd[0]);
+
+    reset_transfer();
+    MMC_TRACE("%s:%d %s() reset_transfer() due to common_reset\n"
+            , __FILE__, __LINE__, __FUNCTION__);
+}
+
+behavior reset_transfer(void)
+{
+    MMC_DEBUG_VERBOSE("%s:%d %s() \n", __FILE__, __LINE__, __FUNCTION__);
+    multiple_blocks     = 0;
+    data_pointer        = NULL;
+    block_address       = 0;
+
+    stop_timer();
+}
+
+// External ports
+slave port <MMC_Protocol> mmc
+{
+    behavior cmd(mmc_cmd_t cmd, uint32_t arg, void *resp) : mmc_resp_t
+    {
+        if (mmc_capacity != 0) {
+            return (doCommand(cmd, arg, resp));
+        } else {
+            MMC_TRACE("%s: Returning command error, as mmc_capacity = 0.\n"
+                    , getInstanceName().c_str());
+            return MMC_RERROR;
+        }
+    }
+
+    behavior cmd_name(mmc_cmd_t cmd) : const char *
+    {
+        return(MMCcmdName(cmd));
+    }
+
+    behavior Rx_rdy(void)
+    {
+        MMC_DEBUG_READ("%s:%d %s() \n", __FILE__, __LINE__, __FUNCTION__);
+        if (cstate != MMCS_DATA)
+        {
+            return;
+        }
+
+        if (multiple_blocks)
+        {
+            MMC_DEBUG_READ("%s:%d %s() starting timer in order to read next data block\n", __FILE__, __LINE__, __FUNCTION__);
+            multiple_blocks--;
+            block_address += BLOCKLEN_REG;
+            MMC_DEBUG_READ("%s:%d %s() multiple_blocks=%d block_address=0x%08X\n"
+                    , __FILE__, __LINE__, __FUNCTION__, multiple_blocks, block_address);
+            if (check_address(block_address))
+            {
+                start_timer(BLOCKLEN_REG*8);
+            }
+            else
+            {
+                message(MSG_WARNING, "%s: Forcing state back from DATA -> TRANSFER (addr=0x%08x).\n"
+                        , getInstanceName().c_str(), block_address);
+                cstate = MMCS_TRANSFER;
+            }
+        }
+        else
+        {
+            MMC_DEBUG_READ("%s: DATA -> TRANSFER at end of last block (addr=0x%08x).\n"
+                    , getInstanceName().c_str(), block_address);
+            cstate = MMCS_TRANSFER;
+        }
+    } // Rx_rdy
+
+    behavior Tx_done(void)
+    {
+        if (cstate != MMCS_RECEIVE)
+        {
+            return;
+        }
+
+        // Upstream has filled the last block
+        if (multiple_blocks)
+        {
+            MMC_DEBUG_WRITE("%s:%d %s() starting timer in order to write back data block\n", __FILE__, __LINE__, __FUNCTION__);
+            start_timer(BLOCKLEN_REG*8);
+        }
+        else
+        {
+            MMC_DEBUG_WRITE("%s: RECEIVE -> TRANSFER at end of last block (addr=0x%08x).\n"
+                    , getInstanceName().c_str(), block_address);
+            assert_timer_is_stopped();
+            cstate = MMCS_TRANSFER;
+        }
+    }
+
+} // slave port mmc
+
+master port<StateSignal> card_present
+{
+    behavior getValue():sg::Signal::State
+    {
+        return mmc_store ? sg::Signal::Set : sg::Signal::Clear;
+    }  
+}
+
+// Is only called when we're legally in RECEIVE state
+// Called when Tx_done is called
+behavior advance_writeToCard_state(void)
+{
+    // Upstream has filled the last block
+    assert(multiple_blocks);
+
+    block_address += BLOCKLEN_REG;
+    MMC_DEBUG_WRITE("%s:%d %s() multiple_blocks=%d block_address=0x%08X\n"
+            , __FILE__, __LINE__, __FUNCTION__, multiple_blocks, block_address);
+
+    // check address validates mmc_store
+    if (check_address(block_address))
+    {
+        multiple_blocks--;
+        // dump out the previous block
+        dumpBlock(block_address, BLOCKLEN_REG, data_pointer);
+
+        // This is the block controller will write into
+        mmc_store->accessBlock(block_address, BLOCKLEN_REG, &data_pointer);
+        MMC_DEBUG_WRITE("%s:%d %s() next block at %p multiple_blocks=%d now\n"
+                , __FILE__, __LINE__, __FUNCTION__, data_pointer, multiple_blocks);
+        // Provide the controller a place to put the data
+        mmc.Tx(data_pointer, BLOCKLEN_REG);
+    }
+    else
+    {
+        message(MSG_WARNING, "%s: Forcing state back from RECEIVE -> TRANSFER (addr=0x%08x).\n"
+                , getInstanceName().c_str(), block_address);
+        stop_timer();
+        cstate = MMCS_TRANSFER;
+    }
+}
+
+behavior flushWriteBlock()
+{
+    MMC_DEBUG_WRITE("%s:%d %s() flushing block at %p multiple_blocks=%d now (actually doing nothing except dump)\n"
+            , __FILE__, __LINE__, __FUNCTION__, data_pointer, multiple_blocks);
+    dumpBlock(block_address, BLOCKLEN_REG, data_pointer);
+}
+
+behaviour dumpBlock(uint32_t adr, uint32_t len, uint8_t *p)
+{
+    uint32_t bytesPerLine = 32;
+    uint32_t lines;
+    uint32_t i, l;
+    lines = len / bytesPerLine;            
+
+    for (l = 0; l < lines; l++)
+    {
+        MMC_DEBUG_VERBOSE("%08X : ", adr + l * bytesPerLine);
+        for (i = 0; i < bytesPerLine; i++)
+        {
+            MMC_DEBUG_VERBOSE("%02X ", p[l*bytesPerLine + i]);
+        }
+        MMC_DEBUG_VERBOSE("\n");
+    }
+}
+
+behavior advance_readFromCard_state()
+{
+    // We're in DATA state, and we've either been called by an expired
+    // timer, or the timer had previously expired, and we're being called
+    // by the contoller, telling us they're ready for more data
+    mmc_store->accessBlock(block_address, BLOCKLEN_REG, &data_pointer);
+    CheckForBackingStoreError();
+    MMC_DEBUG_READ("%s:%d %s() multiple_blocks=%d block_address=0x%08X, calling Rx() now\n"
+            , __FILE__, __LINE__, __FUNCTION__
+            , multiple_blocks, block_address);
+#ifdef MMC_DEBUG_VERBOSE
+    dumpBlock(block_address, BLOCKLEN_REG, data_pointer);
+#endif
+    mmc.Rx(data_pointer, BLOCKLEN_REG);   // send prior batch of data
+}
+
+behavior check_address(uint32_t blk_addr) : bool
+{
+    if (!mmc_store)
+    {
+        STATUS_REG |= ST_ER_C_OUT_OF_RANGE;
+        MMC_ERROR("%s: The card was not initialized - returning OUT_OF_RANGE.\n"
+                , getInstanceName().c_str());
+        return false;
+    }
+
+    if (blk_addr & (BLOCKLEN_REG-1))
+    {
+        STATUS_REG |= ST_ERX_C_ADDRESS_ERROR;
+        MMC_ERROR("%s: arg(0x%08x) isn't aligned to a block (0x0%x)\n"
+                , getInstanceName().c_str(), block_address, BLOCKLEN_REG);
+        return false;
+    }
+
+    if ((blk_addr + BLOCKLEN_REG) > mmc_capacity)
+    {
+        STATUS_REG |= ST_ER_C_OUT_OF_RANGE;
+        MMC_ERROR("%s: arg(0x%08x) ends past the end of the card (%"PRId64")\n"
+                , getInstanceName().c_str(), block_address, mmc_capacity);
+        return false;
+    }
+    return true;
+}
+
+// Input clock signal used to drive our 'bus'.
+slave port<ClockSignal> clk_in;
+
+    // Handle event notifications from the timer.
+    internal slave port<TimerCallback> timer_callback_handler
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            if (cstate == MMCS_DATA)
+            {
+                MMC_DEBUG_TIMER("%s:%d %s() read timer alarm\n", __FILE__, __LINE__, __FUNCTION__);
+                // Send data, advance, and re-arm timer if necessary
+                advance_readFromCard_state();
+                return 0;
+            }
+            else if (cstate == MMCS_RECEIVE)
+            {
+                // advance, provide another buffer, and re-arm timer if necessary
+                MMC_DEBUG_TIMER("%s:%d %s() write timer alarm\n", __FILE__, __LINE__, __FUNCTION__);
+                advance_writeToCard_state();
+                return 0;
+            }
+
+            // seems to be harmless, but we need to investigate why we see this:
+            MMC_ERROR("%s: In timer handler, unexpected state %s\n",
+                      getInstanceName().c_str(), MMCstateName(cstate));
+            return 0; // don't re-arm
+        }
+    }
+//
+// MMC Command Handler
+//
+behavior doCommand(mmc_cmd_t cmd, uint32_t arg, void *resp) : mmc_resp_t
+{
+    old_state = cstate;       // May be used by status update
+
+    switch (cmd)
+    {
+        // Basic and Read stream commands (Class 0)
+        case MMC_GO_IDLE_STATE:  // 0
+            {
+                reset_transfer();    // cancel any outstanding transfers
+                cstate = MMCS_IDLE;
+                return MMC_RNONE;
+            }
+        case MMC_SEND_OP_COND:   // 1
+            {
+                cstate_change(MMCS_IDLE, MMCS_READY, cmd, true);
+                // Here, we assume that the card can accommodate any voltages,
+                // so we'll just AND with what was passed in (assuming a match
+                // needs to be returned). We'll also always be READY (even
+                // if our state machine didn't advance as desired).
+                arg &= ~(1<<31);  // clear top bit of arg (just in case)
+                ((mmc_ocr_resp_t *)resp)[0] = (OCR_REG) |
+                    (is_ready() << 31);
+                return MMC_R32;
+            }
+        case MMC_ALL_SEND_CID:   // 2
+            {
+                cstate_change(MMCS_READY, MMCS_ID, cmd, true);
+                // move state, and send our ID regardless of legality
+                mmc_cxd_resp_t *cid_resp = (mmc_cxd_resp_t *)resp;
+                cid_resp->cxd[0] = CID_REG0;
+                cid_resp->cxd[1] = CID_REG1;
+                cid_resp->cxd[2] = CID_REG2;
+                cid_resp->cxd[3] = CID_REG3;
+                return MMC_R128;
+            }
+        case MMC_SET_RELATIVE_ADDR: // 3
+            {
+                RCA_REG = ARG_RCA(arg);
+                // always allow & respond
+                cstate_change(MMCS_ID, MMCS_STANDBY, cmd, true);
+                mmc_update_status((mmc_status_t *)resp);
+
+                // make drivers happy
+                *((uint32_t *)resp) = RCA_REG << 16;
+                return MMC_R32;
+            }
+        case MMC_SET_DSR:           // 4
+            {
+                DSR_REG = arg >> 16;
+                return MMC_RNONE;
+            }
+        case MMC_SWITCH:            // 6
+            {
+                // This command was introduced in MMC 4.1, and is
+                // also present in SD 1.1 / SD 2.0. It is NOT in
+                // MMC 3.3, which, for the moment, we're trying to be
+                //                MMC_ERROR("%s: SWITCH unimplemented by this card.\n",
+                //                          getInstanceName().c_str());
+
+                // return short response to make drivers happy
+                return MMC_R32;
+            }
+        case MMC_SELDESL_CARD:    // 7
+            {
+                // Toggle card between standby / transfer
+                // or programming / disconnected states
+
+                if (ARG_RCA(arg) == RCA_REG)
+                {
+                    MMC_TRACE("%s: Card SELECTED: returning status\n",
+                            getInstanceName().c_str());
+                    // might want to set this to block?
+                    cstate_change(MMCS_STANDBY,
+                            MMCS_TRANSFER, cmd, true);
+                    // we're selected - send our RCA
+                    mmc_update_status((mmc_status_t *)resp);
+                    return MMC_R32;
+                }
+
+                MMC_TRACE("%s: Card deselected: no need to return status\n",
+                        getInstanceName().c_str());
+                // might want to set this to block?
+                cstate_change(MMCS_TRANSFER,
+                        MMCS_STANDBY, cmd, true);
+                // we're deselected - don't send anything
+                return MMC_RNONE;
+            }
+        case MMC_SEND_EXT_CSD: // 8
+            {
+                // MMC 4.x and SD 2.0+ only
+                // Not currently implemented .. this command
+                // would otherwise send back the 512 bytes of extCSD
+                // as a data chunk (not as a response)
+                MMC_UNSUPPORTED("%s: SEND_EXT_CSD unimplemented by this card.\n",
+                        getInstanceName().c_str());
+                STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+                return MMC_RERROR;
+            }
+        case MMC_SEND_CSD: // 9
+            { // CMD9
+                cstate_change(MMCS_STANDBY, MMCS_STANDBY, cmd, true);
+
+                mmc_cxd_resp_t *csd_resp = (mmc_cxd_resp_t *)resp;
+                csd_resp->cxd[0] = CSD_REG0;
+                csd_resp->cxd[1] = CSD_REG1;
+                csd_resp->cxd[2] = CSD_REG2;
+                csd_resp->cxd[3] = CSD_REG3;
+                return MMC_R128;
+            }
+        case MMC_SEND_CID: // 10
+            { // CMD10
+                cstate_change(MMCS_STANDBY, MMCS_STANDBY, cmd, true);
+                mmc_cxd_resp_t *cid_resp = (mmc_cxd_resp_t *)resp;
+                cid_resp->cxd[0] = CID_REG0;
+                cid_resp->cxd[1] = CID_REG1;
+                cid_resp->cxd[2] = CID_REG2;
+                cid_resp->cxd[3] = CID_REG3;
+                return MMC_R128;
+            }
+        case MMC_STOP_TRANSMISSION:   // 12
+            {
+                // because we're in block transfer mode
+                // just stop after the next transfer
+                MMC_DEBUG_VERBOSE("%s:%d %s() MMC_STOP_TRANSMISSION\n", __FILE__, __LINE__, __FUNCTION__);
+
+                stop_timer();
+
+                multiple_blocks = 0;
+                mmc_update_status((mmc_status_t *)resp);
+                return MMC_R32;
+            }
+        case MMC_SEND_STATUS:         // 13
+            {
+                if (ARG_RCA(arg) == RCA_REG)
+                {
+                    mmc_update_status((mmc_status_t *)resp);
+                    return MMC_R32;
+                }
+                MMC_TRACE("%s: SEND_STATUS(%04x) didn't match RCA(%04x)\n",
+                        getInstanceName().c_str(), ARG_RCA(arg), RCA_REG);
+                return MMC_RNONE;
+            }
+        case MMC_BUSTEST_R:           // 14
+        case MMC_BUSTEST_W:           // 19
+            {
+                STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+                MMC_TRACE("%s: BUSTEST commands unimplemented\n",
+                        getInstanceName().c_str());
+                return MMC_RNONE;
+            }
+        case MMC_GO_INACTIVE_STATE:   // 15
+            {
+                // Right now, all transfers are atomic,
+                // so we don't have to clear any state before we..
+                cstate = MMCS_DISABLED;
+                return MMC_RNONE;
+            }
+            // Block oriented read commands (Class 2)
+        case MMC_SET_BLOCKLEN:        // 16
+            {
+                // We're not going to support modifying the block
+                // length in this device
+                if ((arg & 0xffff) != BLOCKLEN_REG)
+                {
+                    MMC_ERROR("%s: 0x%04x didn't match our BLOCKLEN (0x%04x)\n",
+                            getInstanceName().c_str(), (arg & 0xffff), BLOCKLEN_REG);
+
+                    STATUS_REG |= ST_ER_C_BLOCK_LEN_ERROR;
+                }
+                mmc_update_status((mmc_status_t *)resp);
+                return MMC_R32;
+            }
+        case MMC_READ_SINGLE_BLOCK:   // 17
+            {
+                reset_transfer();
+                multiple_blocks = 0;
+                return(start_rblock(cmd, arg, resp));
+            }
+        case MMC_READ_MULTIPLE_BLOCK: // 18
+            {
+                reset_transfer();
+                multiple_blocks = BLOCK_COUNT_REG;
+
+                MMC_DEBUG_VERBOSE("%s:%d %s() multiple_blocks=%d\n"
+                        , __FILE__, __LINE__, __FUNCTION__, multiple_blocks);
+                return(start_rblock(cmd, arg, resp));
+            }
+            // Stream read / write commands (Classes 1 and 3)
+        case MMC_READ_DAT_UNTIL_STOP:  // 11
+        case MMC_WRITE_DAT_UNTIL_STOP: // 20
+            {
+                MMC_TRACE("%s: Streaming commands not supported\n",
+                        getInstanceName().c_str());
+                STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+                return MMC_RNONE;
+            }
+            // Block oriented write commands (Class 4)
+        case MMC_SET_BLOCK_COUNT:        // 23
+            {
+                MMC_TRACE("%s: SET_BLOCK_COUNT command (%d, 0x%08x)\n",
+                        getInstanceName().c_str(), cmd, arg);
+                // Only lower 16 bits are valid
+                arg &= 0xffff;
+                // set block count to 0 for 1 block, 1 for two blocks etc
+                BLOCK_COUNT_REG = arg > 0 ? arg - 1 : 0;
+                MMC_DEBUG("%s:%d %s() BLOCK_COUNT_REG=%d\n", __FILE__, __LINE__, __FUNCTION__, BLOCK_COUNT_REG);
+                mmc_update_status((mmc_status_t *)resp);
+                return MMC_R32;
+            }
+        case MMC_WRITE_BLOCK:            // 24
+            {
+                reset_transfer();
+                multiple_blocks = 0;
+                return(start_wblock(cmd, arg, resp));
+            }
+        case MMC_WRITE_MULTIPLE_BLOCK:   // 25
+            {
+                reset_transfer();
+                multiple_blocks = BLOCK_COUNT_REG;
+                MMC_DEBUG("%s:%d %s() multiple_blocks=%d\n", __FILE__, __LINE__, __FUNCTION__, multiple_blocks);
+                return(start_wblock(cmd, arg, resp));
+            }
+        case MMC_PROGRAM_CID:            // 26
+            {
+            }
+        case MMC_PROGRAM_CSD:            // 27
+            {
+            }
+
+            // Block oriented write protection commands (Class 6)
+        case MMC_SET_WRITE_PROT:         // 28
+        case MMC_CLR_WRITE_PROT:         // 29
+        case MMC_SEND_WRITE_PROT:        // 30
+            {
+                MMC_UNSUPPORTED("%s: WRITE_PROT commands not supported (%d, 0x%08x)\n",
+                        getInstanceName().c_str(), cmd, arg);
+                STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+                return MMC_RNONE;
+            }
+
+            // Erase commands (Class 5)
+            // We don't actually erase anything, but
+            // return as if the commands succeeded
+        case MMC_ERASE_GROUP_START:      // 35
+            {
+                mmc_update_status((mmc_status_t *)resp);
+                return MMC_R32;
+            }
+        case MMC_ERASE_GROUP_END:        // 36
+            {
+                mmc_update_status((mmc_status_t *)resp);
+                return MMC_R32;
+            }
+        case MMC_ERASE:                  // 38
+            {
+                if (is_write_protected())
+                {
+                    MMC_TRACE("%s: write protected card\n",
+                              getInstanceName().c_str());
+                    STATUS_REG |= ST_SX_C_WP_ERASE_SKIP;
+                }
+                mmc_update_status((mmc_status_t *)resp);
+                return MMC_R32;
+            }
+            // I/O mode commands (Class 9)
+        case MMC_FAST_IO:                // 39
+        case MMC_GO_IRQ_STATE:           // 40
+            {
+                MMC_UNSUPPORTED("%s: IO command not supported (%d, 0x%08x)\n",
+                        getInstanceName().c_str(), cmd, arg);
+                STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+                return MMC_RERROR;
+            }
+            // Lock card (Class 7)
+        case MMC_LOCK_UNLOCK:            // 42
+            {
+                // return short response to make drivers happy
+                return MMC_R32;
+            }
+            // Application specific commands (Class 8)
+        case MMC_APP_CMD:                // 55
+            // Do what drivers expect
+            *((uint32_t *)resp) = 0;
+            return MMC_R32;
+        case MMC_GEN_CMD:                // 56
+            {
+                MMC_UNSUPPORTED("%s: Application specific command not supported (%d, 0x%08x)\n",
+                        getInstanceName().c_str(), cmd, arg);
+                STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+                return MMC_RERROR;
+            }
+        case MMC_CMD41: // Class 9 reserved
+            // Do what the bootmonitor expects
+            *((uint32_t *)resp) = 0x80000000;
+            return MMC_R32;
+
+        case MMC_CMD5:  // class 0 / 1 reserved
+        case MMC_CMD21: // class 3 reserved
+        case MMC_CMD22:
+        case MMC_CMD31: // Class 6 reserved
+        case MMC_CMD43: // Class 7 reserved
+        case MMC_CMD44:
+        case MMC_CMD45:
+        case MMC_CMD46:
+        case MMC_CMD47:
+        case MMC_CMD48:
+        case MMC_CMD49:
+        case MMC_CMD50:
+        case MMC_CMD51:
+        case MMC_CMD52:
+        case MMC_CMD53:
+        case MMC_CMD54:
+        case MMC_CMD57: // Class 8 reserved
+        case MMC_CMD58:
+        case MMC_CMD59:
+            MMC_UNSUPPORTED("%s: reserved MMC command %d (0x%08x)\n",
+                    getInstanceName().c_str(), cmd, arg);
+            STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+            return MMC_RERROR;
+        case MMC_CMD32: // Class 5 reserved
+        case MMC_CMD33:
+            // return short response
+            return MMC_R32; 
+        case MMC_CMD34:
+        case MMC_CMD37:
+            MMC_UNSUPPORTED("%s: MMC class 5 command %d (0x%08x)"
+                    " reserved for compatibility\n",
+                    getInstanceName().c_str(), cmd, arg);
+            STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+            return MMC_RERROR;
+        case MMC_CMD60: // Class 8 reserved for manufacturer
+        case MMC_CMD61:
+        case MMC_CMD62:
+        case MMC_CMD63:
+            MMC_UNSUPPORTED("%s: MMC command %d is reserved for manufacturer (0x%08x)\n",
+                    getInstanceName().c_str(), cmd, arg);
+            STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+            return MMC_RERROR;
+        default:
+            MMC_UNSUPPORTED("%s: unhandled MMC command %d (0x%08x)\n",
+                    getInstanceName().c_str(), cmd, arg);
+            STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+            return MMC_RERROR;
+
+    }
+    return MMC_RNONE;
+}
+
+// More command processing
+//
+
+behavior start_timer(uint32_t delay)
+{
+    assert(!timer.timer_control.isSet());
+    MMC_DEBUG_TIMER("%s:%d %s() start_timer \n", __FILE__, __LINE__, __FUNCTION__);
+    if (p_fast_access)
+        timer.timer_callback.signal();
+    else
+        timer.timer_control.set(delay);
+}
+
+behavior stop_timer()
+{
+    MMC_DEBUG_TIMER("%s:%d %s() stop_timer \n", __FILE__, __LINE__, __FUNCTION__);
+    if ((cstate == MMCS_RECEIVE) && timer.timer_control.isSet())
+    {
+        flushWriteBlock();
+    }
+    timer.timer_control.cancel();
+}
+
+behavior assert_timer_is_stopped()
+{
+    assert(!timer.timer_control.isSet());
+}
+
+behavior start_rblock(mmc_cmd_t cmd, uint32_t arg, void *resp) : mmc_resp_t
+{
+    MMC_DEBUG_READ("%s:%d %s() enter block_address=0x%08X\n", __FILE__, __LINE__, __FUNCTION__, arg);
+    if (!cstate_change(MMCS_TRANSFER, MMCS_DATA, cmd, false))
+    {
+        STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+        return MMC_RNONE;
+    }
+
+    // Provide this data atomically, at the end of a
+    // calculated transfer time
+    block_address = arg;
+
+    // NB strictly this should check if ACMD41 has been called wih HCS set, and
+    // OCR.CCS (bit 30) is now set to do block rather than byte addressing mode.
+    // However, we currently don't support >2GB images anyway.
+    if (mmc_capacity > 0x80000000)
+    {
+        block_address *= BLOCKLEN_REG;
+    }
+
+    if (!check_address(block_address))
+    {   /// switch back state, and return any error
+        cstate_change(MMCS_DATA, MMCS_TRANSFER, cmd, true);
+        mmc_update_status((mmc_status_t *)resp);
+        return MMC_R32;
+    }
+    start_timer(BLOCKLEN_REG*8);
+
+    MMC_DEBUG_READ("%s:%d %s() start_rblock(): Set time to expire in %d ticks.\n"
+            , __FILE__, __LINE__, __FUNCTION__, BLOCKLEN_REG*8);
+    mmc_update_status((mmc_status_t *)resp);
+    return MMC_R32;
+} // start_rblock
+
+behavior start_wblock(mmc_cmd_t cmd, uint32_t arg, void *resp) : mmc_resp_t
+{
+    if (is_write_protected())
+    {
+        MMC_TRACE("%s: start_wblock(): write protected card\n",
+                  getInstanceName().c_str());
+        STATUS_REG |= ST_ERX_C_WP_VIOLATION;
+        return MMC_RNONE;
+    }
+
+    if (!cstate_change(MMCS_TRANSFER, MMCS_RECEIVE, cmd, false))
+    {
+        STATUS_REG |= ST_ER_B_ILLEGAL_COMMAND;
+        return MMC_RNONE;
+    }
+
+    block_address = arg;
+    // NB strictly this should check if ACMD41 has been called wih HCS set, and
+    // OCR.CCS (bit 30) is now set to do block rather than byte addressing mode.
+    // However, we currently don't support >2GB images anyway.
+    if (mmc_capacity > 0x80000000)
+    {
+        block_address *= BLOCKLEN_REG;
+    }
+    if (!check_address(block_address))
+    {   /// switch back state, and return any error
+        cstate_change(MMCS_RECEIVE, MMCS_TRANSFER, cmd, true);
+        mmc_update_status((mmc_status_t *)resp);
+        return MMC_R32;
+    }
+    // check address validates mmc_store for us
+
+    // This is the block controller will write into
+    mmc_store->accessBlock(block_address, BLOCKLEN_REG, &data_pointer);
+    CheckForBackingStoreError();
+
+    MMC_DEBUG_WRITE("%s:%d %s() multiple_blocks=%d calling tx()\n", __FILE__, __LINE__, __FUNCTION__, multiple_blocks);
+    // Provide the controller a place to put the data
+    mmc.Tx(data_pointer, BLOCKLEN_REG);
+
+    // The minimum time before we'll provide another block
+    mmc_update_status((mmc_status_t *)resp);
+    return MMC_R32;
+} // start_wblock
+
+
+
+behavior stuff_bits(uint32_t &w, uint32_t off, uint32_t s, uint32_t val)
+{
+    w |= (val << (s-off));
+}
+
+//
+// utility functions
+//
+
+behavior init_csd_r(uint32_t *w)
+{
+
+    uint32_t m, e;
+    get_capacity(&m, &e);
+
+    w[0] = w[1] = w[2] = w[3] = 0;
+
+    stuff_bits(/* csd_v:2     */ w[0], 96, 126, CSD_VER_1_1);
+    stuff_bits(/* mmca_v:4    */ w[0], 96, 122, MMCA_VERSION_3_x);
+    stuff_bits(/* tacc_ns_m:4 */ w[0], 96, 115, 0x0f);
+    stuff_bits(/* tacc_ns_e:3 */ w[0], 96, 112, 0x00);
+    stuff_bits(/* tacc_clks:8 */ w[0], 96, 104, 1);
+    stuff_bits(/* max_dtr_m:4 */ w[0], 96, 99 , 1 );
+    stuff_bits(/* max_dtr_e:3 */ w[0], 96, 96 , 1 );
+
+    stuff_bits(/* cmdclass:12    */ w[1], 64, 84, (CCC_BASIC | CCC_BLOCK_READ | CCC_BLOCK_WRITE | CCC_ERASE));
+    stuff_bits(/* read_blkbit:4  */ w[1], 64, 80, DEFAULT_BLKBITS );
+    stuff_bits(/* read_partial:1 */ w[1], 64, 79, 0 );
+    stuff_bits(/* write_misal:1  */ w[1], 64, 78, 0 );
+    stuff_bits(/* read_misal:1   */ w[1], 64, 77, 0 );
+    stuff_bits(/* capacity_m:10  */ w[1], 64, 64, (m >> 2) & 0x3ff );
+
+    stuff_bits(/* capacity_m:2   */ w[2], 32, 62, (m & 3) );
+    stuff_bits(/* capacity_e:3   */ w[2], 32, 47, e );
+
+    stuff_bits(/* r2w:3           */ w[3], 0, 26, 2 );
+    stuff_bits(/* write_blkbit:4  */ w[3], 0, 22, DEFAULT_BLKBITS );
+    stuff_bits(/* write_partial:1 */ w[3], 0, 21, 0 );
+
+    bool wp = false;
+
+    if (mmc_store)
+    {
+        wp = mmc_store->isReadOnly();
+    }
+    stuff_bits(/* perm_write_prot:1 */ w[3], 0, 13, wp);
+}
+
+behavior init_cid_r(uint32_t *r)
+{
+    const char *c = p_prodName.c_str();
+
+    r[0]=r[1]=r[2]=r[3]=0;
+
+    stuff_bits(/* manfid:8    */ r[0], 96, 120, p_manid & 0xff);
+    stuff_bits(/* oemid:16    */ r[0], 96, 104, p_OEMid & 0xffff);
+    stuff_bits(/* name_0:8    */ r[0], 96, 96, c[0]);
+    stuff_bits(/* name_1:8    */ r[1], 64, 88, c[1]);
+    stuff_bits(/* name_2:8    */ r[1], 64, 80, c[2]);
+    stuff_bits(/* name_3:8    */ r[1], 64, 72, c[3]);
+    stuff_bits(/* name_4:8    */ r[1], 64, 64, c[4]);
+    stuff_bits(/* name_5:8    */ r[2], 32, 56, c[5]);
+    stuff_bits(/* prod_rev:8 */  r[2], 32, 48, p_prodRev & 0xff);
+    stuff_bits(/* serial:16 */   r[2], 32, 32, (p_sernum >> 16) & 0xffff);
+    stuff_bits(/* serial:16 */   r[3],  0, 16, p_sernum & 0xffff);
+    stuff_bits(/* month:4 */     r[3],  0, 12, 1);
+    stuff_bits(/* year:4 */      r[3],  0,  8, 2008-1997);
+}
+
+behavior update_csd(uint32_t *data)
+{
+    CSD_REG0 = data[0];
+    CSD_REG1 = data[1];
+    CSD_REG2 = data[2];
+    CSD_REG3 = data[3];
+}
+
+behavior update_cid(uint32_t *data)
+{
+    CID_REG0 = data[0];
+    CID_REG1 = data[1];
+    CID_REG2 = data[2];
+    CID_REG3 = data[3];
+}
+
+// Classing Number of Leading Zeros implementation
+behaviour nlz(uint32_t x) : int
+{
+    int n;
+
+    if (x == 0)
+        return 32;
+
+    n = 1;
+
+    if ((x >> 16) == 0) { n = n + 16; x = x << 16; }
+    if ((x >> 24) == 0) { n = n +  8; x = x <<  8; }
+    if ((x >> 28) == 0) { n = n +  4; x = x <<  4; }
+    if ((x >> 30) == 0) { n = n +  2; x = x <<  2; }
+
+    n = n - (x >> 31);
+
+    return n;
+}
+// Calculates capacity based on back store file size
+// Capacity is stored as m:12 and e:3, where size = (1+m) << (e+2)
+// Parameter should be > 2k, and <= 2GB
+behavior get_capacity(uint32_t *mp, uint32_t *ep) : bool
+{
+    uint64_t capacity = 0;
+
+    if (mmc_store)
+        capacity = (uint64_t)mmc_store->size();
+
+    // Minimum supported size is block size times minimal size multiplier (capacity_e)
+    const uint64_t our_min_size = (1 << DEFAULT_BLKBITS) * (1 << 2);
+    if (capacity < our_min_size)
+    {
+        MMC_TRACE("%s: Backing store (%"PRIu64") is too small (min. %"PRIu64").\n",
+                getInstanceName().c_str(), capacity, our_min_size);
+        mmc_capacity = 0;
+        return false;
+    }
+
+    // Support 2GB max
+    const uint64_t our_max_size = 0x80000000;
+    if (capacity > our_max_size)
+    {
+        message(MSG_ERROR, "%s: File too big: capacity(%"PRIu64" > %"PRIu64")\n",
+                getInstanceName().c_str(), capacity, our_max_size);
+        mmc_capacity = 0;
+        return false;
+    }
+
+    uint32_t blocks = capacity >> DEFAULT_BLKBITS;
+
+    // blocks = (m + 1) * 2^(e + 2)
+
+    uint32_t m = blocks - 1;
+    while (m >= (1 << 12)) // capacity_m field is 12 bits long
+        m >>= 1;
+
+    // 2^(e + 2) = blocks / (m + 1)
+    // e + 2 = log2(blocks / (m + 1))
+    // e = log2(blocks / (m + 1)) - 2
+
+    // log2(x) = 31 - nlz(x)
+    // ceiling(log2(x)) = 31 - (nlz(x) - 1) + 1
+
+    int32_t e = 31 - nlz(blocks / (m + 1) - 1) + 1 - 2;
+
+    // NB the above can lead to a negative e. If so scale m to make e = 0
+    // (For DEFAULT_BLKBITS=11, this will happen for capacities <16386kB)
+    if (e < 0) {
+        m >>= -e;
+        e = 0;
+    }
+
+    mmc_capacity = (m + 1) << (e + 2 + DEFAULT_BLKBITS);
+
+    if (mmc_capacity != capacity)
+        message(MSG_ERROR, "%s: Backing store size (%"PRIu64") adjusted to %"PRIu64"!\n",
+                getInstanceName().c_str(), capacity, mmc_capacity);
+
+    if (mp)
+        *mp = m;
+    if (ep)
+        *ep = e;
+
+    MMC_TRACE("%s: Capacity = %"PRIu64" bytes (e=%u, m=%u)\n",
+            getInstanceName().c_str(), mmc_capacity, e, m);
+
+    return true;
+} // get_capacity
+
+
+// is_write_protected() returns true if and only if the back store file is read
+// only
+behavior is_write_protected() : bool
+{
+    bool write_protect = (CSD_REG3 & (1 << 13)) || (CSD_REG3 & (1 << 12));
+
+    if (mmc_store)
+    {
+        write_protect |= mmc_store->isReadOnly();
+    }
+    MMC_TRACE("%s: write_protect = %s\n",
+              getInstanceName().c_str(),
+              (write_protect? "true": "false"));
+    return (write_protect);
+}
+
+// move from old state to new. allow_anyway controls whether
+// the state is changed even if we're not in the expected state
+// (generally we allow this currently)
+// Returns whether the state was changed.
+behavior cstate_change(card_state_t old, card_state_t n,
+        mmc_cmd_t cmd,
+        bool allow_anyway) : bool
+{
+    if ((cstate & old) == 0)
+    {
+        if (allow_anyway)
+        {
+            MMC_TRACE("%s: [%s] Illegal transition to %s from %s (not %s)."
+                    " Never mind!\n", getInstanceName().c_str(),
+                    MMCcmdName(cmd), MMCstateName(n),
+                    MMCstateName(cstate), MMCstateName(old));
+            cstate = n;
+            return true;
+        }
+        // Block transition
+        message(MSG_WARNING, "%s: [%s] Illegal transition to %s from %s (not %s)."
+                " Blocking!\n", getInstanceName().c_str(),
+                MMCcmdName(cmd), MMCstateName(n),
+                MMCstateName(cstate), MMCstateName(old));
+        return false;
+    }
+    // Legal transition
+    MMC_TRACE("%s: [%s] State change to %s from %s.\n",
+            getInstanceName().c_str(), MMCcmdName(cmd),
+            MMCstateName(n), MMCstateName(cstate));
+    cstate = n;
+    return true;
+}
+
+behavior is_ready(void) : uint32_t
+{
+    if (cstate == MMCS_READY)
+        return 1;
+    return 0;
+}
+
+
+behavior mmc_update_status(mmc_status_t *st)
+{
+
+    // These bits plausibly always stay set for us
+    STATUS_REG |= ST_SX_A_READY_FOR_DATA;
+
+    *st = STATUS_REG | (((uint32_t)old_state) << ST_SX_B_CURRENT_STATE_SHIFT);
+
+    STATUS_REG &= ~(ST__C_BITS);   // clear clear on read bits
+
+    // This isn't really clear on read, but since it is set when
+    // there's guaranteed to be no status returned, it's safe to set
+    // on error, and clear on update.
+    STATUS_REG &= ~(ST_ER_B_ILLEGAL_COMMAND);
+}
+
+behavior MMCcmdName(mmc_cmd_t cmd) : const char *
+{
+    static const char *strs[64] = {
+        "MMC_GO_IDLE_STATE       ", "MMC_SEND_OP_COND        ", "MMC_ALL_SEND_CID        ",
+        "MMC_SET_RELATIVE_ADDR   ", "MMC_SET_DSR             ", "MMC_CMD5                ",
+        "MMC_SWITCH              ", "MMC_SELDESL_CARD        ", "MMC_SEND_EXT_CSD        ",
+        "MMC_SEND_CSD            ", "MMC_SEND_CID            ", "MMC_READ_DAT_UNTIL_STOP ",
+        "MMC_STOP_TRANSMISSION   ",                                                         // 12
+        "MMC_SEND_STATUS         ", "MMC_BUSTEST_R           ",
+        "MMC_GO_INACTIVE_STATE   ",
+        "MMC_SET_BLOCKLEN        ", "MMC_READ_SINGLE_BLOCK   ", "MMC_READ_MULTIPLE_BLOCK ",
+        "MMC_BUSTEST_W           ",                                                         // 19
+        "MMC_WRITE_DAT_UNTIL_STOP", "MMC_CMD21               ", "MMC_CMD22               ",
+        "MMC_SET_BLOCK_COUNT     ", "MMC_WRITE_BLOCK         ", "MMC_WRITE_MULTIPLE_BLOCK",
+        "MMC_PROGRAM_CID         ", "MMC_PROGRAM_CSD         ",
+        "MMC_SET_WRITE_PROT      ", "MMC_CLR_WRITE_PROT      ", "MMC_SEND_WRITE_PROT     ",
+        "MMC_CMD31               ",
+        "MMC_CMD32               ", "MMC_CMD33               ", "MMC_CMD34               ",
+        "MMC_ERASE_GROUP_START   ", "MMC_ERASE_GROUP_END     ", "MMC_CMD37               ",
+        "MMC_ERASE               ",
+        "MMC_FAST_IO             ", "MMC_GO_IRQ_STATE        ", "MMC_CMD41               ",
+        "MMC_LOCK_UNLOCK         ", "MMC_CMD43               ", "MMC_CMD44               ",
+        "MMC_CMD45               ", "MMC_CMD46               ", "MMC_CMD47               ",
+        "MMC_CMD48               ", "MMC_CMD49               ", "MMC_CMD50               ",
+        "MMC_CMD51               ", "MMC_CMD52               ", "MMC_CMD53               ",
+        "MMC_CMD54               ",
+        "MMC_APP_CMD             ", "MMC_GEN_CMD             ", "MMC_CMD57               ",
+        "MMC_CMD58               ", "MMC_CMD59               ", "MMC_CMD60               ",
+        "MMC_CMD61               ", "MMC_CMD62               ", "MMC_CMD63               "
+    };
+
+    return strs[cmd];
+}
+
+behavior MMCstateName(card_state_t st) : const char *
+{
+    static char buf[40];
+
+    switch (st) {
+        case MMCS_IDLE:      return "IDLE";
+        case MMCS_READY:     return "READY";
+        case MMCS_ID:        return "ID";
+        case MMCS_STANDBY:   return "STANDBY";
+        case MMCS_TRANSFER:  return "TRANSFER";
+        case MMCS_DATA:      return "DATA";
+        case MMCS_RECEIVE:   return "RECEIVE";
+        case MMCS_PROGRAM:   return "PROGRAM";
+        case MMCS_DISABLED:  return "DISABLED";
+        default:
+                             sprintf(buf,"UNKNOWN (0x%x)", (uint32_t)st);
+                             return(buf);
+    }
+}
+
+
+} // end of component

@@ -1,0 +1,1638 @@
+/*
+ * Copyright 2007-2008 ARM Limited. All rights reserved.
+ */
+
+// Demonstration of using the Visualisation library to create a skinnable
+// display window.
+
+component MPSVisualisation
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Display window for MPS using Visualisation library.";
+        documentation_file = "../../../#DUI0423#";
+    }
+    includes
+    {
+        // Include the visualisation API
+        #include "sg/SGSimulationContext.h"
+        #include "sg/SystemInclude.h"
+        #include "sg/MSCFixes.h"
+        #include "components/Visualisation.h"
+        #include "components/KeyCode.h"
+
+        #define MPSVIS_TRACE if (!0) ; else  printf
+
+        #ifdef WIN32
+            #define pvis_sleep(x) Sleep(x)
+        #else
+            #include <sys/time.h>
+            #define pvis_sleep(x) usleep((x)*1000)
+        #endif
+
+        // Constants
+        enum {
+            MPSVIS_FONT_WIDTH = 6,
+            MPSVIS_DIP_WIDTH = 8,
+            MPSVIS_LED_WIDTH = 10,
+            MPSVIS_STATUS_LINE_HEIGHT = 15,
+            MPSVIS_PANEL_HEIGHT = 125,
+            MPSVIS_EXTRAS_HEIGHT = 60,
+            MPSVIS_LINE_WIDTH = 640,
+            MPSVIS_BUTTON_WIDTH = 15,
+            MPSVIS_DARK_GRAY = 0,
+            MPSVIS_LIGHT_GRAY = 1,
+            MPSVIS_ORANGE = 2,
+            MPSVIS_GREEN = 3,
+            MPSVIS_7SEG_X_THICKNESS = 4,
+            MPSVIS_7SEG_X_WIDTH = 17,
+            MPSVIS_7SEG_Y_THICKNESS = 4,
+            MPSVIS_7SEG_Y_WIDTH = 11,
+        };
+    }
+
+    resources
+    {
+        // This is a bit dirty: workaround for SG 2.3 bug where a C++ file
+        // can't be included in the project under Linux.  Normally, the
+        // following class definition would be split as per regular
+        // (unrestricted) C++ code, but for now, it's embedded directly into
+        // the visualization component.
+
+        // UIclass.cpp
+
+        class Cui {
+            public:
+                Cui(VisRenderRegion *render_reg, int xpos, int ypos, int width, int height) 
+                    : m_x(xpos), m_y(ypos), m_xs(width), m_ys(height), m_rr(render_reg)
+                {
+                }
+
+                virtual ~Cui() {}
+
+                inline int width(void)      { return m_xs; }
+                inline int height(void)     { return m_ys; }
+                inline void setWidth(int w)  { m_xs = w;    }
+                inline void setHeight(int h) { m_ys = h;    }
+
+                int get_x()  {return m_x; }
+                int get_y()  {return m_y; }
+                int get_xs() {return m_xs;}
+                int get_ys() {return m_ys;}
+
+                int m_x;  // absolute x position
+                int m_y;  // absolute y position
+                int m_xs; // x size
+                int m_ys; // y size
+
+                VisRenderRegion *m_rr;
+
+        };
+
+        class Cicount : public Cui {
+            public:
+                Cicount(VisRenderRegion *render_reg, int x, int y, int width, int height)  
+                    : Cui(render_reg, x, y, width, height), rj(true)
+                {
+                }
+
+                ~Cicount() {}
+
+                void setRightJustify(void) { rj = true; }
+                void setLeftJustify(void)  { rj = false; }
+
+                void redraw(uint64_t n)
+                {
+                    // Black background
+                    m_rr->fillRect(m_rr->mapRGB(0, 0, 0), m_x, m_y, m_xs, m_ys);
+
+                    (void) write_uint64(n, 13 /* digits */, m_x, m_y);
+
+                    m_rr->update(m_x, m_y, m_xs, m_ys);        
+                }
+
+            private:
+                bool rj; // Right justify numbers in container
+
+                // Display a 64-bit number as a comma-divided decimal at the
+                // given location of the status region.
+                // Returns the x-coordinate at the end of the text.
+                int write_uint64(uint64_t value, int num_digits, int x, int y) 
+                {
+                    char buffer[30], str[30];
+                    int  buff_size=0;
+
+                    for(int place=0; place < num_digits; place++)
+                    {
+                        int digit = (int)(value % 10);
+
+                        buffer[buff_size++] = '0' + digit;
+
+                        value /= 10;
+                        if (value == 0) break;
+
+                        if ((place % 3) == 2) buffer[buff_size++] = ',';
+                    }
+
+                    // Reverse copy into rendered string
+                    for(int i=0; i<buff_size; i++)
+                    {
+                        str[i] = buffer[buff_size-i-1];
+                    }
+                    str[buff_size] = '\0';
+
+                    // Ignore the rj. It's not actually used.
+                    return m_rr->writeText(str, x, y);
+                } /* write_uint64 */
+        };
+
+        // Very quick 'n dirty class, needs a good restructuring to provide
+        // cleaner interfaces
+        class Clabel : public Cui {
+            public:
+                // Initialize with a constant string, automatic size
+                Clabel(VisRenderRegion *render_reg, const char *label, int x, int y, uint32_t r_, uint32_t g_, uint32_t b_)  
+                    : Cui(render_reg, x, y, MPSVIS_FONT_WIDTH*int(strlen(label)), 2*MPSVIS_FONT_WIDTH),rj(false), str(0)
+                {
+                    init_str(strlen(label)+1);
+                    setLabel(label);
+                    bg_color = m_rr->mapRGB(r_, g_, b_);
+                }
+
+                // Initialize with a constant string
+                Clabel(VisRenderRegion *render_reg, const char *label, int x, int y, int width, int height)  
+                    : Cui(render_reg, x, y, width, height), rj(false), str(0)
+                {
+                    init_str(strlen(label)+1);
+                    setLabel(label);
+                    bg_color = m_rr->mapRGB(0, 0, 0);
+                }
+
+                // Initialize with a blank string
+                Clabel(VisRenderRegion *render_reg, int length, int x, int y, int width, int height)  
+                    : Cui(render_reg, x, y, width, height), rj(false), str(0)
+                {
+                    init_str(length+1);
+                    str[0]=0;
+                    bg_color = m_rr->mapRGB(0, 0, 0);
+                    bg_color = m_rr->mapRGB(0, 100, 146);
+
+                }
+
+                ~Clabel() {delete [] str;}
+
+                void setRightJustify(void) { rj = true; }
+                void setLeftJustify(void)  { rj = false; }
+
+                void setLabel(const char *label)
+                {
+                    strncpy(str, label, slen);
+                    redraw();
+                }
+
+                void setBGColor(unsigned int r_, unsigned int g_, unsigned int b_)
+                {
+                    bg_color = m_rr->mapRGB(r_, g_, b_);
+                }
+
+                void redraw(void)
+                {
+#ifndef USE_COLORS
+                    bg_color = m_rr->mapRGB(0, 0, 0); //remove me
+#endif
+
+                    m_rr->fillRect(bg_color, m_x, m_y, m_xs, m_ys);
+
+                    // LJ only currently
+                    (void) m_rr->writeText(str, m_x, m_y);
+
+                    m_rr->update(m_x, m_y, m_xs, m_ys);
+                }
+
+
+            private:
+                bool rj;
+                char *str;
+                size_t slen;
+                unsigned int bg_color;
+
+                void init_str(size_t len)
+                {
+                    if (str)
+                        delete [] str;
+                    slen = len;
+                    str = new char[len];
+                }
+        };
+
+#define AUTO_RELASE_BUTTON true
+#define NO_AUTO_RELASE_BUTTON false
+
+        class Cbutton : public Cui {
+            public:
+                Cbutton(VisRenderRegion *render_reg
+                        , uint32_t buttonId
+                        , int x
+                        , int y
+                        , int w
+                        , int h
+                        , VisBitmap *bmpOn
+                        , VisBitmap *bmpOff
+                        , uint32_t *p_pPressed
+                        , bool bAutoRelease)
+                    : Cui(render_reg, x, y, w, h)
+                      , m_pressed(false)
+                      , m_id(buttonId)
+                      , m_ppressedButtons(p_pPressed)
+                      , m_but_normal(bmpOn)
+                      , m_but_pressed(bmpOff) 
+                      , m_bAutoRelease(bAutoRelease) 
+                      , m_state(false)
+                {
+                }
+
+                ~Cbutton(){}
+
+                void reset(void)
+                {
+                    m_pressed = false;
+                    m_state = false;
+                }
+
+                void redraw()
+                {
+                    // Draw button
+                    m_rr->renderBitmap(m_state ? m_but_pressed : m_but_normal, m_x, m_y);
+                    m_rr->update(m_x, m_y, m_xs, m_ys);
+                }
+
+                void setState(bool _state)
+                {
+                    m_state = _state;
+                }
+
+                bool clicked(int x_, int y_, uint32_t now)
+                {
+                    bool ret;
+                    ret = (    (x_ >= get_x()) && (x_ < get_x() + get_xs())
+                            && (y_ >= get_y()) && (y_ < get_y() + get_ys()));
+                    if (ret)
+                    {
+                        if (m_bAutoRelease)
+                        {
+                            m_timePressed = now;
+                            m_state = true;
+                            *m_ppressedButtons |= m_id;
+                        }
+                        else
+                        {
+                            m_state = !m_state;
+                        }
+                    }
+                    return ret;
+                }
+
+                bool released(uint32_t now)
+                {
+                    bool ret = false;
+                    if (now - m_timePressed > 100)
+                    {
+                        *m_ppressedButtons &= ~m_id;
+                        m_state = false;
+                        redraw();
+                        ret = true;
+                    }
+                    return ret;
+                }
+
+            private:
+                bool m_pressed;
+                uint32_t m_id;
+                uint32_t* m_ppressedButtons;
+                uint32_t m_timePressed;
+                VisBitmap *m_but_normal, *m_but_pressed;
+                bool m_bAutoRelease;
+                bool m_state;
+        };
+
+        class CCharLCD : public Cui {
+            public:
+                CCharLCD(VisRenderRegion *render_reg, int x, int y, int w_, int h_
+                                , uint32_t r_, uint32_t g_, uint32_t b_
+                                , uint32_t br_, uint32_t bg_, uint32_t bb_
+                                )
+                    : Cui(render_reg, x, y, w_, h_), m_pixel_width(1), m_pixel_height(2)
+                {
+                    m_color_bg = render_reg->mapRGB(br_, bg_, bb_);
+                    m_color_fg = render_reg->mapRGB(r_, g_, b_);
+                    m_rows = 4;
+                    m_columns = 20;
+                    m_characterPixelsX = 8;
+                    m_characterPixelsY = 8;
+                }
+
+                ~CCharLCD(){}
+
+                void setLayout(uint32_t rows, uint32_t columns, uint32_t characterPixelsX, uint32_t characterPixelsY)
+                {
+                    m_rows = rows;
+                    m_columns = columns;
+                    m_characterPixelsX = characterPixelsX;
+                    m_characterPixelsY = characterPixelsY;
+                }
+
+                void reset(void)
+                {
+                }
+
+                void redraw()
+                {
+                    m_rr->fillRect(m_color_bg, m_x, m_y, m_xs, m_ys);
+                    m_rr->update(m_x, m_y, m_xs, m_ys);
+                }
+
+                void drawCharacter(TCharacterInfo *pChar)
+                {
+                    uint32_t i, j, mask;
+
+                    for (j = 0; j < m_characterPixelsY; j++)
+                    {
+                        uint8_t ch = pChar->pBitmap[j];
+                        for (i = 0, mask = 0x80; i < m_characterPixelsX; i++, mask >>= 1)
+                        {
+                            putPixel( 20 + pChar->posX * m_pixel_width  * m_characterPixelsX + m_pixel_width  * i
+                                    ,  4 + pChar->posY * m_pixel_height * m_characterPixelsY + m_pixel_height * j
+                                    , ch & mask ? m_color_fg : m_color_bg);
+                        }
+                    }
+
+                    m_rr->update(m_x, m_y, m_xs, m_ys);
+                }
+
+            private:
+                uint32_t m_color_bg, m_color_fg;
+                uint32_t m_pixel_width, m_pixel_height;
+                uint32_t m_rows, m_columns;
+                uint32_t m_characterPixelsX, m_characterPixelsY;
+
+                void putPixel(uint32_t xp,uint32_t yp, uint32_t color)
+                {
+                    m_rr->fillRect(color, m_x + xp, m_y + yp, m_pixel_width, m_pixel_height);
+                }
+        };
+
+        class Cled : public Cui {
+            public:
+                Cled(VisRenderRegion *render_reg, int x, int y, uint32_t num, uint32_t stat, VisBitmap *bmpOn, VisBitmap *bmpOff)
+                    : Cui(render_reg, x, y, 20, 20), led_num(num), led_stat(stat), m_led_on(bmpOn), m_led_off(bmpOff)
+                {
+                }
+
+                ~Cled() {}
+
+                void redraw(uint32_t st)
+                {
+                    led_stat = st;
+                    //m_rr->fillRect(m_rr->mapRGB(220,221,222), m_x, m_y, m_xs, m_ys);
+
+                    tmpx = m_x;
+
+                    for(uint32_t i=0; i<led_num; i++)
+                    {
+                        draw_led((led_stat & (1 << i)) != 0);
+                    }
+                    m_rr->update(m_x, m_y, m_xs, m_ys);
+                }
+
+            private:
+                uint32_t led_num; // how many leds there are?
+                uint32_t led_stat; // LED staus
+                uint32_t tmpx;
+                VisBitmap *m_led_on;
+                VisBitmap *m_led_off;
+
+                void draw_led(bool on_off)
+                {
+                    //                m_rr->fillRect(colour, tmpx, m_y, MPSVIS_LED_WIDTH, MPSVIS_LED_WIDTH);
+                    m_rr->renderBitmap(on_off ? m_led_on : m_led_off, tmpx, m_y);
+                    tmpx += MPSVIS_LED_WIDTH + 1;
+                }
+
+                uint32_t led_colour(bool on)
+                {
+                    if (on) 
+                    {
+                        return m_rr->mapRGB(176,  79, 51);
+                    }
+                    else 
+                    {
+                        return m_rr->mapRGB( 94, 152, 72);
+                    }
+                }
+        };
+
+        class Cdipswitch : public Cui {
+            public:
+                Cdipswitch(VisRenderRegion *render_reg, int x, int y, int width, int height,
+                        uint32_t num, uint32_t stat)
+                    : Cui(render_reg, x, y, width, height), dip_num(num), dip_stat(stat)
+                {
+                }
+
+                ~Cdipswitch() {};
+
+                void redraw(uint32_t st)
+                {
+                    dip_stat = st;
+
+                    // Black background
+                    m_rr->fillRect(m_rr->mapRGB(0, 0, 0), m_x, m_y, m_xs, m_ys);
+
+                    uint32_t col = m_rr->mapRGB(200, 200, 200);
+                    uint32_t tmpx = m_x;
+                    for (uint32_t i=0; i<dip_num; i++)
+                    {
+                        bool dip_on = ((dip_stat & (1 << i)) != 0 );
+                        uint32_t dipy = dip_on ? 0 : MPSVIS_DIP_WIDTH;
+                        m_rr->fillRect(col, tmpx, m_y + dipy, MPSVIS_DIP_WIDTH, MPSVIS_DIP_WIDTH);
+                        tmpx += MPSVIS_DIP_WIDTH + 1;
+                    }
+
+                    m_rr->update(m_x, m_y, m_xs, m_ys);
+                }
+
+            private:
+                uint32_t dip_num; // how many dips are there?
+                uint32_t dip_stat; // dipswitch status
+        };
+
+        class Cseparateline : public Cui {
+            public:
+                Cseparateline(VisRenderRegion *render_reg, int x, int y, int width, int height)
+                    : Cui(render_reg, x, y, width, height)
+                {
+                }
+
+                ~Cseparateline() {};
+
+                void redraw(void)
+                {
+                    // write line
+                    m_rr->fillRect(m_rr->mapRGB(0xff,0xff,0xff), m_x, m_y, m_xs, m_ys);
+                    m_rr->update(m_x, m_y, m_xs, m_ys);
+                }
+        };
+
+        class C7seg : public Cui {
+            public:
+                C7seg(VisRenderRegion *render_reg, int x, int y, uint32_t val)
+                    : Cui(render_reg, x, y, 0, 0), seg_stat(val)
+                {
+                    col[0] = m_rr->mapRGB(0, 0, 0);
+                    col[1] = m_rr->mapRGB(240, 0, 0);
+                    x0 = 0;
+                    x1 = x0 + MPSVIS_7SEG_X_THICKNESS;
+                    x2 = x1 + MPSVIS_7SEG_X_WIDTH;
+                    x3 = x2 + MPSVIS_7SEG_X_THICKNESS;
+                    x4 = x3 + MPSVIS_7SEG_X_THICKNESS;
+                    x5 = x4 + MPSVIS_7SEG_X_THICKNESS;
+
+                    y0 = 0;
+                    y1 = y0 + MPSVIS_7SEG_Y_THICKNESS;
+                    y2 = y1 + MPSVIS_7SEG_Y_WIDTH;
+                    y3 = y2 + MPSVIS_7SEG_Y_THICKNESS;
+                    y4 = y3 + MPSVIS_7SEG_Y_WIDTH;
+                    y5 = y4 + MPSVIS_7SEG_Y_THICKNESS;
+
+                    setWidth(x4 - x0);
+                    setHeight(y5 - y0);
+                }
+
+                ~C7seg() {}
+
+                void redraw(uint32_t st)
+                {
+                    seg_stat = st;
+                    uint32_t i;
+
+                    for (i = 0; i < 4; i++)
+                    {    
+                        drawDigit((seg_stat >> ((3-i) * 8)) & 255, m_x +(3-i) * x5, m_y);
+                    }
+                }
+
+            private:
+                uint32_t seg_stat;
+                uint32_t x0, x1, x2, x3, x4, x5, y0, y1, y2, y3, y4, y5;
+                uint32_t col[2];
+
+                void drawDigit(uint32_t n, uint32_t x_, uint32_t y_)
+                {
+                    myRect(col[(n &   1) ? 1 : 0], x_ + x1, y_ + y0, x_ + x2, y_ + y1); // A
+                    myRect(col[(n &   2) ? 1 : 0], x_ + x2, y_ + y1, x_ + x3, y_ + y2); // B
+                    myRect(col[(n &   4) ? 1 : 0], x_ + x2, y_ + y3, x_ + x3, y_ + y4); // C
+                    myRect(col[(n &   8) ? 1 : 0], x_ + x1, y_ + y4, x_ + x2, y_ + y5); // D
+                    myRect(col[(n &  16) ? 1 : 0], x_ + x0, y_ + y3, x_ + x1, y_ + y4); // E
+                    myRect(col[(n &  32) ? 1 : 0], x_ + x0, y_ + y1, x_ + x1, y_ + y2); // F
+                    myRect(col[(n &  64) ? 1 : 0], x_ + x1, y_ + y2, x_ + x2, y_ + y3); // G
+                    myRect(col[(n & 128) ? 1 : 0], x_ + x3, y_ + y4, x_ + x4, y_ + y5); // DP
+                    m_rr->update(x_ + x0, y_ + y0, x4, y5);
+                }
+
+                void myRect(uint32_t col_rgb, uint32_t ulx,uint32_t uly,uint32_t lrx,uint32_t lry)
+                {
+                    m_rr->fillRect(col_rgb, ulx, uly, lrx - ulx, lry - uly);
+                } 
+        };
+
+        // An instance of the Visualisation library.
+        Visualisation *vis;
+
+        // LCD display region.
+        VisRenderRegion *render_lcd;
+
+        // One display region for the panel
+        VisRenderRegion *render_panel;
+
+        // One display region for dips and 7 seg
+        VisRenderRegion *render_extras;
+
+        // Current configured size of the LCD.
+        unsigned int lcd_width;
+        unsigned int lcd_height;
+
+        // Maps keycode to a button
+        // unused - should be done in newer SDLVis 
+        // MxU32 key2button[KC_MAX+1];
+
+        // This is a bit dirty: workaround for tool bug where
+        // a C++ file can't be included in the project under Linux
+        // Normally, the following class definition would be in the include
+        // section, and the implementation would just be a part of the project
+
+        Clabel  *label_led_cpu[8];
+        Clabel  *label_led_dut[8];
+        Clabel  *label_FAN;
+        Clabel  *label_POWER;
+        Clabel  *label_CONFIG;
+        Clabel  *label_MPS; 
+        Clabel  *label_cpu;
+        Clabel  *label_dut;
+        Clabel  *label_dip_cpu;
+        Clabel  *label_dip_dut;
+        Clabel  *label_reset;
+        Clabel  *label_button1;
+        Clabel  *label_button2;
+        Clabel  *label_button3;
+        Clabel  *label_button4;
+        Cbutton *button[5];
+        Cbutton *button_sd;
+        Cbutton *button_sdwr;
+        Cled    *UIled_cpu; // User Switch LED
+        Cled    *UIled_dut; // User Switch LED
+        Cled    *UIled_fan_c;
+        Cled    *UIled_fan_d;
+        Cled    *UIled_power_00;
+        Cled    *UIled_power_01;
+        Cled    *UIled_power_10;
+        Cled    *UIled_power_11;
+        Cled    *UIled_fpga_1;
+        Cled    *UIled_fpga_2;
+        Cled    *UIled_fpga_3;
+        Cdipswitch *UIdip_cpu;
+        Cdipswitch *UIdip_dut;
+        Cseparateline *UIsl1; // White divider
+        Cseparateline *UIsl2; // White divider
+        Cseparateline *UIsl3; // White divider
+        C7seg *sevenSeg;
+
+        Cicount *UIcount1;  // Instruction count
+        Clabel  *UIlabel1; // Total count
+        Clabel  *label_TI; // Total Instr
+        Clabel  *label_TT; // Total time
+        Clabel  *label_IPS; // Instruction per Second
+        Clabel  *label_PI; // Perf Index
+        Clabel  *label_TON; //TORTOISE on
+        Clabel  *label_TOFF; // TORTOISE off
+        //Cbutton *UItb; // TORTOISE button
+
+        CCharLCD *charlcd;
+
+        // Current configured height of the panel area.
+        int panel_height;
+
+        // Current configured height of the panel area.
+        int extras_height;
+
+        // Cursor position, for rendering parts of the status area.
+        int sx, sy;
+
+        // Remember where we put the DIP switches so we can detect clicks on them.
+        int dip_x_cpu, dip_y_cpu, dip_w_cpu, dip_h_cpu;
+
+        // Remember where we put the DIP switches so we can detect clicks on them.
+        int dip_x_dut, dip_y_dut, dip_w_dut, dip_h_dut;
+
+        // Remember where we put total instruction and total time region so we can detect clicks on them
+        int instr_region_x, instr_region_y, instr_region_w, instr_region_h;
+        int rate_region_x, rate_region_y, rate_region_w, rate_region_h;
+
+        // True if the window layout needs to be reconfigured on the
+        // next screen redraw.
+        bool relayout_needed;
+
+        // status of the ctrl key
+        bool ctrl_key;
+
+        // toggle mouse
+        bool toggle_mouse;
+
+        bool    disp_totals;
+        bool    disp_delay;
+        bool    stopped;
+
+        uint32_t pressedButtons;
+
+        // Used by the performance calculation routines
+        // Outputs
+        uint64_t sim_ips;
+        float    sim_pidx;
+
+        // Intermediate values
+        uint32_t start_time;          // Aggr. sim time calculated on the fly
+        uint32_t last_time;
+        uint64_t last_ticks;
+        uint32_t perf_index_real_time_ms;     // accumulated real time elapsed between calculateStats() (in ms)
+        uint32_t perf_index_sim_time_ms;      // accumulated sim  time elapsed between calculateStats() (in ms)
+        uint32_t throttle_last_real_time_ms;  // last absolte real time timer::timer_callback_handler.signal() was called (for throttling, in ms)
+        // time in ms that simulator is ahead of real time (this is the budget we can sleep from)
+        // (this does the whole averaging magic and compensation for sleep() inaccuracies)
+        // (x<0 == sim time is x ms behind real time, x>0 sim time is x ms ahead of real time)
+        int throttle_budget;
+        int calculate_stats_phase;
+
+        struct Rect 
+        { 
+            int x, y, w, h; 
+        };
+
+        VisRasterLayout* fake_layout;  // fake area for pl11x when visualisation is disabled
+        VisBitmap *pOnBlue;
+        VisBitmap *pOn;
+        VisBitmap *pOff;
+        VisBitmap *pSD_inserted, *pSD_removed;
+        VisBitmap *pSD_wprot_on, *pSD_wprot_off;
+        VisBitmap *pBut[5];
+        VisBitmap *pButPressed[5];
+
+        PARAMETER { description("Trap key that works with left Ctrl to toggle mouse display."), type(uint32_t), default(74) }  trap_key; // 74 = KC_LALT = Left Alt (press Left Ctrl plus Left Alt to lock/unlock mouse)
+        PARAMETER { name("rate_limit-enable"), description("Rate limit simulation."), type(bool), default("true") } rate_limit_enable;
+        PARAMETER { name("disable-visualisation"), description("Enable/disable visualisation"), type(bool), default("false") } disable_visualisation;
+        PARAMETER { description("Window title (%cpu% is replaced by cpu_name)"), type(string), default("CLCD %cpu%") } window_title;
+        PARAMETER { description("Cpu name displayed in window title"), type(string), default("") } cpu_name;
+    }
+
+    composition
+    {
+        // Visualisation subcomponent responsible for generating real-time callbacks.
+        idler : GUIPoll(delay_ms = 20);
+
+        // Timer for perf calculation
+        timer : ClockTimer;
+    }
+
+    internal slave  port <TimerCallback> timer_callback_handler
+    {
+        // called every 20 simulated ms
+        behaviour signal() : uint32_t  
+        {
+            // get simulated time slice length in ms
+            int sim_ms_per_tick = 100; // 100ms
+            
+            // get real time slice length in ms
+            uint32_t ct = get_msTime();
+            int real_ms_per_tick = ct - throttle_last_real_time_ms;
+            throttle_last_real_time_ms = ct;
+            
+            // this is MPS specific
+            if (pressedButtons)
+            {
+                uint32_t dips = dut_switches_and_buttons.getValue();
+                for (int i = 0; i < 5; i++)
+                {
+                    if (pressedButtons & (1 << i))
+                    {
+                        if (button[i]->released(ct))
+                        {
+                            if ((i >= 1) && (i <=4)) // all buttons except reset
+                            {
+                                dips &= ~(1 << (i - 1 + 4));
+                                dut_switches_and_buttons.setValue(dips);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // update performance index nominator and denominator
+            perf_index_sim_time_ms += sim_ms_per_tick;
+            perf_index_real_time_ms += real_ms_per_tick;
+        
+            // do not sleep when throttling is disabled
+            uint32_t timer_ticks_per_callback = 5; // 100ms
+            if (!disp_delay)
+                return timer_ticks_per_callback;
+            
+            // limit real time passed to one second to avoid extreme cases
+            if (real_ms_per_tick > 1000)
+                real_ms_per_tick = 1000;
+                
+            // update time budget (the ms we have been too fast recently)
+            throttle_budget += sim_ms_per_tick;
+            throttle_budget -= real_ms_per_tick;
+            
+            // limit time budget to catch up for at most 1 second
+            // (we can catch up at most 1 second of simulation time during slow simulation speed by running faster than real time)
+            // (this gets rid of all short term performance drops while not allowing the simulation to catch up indedinitely)
+            if (throttle_budget < -1000)
+                throttle_budget = -1000;
+            
+            // limit time budget to at most 500ms of sleep
+            // (this would never occur if the OS sleep() is 100% accurate, but it isn't so this is an emergency exit: 
+            // never wait for more than one second no matter what we calculated above, in practice throttle_budget 
+            // will always be below 100 (ms))
+            if (throttle_budget > 500)
+                throttle_budget = 500;
+            
+            // if our time budget is positive: sleep, if it is negavtive or 0: continue as fast as possible
+            if (throttle_budget > 0)
+                pvis_sleep(throttle_budget);
+            
+            // call us back next clock tick (100ms == 10Hz simulated time)
+            return timer_ticks_per_callback;
+        }
+    }
+    slave port<ClockSignal> clock_50Hz;
+    slave port<CharacterLCD> char_lcd
+    {
+        behavior setLayoutInfo(uint32_t rows, uint32_t columns, uint32_t characterPixelsX, uint32_t characterPixelsY)
+        {
+            if (!disable_visualisation)
+            {
+                charlcd->setLayout(rows, columns, characterPixelsX, characterPixelsY);
+            }
+        };
+
+        behavior draw(TCharacterInfo *pCharInfo)
+        {
+            if (!disable_visualisation)
+            {
+                charlcd->drawCharacter(pCharInfo);
+            }
+        };
+
+    }
+
+    master port<MouseStatus> touch_screen;
+
+    master port<LCDLayoutInfo> lcd_layout;
+
+    // called every 20ms by GUIPoll
+    behavior calculateStats(bool force)
+    {
+        // every 100ms
+        calculate_stats_phase++;
+        if ((calculate_stats_phase < 5) && (!force))
+            return;
+        calculate_stats_phase = 0;
+
+        // update leds more often than the rest
+        draw_leds();
+        
+        uint32_t ct = get_msTime(); // don't rely on polled time
+        uint32_t elapsed_time_ms = ct - last_time;
+        
+        // update stats at most every 500ms
+        if ((elapsed_time_ms < 500) && (!force))
+            return;
+        
+        uint64_t ic = ticks.getValue();
+        
+        // only update IPS when time has passed - to avoid divide by zero:
+        if (elapsed_time_ms)
+        {
+            // calculate ips here to get a decent sample period
+            sim_ips = (ic - last_ticks);
+            sim_ips = (((uint64_t)1000) * sim_ips) / elapsed_time_ms;
+        }
+
+        // calculate performance index (1.0 == real time, < 1.0 == sim is running too slow, > 1.0 sim is running too fast)
+        if (perf_index_real_time_ms)
+            sim_pidx  = float(perf_index_sim_time_ms) / perf_index_real_time_ms;
+        perf_index_sim_time_ms = 0;
+        perf_index_real_time_ms = 0;
+        
+        if (last_ticks == ic) {
+            start_time += elapsed_time_ms;
+            sim_pidx = 0.0;
+        }
+
+        last_ticks = ic;
+        last_time  = ct;
+
+        draw_status(ct, ic);
+    }
+
+
+    connection
+    {
+        idler.gui_callback => self.gui_callback;
+
+        self.clock_50Hz => timer.clk_in;
+        timer.timer_callback => self.timer_callback_handler;
+    }
+
+    // Handle real-time callback events from the GUIPoll subcomponent.
+    internal slave port<GUIPollCallback> gui_callback
+    {
+        behavior gui_callback()
+        {
+            if (disable_visualisation)
+                return;
+            processMessages();
+            calculateStats(false);
+        }
+    }
+
+
+    // Implement the PL110 FrameBuffer protocol for each display.
+    slave port<LCD> lcd
+    {
+        behavior lock() : const VisRasterLayout * 
+        {
+            if (disable_visualisation)
+                return fake_layout;
+            return render_lcd->lock();
+        }
+        behavior unlock()
+        {
+            if (disable_visualisation)
+                return;
+            return render_lcd->unlock();
+        }
+        behavior update(int x, int y, unsigned int w, unsigned int h)
+        {
+            if (disable_visualisation)
+                return;
+            lcd_layout.setLayoutInfo(x, y, w, h); // Send LCD layout info to touch screen
+            return render_lcd->update(x, y, w, h);
+        }
+        behavior setPreferredLayout(unsigned int w, unsigned int h, unsigned int d)
+        {
+            if (disable_visualisation)
+                return;
+            // Ignore requested depth - request 24-bits.
+            (void)d;
+            resize_lcd(w, h);
+        }
+    }
+
+    slave port<InstructionCount> ticks;
+
+    slave port<ValueState>       cpu_leds;
+    slave port<ValueState>       dut_leds;
+    slave port<ValueState>       cpu_switches;
+    slave port<ValueState>       dut_switches_and_buttons;
+
+    slave port<ValueState>       dut_led_7seg;
+
+    slave port<ValueState>       percfg;
+    behavior checkConnections()
+    {
+        if (!cpu_leds.getValue.implemented())
+        {
+            message(MSG_ERROR, "MPSVisualisation: cpu_leds needs to be connected"
+                    " and getValue() needs to be implemented.\n");
+        }
+        if (!dut_leds.getValue.implemented())
+        {
+            message(MSG_ERROR, "MPSVisualisation: dut_leds needs to be connected"
+                    " and getValue() needs to be implemented.\n");
+        }
+        if (!dut_led_7seg.getValue.implemented())
+        {
+            message(MSG_ERROR, "MPSVisualisation: dut_led_7seg needs to be connected"
+                    " and getValue() needs to be implemented.\n");
+        }
+        if (!ticks.getValue.implemented())
+        {
+            message(MSG_ERROR, "MPSVisualisation: ticks needs to be connected"
+                    " and getValue() needs to be implemented.\n");
+        }
+        if (!cpu_switches.getValue.implemented()) {
+            message(MSG_ERROR, "MPSVisualisation: cpu_switches needs to be connected"
+                    " and getValue() needs to be implemented.\n");
+        }
+        if (!cpu_switches.setValue.implemented())
+        {
+            message(MSG_ERROR, "MPSVisualisation: cpu_switches needs to be connected"
+                    " and setValue() needs to be implemented.\n");
+        }
+        if (!dut_switches_and_buttons.getValue.implemented())
+        {
+            message(MSG_ERROR, "MPSVisualisation: dut_switches_and_buttons needs to be connected"
+                    " and getValue() needs to be implemented.\n");
+        }
+        if (!dut_switches_and_buttons.setValue.implemented())
+        {
+            message(MSG_ERROR, "MPSVisualisation: dut_switches_and_buttons needs to be connected"
+                    " and setValue() needs to be implemented.\n");
+        }
+        if (!percfg.getValue.implemented())
+        {
+            message(MSG_ERROR, "MPSVisualisation: percfg needs to be connected"
+                    " and getValue() needs to be implemented.\n");
+        }
+        if (!percfg.setValue.implemented())
+        {
+            message(MSG_ERROR, "MPSVisualisation: percfg needs to be connected"
+                    " and setValue() needs to be implemented.\n");
+        }
+    }
+
+    behavior init()
+    {
+        composition.init(); // Pass the call down to subcomponents.
+
+        if (disable_visualisation)
+        {
+            fake_layout = new VisRasterLayout();
+            return;
+        }
+
+        checkConnections();
+        ctrl_key = false;
+        toggle_mouse = false;
+        start_time     = get_msTime();
+        last_time      = start_time;
+        last_ticks     = ticks.getValue();
+        perf_index_real_time_ms = 0;
+        perf_index_sim_time_ms = 0;
+        throttle_last_real_time_ms = start_time;
+        throttle_budget = 0;
+        calculate_stats_phase = 0;
+
+        sim_pidx = 0.0;
+        sim_ips  = 0;
+
+        disp_delay  = rate_limit_enable;
+        disp_totals = true;
+        stopped     = false;
+        pressedButtons = 0;
+
+        lcd_width = 320;
+        lcd_height = 240;
+        init_gui();
+    }
+
+    behavior init_gui()
+    {
+        // Initialise the visualisation library and the display window.
+        vis = createVisualisation(cpu_name.c_str(), window_title.c_str());
+
+        VisBitmap *background_bmp = smartLoadImage("panel.bmp");
+        vis->setBackground(background_bmp, 0, 0);
+        vis->releaseImage(background_bmp);
+        // Create display regions for the LCD panel.
+        render_lcd = vis->createRenderRegion();
+        render_panel = vis->createRenderRegion();
+        render_extras = vis->createRenderRegion();
+        resize_lcd(MPSVIS_LINE_WIDTH, MPSVIS_PANEL_HEIGHT + MPSVIS_EXTRAS_HEIGHT);
+        reconfigureWindow();
+        render_lcd->setVisible(true);
+        render_panel->setVisible(true);
+        render_extras->setVisible(true);
+        init_status();
+        draw_all();
+    }
+
+    behaviour smartLoadImage(const char *pFileName) :VisBitmap* 
+    {
+        VisBitmap* pRet;
+        char tmp[4096];
+
+        pRet = vis->loadImage(pFileName);
+        if (!pRet)
+        {
+            sprintf(tmp, "../%s", pFileName);
+            pRet = vis->loadImage(tmp);
+        }
+        if (!pRet)
+        {
+            sprintf(tmp, "../../%s", pFileName);
+            pRet = vis->loadImage(tmp);
+        }
+        if (!pRet)
+        {
+            sprintf(tmp, "./LISA/%s", pFileName);
+            pRet = vis->loadImage(tmp);
+        }
+        if (!pRet)
+        {
+            sprintf(tmp, "../LISA/%s", pFileName);
+            pRet = vis->loadImage(tmp);
+        }
+        if (!pRet)
+        {
+            sprintf(tmp, "../../LISA/%s", pFileName);
+            pRet = vis->loadImage(tmp);
+        }
+
+        return pRet;
+    }
+
+    behavior init_status()
+    {
+        charlcd = new CCharLCD(render_panel, 29, 29, 200, 40,   0,  0, 255, 255, 255, 255);
+
+        pOnBlue = smartLoadImage("led_on_blue.bmp");
+        pOn  = smartLoadImage("led_on.bmp");
+        pOff = smartLoadImage("led_off.bmp");
+
+        pSD_inserted = smartLoadImage("sd_inserted.bmp");
+        pSD_removed = smartLoadImage("sd_removed.bmp");
+        pSD_wprot_on  = smartLoadImage("sdwriteprot_on.bmp");
+        pSD_wprot_off = smartLoadImage("sdwriteprot_off.bmp");
+        pBut[0] = smartLoadImage("button0.bmp");
+        pBut[1] = smartLoadImage("button1.bmp");
+        pBut[2] = smartLoadImage("button2.bmp");
+        pBut[3] = smartLoadImage("button3.bmp");
+        pBut[4] = smartLoadImage("button4.bmp");
+        pButPressed[0] = smartLoadImage("button0_pushed.bmp");
+        pButPressed[1] = smartLoadImage("button1_pushed.bmp");
+        pButPressed[2] = smartLoadImage("button2_pushed.bmp");
+        pButPressed[3] = smartLoadImage("button3_pushed.bmp");
+        pButPressed[4] = smartLoadImage("button4_pushed.bmp");
+
+        UIled_cpu = new Cled(render_panel, 283, 85, 8, cpu_leds.getValue(), pOn, pOff);
+        UIled_dut = new Cled(render_panel, 386, 85, 8, dut_leds.getValue(), pOn, pOff);
+
+        UIled_fan_c = new Cled(render_panel, 489, 84, 1, 1, pOn, pOff);
+        UIled_fan_d = new Cled(render_panel, 506, 84, 1, 1, pOn, pOff);
+
+        UIled_power_00 = new Cled(render_panel, 530,  84, 1, 1, pOn, pOff);
+        UIled_power_01 = new Cled(render_panel, 547,  84, 1, 1, pOn, pOff);
+        UIled_power_10 = new Cled(render_panel, 530, 104, 1, 1, pOn, pOff);
+        UIled_power_11 = new Cled(render_panel, 547, 104, 1, 1, pOn, pOff);
+
+        UIled_fpga_1 = new Cled(render_panel, 573, 84, 1, 1, pOnBlue, pOff);
+        UIled_fpga_2 = new Cled(render_panel, 590, 84, 1, 1, pOnBlue, pOff);
+        UIled_fpga_3 = new Cled(render_panel, 606, 84, 1, 1, pOnBlue, pOff);
+        button[0] = new Cbutton(render_panel, (1 << 0),  24, 100, MPSVIS_BUTTON_WIDTH, MPSVIS_BUTTON_WIDTH, pBut[0], pButPressed[0], &pressedButtons, AUTO_RELASE_BUTTON); // reset button
+        button[1] = new Cbutton(render_panel, (1 << 1),  74, 100, MPSVIS_BUTTON_WIDTH, MPSVIS_BUTTON_WIDTH, pBut[1], pButPressed[1], &pressedButtons, AUTO_RELASE_BUTTON);
+        button[2] = new Cbutton(render_panel, (1 << 2), 103,  99, MPSVIS_BUTTON_WIDTH, MPSVIS_BUTTON_WIDTH, pBut[2], pButPressed[2], &pressedButtons, AUTO_RELASE_BUTTON);
+        button[3] = new Cbutton(render_panel, (1 << 3), 133,  99, MPSVIS_BUTTON_WIDTH, MPSVIS_BUTTON_WIDTH, pBut[3], pButPressed[3], &pressedButtons, AUTO_RELASE_BUTTON);
+        button[4] = new Cbutton(render_panel, (1 << 4), 164,  99, MPSVIS_BUTTON_WIDTH, MPSVIS_BUTTON_WIDTH, pBut[4], pButPressed[4], &pressedButtons, AUTO_RELASE_BUTTON);
+
+
+        button_sd   = new Cbutton(render_extras, (1 << 5), 180,  15, 26, 34, pSD_removed, pSD_inserted, &pressedButtons, NO_AUTO_RELASE_BUTTON);
+        button_sdwr = new Cbutton(render_extras, (1 << 5), 180,  23,  6,  12, pSD_wprot_off, pSD_wprot_on, &pressedButtons, NO_AUTO_RELASE_BUTTON);
+
+        UIsl1 = new Cseparateline(render_extras, 0, 0, MPSVIS_LINE_WIDTH, 1);
+
+        label_dip_cpu  = new Clabel(render_extras, "DIP CPU", 230, 40, 0, 0, 0);
+        dip_x_cpu = 230;
+        dip_y_cpu =  20;
+        dip_w_cpu = MPSVIS_DIP_WIDTH*8+9;
+        dip_h_cpu = MPSVIS_DIP_WIDTH*2;
+
+        UIdip_cpu = new Cdipswitch(render_extras, dip_x_cpu, dip_y_cpu, dip_w_cpu, dip_h_cpu, 8, cpu_switches.getValue());
+
+        label_dip_dut  = new Clabel(render_extras, "DIP DUT", 320, 40, 0, 0, 0);
+        dip_x_dut = 320;
+        dip_y_dut =  20;
+        dip_w_dut = MPSVIS_DIP_WIDTH*8+9;
+        dip_h_dut = MPSVIS_DIP_WIDTH*2;
+
+        UIdip_dut = new Cdipswitch(render_extras, dip_x_dut, dip_y_dut, dip_w_dut, dip_h_dut, 4, dut_switches_and_buttons.getValue());
+
+        sevenSeg = new C7seg(render_extras, 20, 13, 0); 
+
+        int textx = 400;
+        UIsl3 = new Cseparateline(render_extras, textx, 0, 1, extras_height);
+
+        instr_region_x = textx + MPSVIS_FONT_WIDTH;
+        instr_region_y = 3 + 0 * MPSVIS_FONT_WIDTH;
+        instr_region_w = MPSVIS_LINE_WIDTH - instr_region_x;
+        instr_region_h = 3 + 2 * MPSVIS_FONT_WIDTH;
+
+
+
+        label_TI  = new Clabel(render_extras, "Total Instr:", textx + MPSVIS_FONT_WIDTH * 1, 3 + 0 * MPSVIS_FONT_WIDTH, 1, 1, 1);
+        label_TT  = new Clabel(render_extras, "Total Time :", textx + MPSVIS_FONT_WIDTH * 1, 3 + 2 * MPSVIS_FONT_WIDTH, 1, 1, 1);
+        label_IPS = new Clabel(render_extras, "Instr / sec:", textx + MPSVIS_FONT_WIDTH * 1, 3 + 0 * MPSVIS_FONT_WIDTH, 1, 1, 1);
+        label_PI  = new Clabel(render_extras, "Perf Index :", textx + MPSVIS_FONT_WIDTH * 1, 3 + 2 * MPSVIS_FONT_WIDTH, 1, 1, 1);
+
+        UIcount1 = new Cicount(render_extras    , textx + MPSVIS_FONT_WIDTH*(12+1), 3 + 0 * MPSVIS_FONT_WIDTH, MPSVIS_FONT_WIDTH * 15, 2 * MPSVIS_FONT_WIDTH);
+        UIcount1->setLeftJustify();
+        UIlabel1 = new Clabel(render_extras, 256, textx + MPSVIS_FONT_WIDTH*(12+1), 3 + 2 * MPSVIS_FONT_WIDTH, MPSVIS_FONT_WIDTH * 15, 2 * MPSVIS_FONT_WIDTH);
+        UIlabel1->setLeftJustify();
+        UIlabel1->setBGColor(0, 0, 0);
+
+        // Rate Limiting
+        rate_region_x = textx + MPSVIS_FONT_WIDTH;
+        rate_region_y = 2 + 5 * MPSVIS_FONT_WIDTH;
+        rate_region_w = MPSVIS_FONT_WIDTH * 15;
+        rate_region_h = 3 + MPSVIS_FONT_WIDTH;
+        label_TON  = new Clabel(render_extras, "Rate Limit ON ", textx + MPSVIS_FONT_WIDTH * 1, 2 + 5 * MPSVIS_FONT_WIDTH, 0, 0, 0);
+        label_TOFF = new Clabel(render_extras, "Rate Limit OFF", textx + MPSVIS_FONT_WIDTH * 1, 2 + 5 * MPSVIS_FONT_WIDTH, 0, 0, 0);
+
+        UIsl2 = new Cseparateline(render_extras, 0, extras_height - 1, MPSVIS_LINE_WIDTH, 1);
+    }
+
+
+    behavior draw_status(uint32_t msTime, uint64_t ticks)
+    {
+        char buf[30];
+
+        if (disp_totals)
+        {
+            UIcount1->redraw(ticks);
+            UIlabel1->setLabel(ms2str(buf, msTime - start_time));
+        }
+        else
+        {
+            UIcount1->redraw(sim_ips);
+            sprintf(buf,"%01.2f",sim_pidx);
+            UIlabel1->setLabel(buf);
+        }
+        draw_switches();
+        draw_7seg();
+        draw_sdcard();
+    }
+
+    behavior draw_7seg(void)
+    {
+        sevenSeg->redraw(dut_led_7seg.getValue());
+    }
+
+    behavior draw_buttons(void)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            button[i]->redraw();
+        }
+        uint32_t sys_percfg = percfg.getValue() ;
+        button_sd->setState((sys_percfg & 1) != 0);
+        button_sdwr->setState((sys_percfg & 2) != 0);
+    }
+    
+    behavior draw_sdcard()
+    {
+        button_sd->redraw();
+        button_sdwr->redraw();
+    }
+
+    behavior draw_leds(void)
+    {
+        UIled_cpu->redraw(cpu_leds.getValue());
+        UIled_dut->redraw(dut_leds.getValue());
+        UIled_fan_c->redraw(0);
+        UIled_fan_d->redraw(0);
+        UIled_power_00->redraw(1);
+        UIled_power_01->redraw(1);
+        UIled_power_10->redraw(1);
+        UIled_power_11->redraw(1);
+        UIled_fpga_1->redraw(1);
+        UIled_fpga_2->redraw(1);
+        UIled_fpga_3->redraw(1);
+    }
+
+    behavior draw_charlcd(void)
+    {
+        charlcd->redraw();
+    }
+
+    behavior draw_divider(void)
+    {
+        UIsl1->redraw();
+        UIsl2->redraw();
+        UIsl3->redraw();
+    }
+
+    behavior draw_labels(void)
+    {
+        label_dip_cpu->redraw();
+        label_dip_dut->redraw();
+
+        if (disp_totals)
+        {
+            label_TT->redraw();
+            label_TI->redraw();
+        }
+        else
+        {
+            label_PI->redraw();
+            label_IPS->redraw();
+        }
+
+        if (disp_delay)
+        {
+            label_TON->redraw();
+        }
+        else
+        {
+            label_TOFF->redraw();
+        }
+    }
+        
+    behaviour draw_all()
+    {
+        draw_labels();
+        draw_leds();
+        draw_switches();
+        draw_7seg();
+        draw_charlcd();
+
+        draw_buttons();
+        draw_divider();
+
+        draw_status(get_msTime(), ticks.getValue());
+    }
+
+    behavior draw_switches(void)
+    {
+        UIdip_cpu->redraw(cpu_switches.getValue());
+        UIdip_dut->redraw(dut_switches_and_buttons.getValue()); 
+    }
+
+    behavior reset(int level)
+    {
+        if (disable_visualisation)
+            return;
+        composition.reset(level);
+
+        timer.timer_control.cancel();
+        timer.timer_control.set(1);
+
+        start_time     = get_msTime();
+        last_time      = start_time;
+        last_ticks     = ticks.getValue();
+        perf_index_real_time_ms = 0;
+        perf_index_sim_time_ms = 0;
+        throttle_last_real_time_ms = start_time;
+        throttle_budget = 0;
+        calculate_stats_phase = 0;
+
+        sim_pidx = 0.0;
+        sim_ips  = 0;       
+
+        for (int i = 0; i < 5; i++)
+        {
+            button[i]->reset();
+        }
+        pressedButtons = 0;
+        draw_all();
+    }
+
+    behavior delete_gui_elements
+    {
+        if (disable_visualisation)
+            return;
+        delete label_dip_cpu;
+        delete label_dip_dut;
+        vis->releaseImage(pSD_inserted);
+        vis->releaseImage(pSD_removed);
+        vis->releaseImage(pSD_wprot_on);
+        vis->releaseImage(pSD_wprot_off);
+        vis->releaseImage(pBut[0]);
+        vis->releaseImage(pBut[1]);
+        vis->releaseImage(pBut[2]);
+        vis->releaseImage(pBut[3]);
+        vis->releaseImage(pBut[4]);
+        vis->releaseImage(pButPressed[0]);
+        vis->releaseImage(pButPressed[1]);
+        vis->releaseImage(pButPressed[2]);
+        vis->releaseImage(pButPressed[3]);
+        vis->releaseImage(pButPressed[4]);
+        delete UIdip_cpu;
+        delete UIdip_dut;
+        delete UIled_cpu;
+        delete UIled_dut;
+        delete UIled_fan_c;
+        delete UIled_fan_d;
+        delete UIled_power_00;
+        delete UIled_power_01;
+        delete UIled_power_10;
+        delete UIled_power_11;
+        delete UIled_fpga_1;
+        delete UIled_fpga_2;
+        delete UIled_fpga_3;
+        delete sevenSeg;
+
+        for (int i = 0; i < 5; i++)
+        {
+            delete button[i];
+        }
+        delete button_sdwr;
+        delete button_sd;
+
+        delete label_TI;
+        delete label_IPS;
+        delete label_TT;
+        delete label_PI;
+        delete UIcount1;
+        delete UIlabel1;
+        delete label_TON;
+        delete label_TOFF;
+        delete UIsl1;
+        delete UIsl2;
+        delete UIsl3;
+        delete charlcd;
+
+        delete render_panel;
+        delete render_extras;
+        delete render_lcd;
+
+        delete vis;
+    }
+
+    behavior terminate()
+    {
+        delete_gui_elements();
+        if (disable_visualisation)
+            delete fake_layout;
+        // Explicitly invoke subcomponent's terminate() behavior.
+        composition.terminate();
+    }
+
+    behavior get_msTime(void) : uint32_t 
+    {
+#ifdef WIN32
+        return (GetTickCount());
+#else
+        struct timeval tv;
+        if (gettimeofday(&tv, NULL) != 0) {
+            return 0;
+        }
+        return (tv.tv_sec*1000)+(tv.tv_usec/1000);      
+#endif
+    }
+
+    behavior toggleMouse(void)
+    {
+        toggle_mouse = !toggle_mouse;
+        toggle_mouse?vis->lockMouse(render_lcd):vis->unlockMouse();
+    }
+
+    // Helper functions for processMessages
+    // There is no keyboard on an MPS so all we have to do
+    // is handle the mouse-capture toggle.
+    behavior handleKeyDown(ATKeyCode key)
+    {
+        if ( key == KC_LCONTROL )
+            ctrl_key = true;
+
+        if ( key == (ATKeyCode)trap_key )
+            if (ctrl_key)
+                toggleMouse();
+    }
+
+    behavior handleKeyUp(ATKeyCode key)
+    {
+        if ( key == KC_LCONTROL )
+            ctrl_key = false;
+    }
+
+    // Process the GUI message loop
+    behavior processMessages()
+    {
+        VisEvent event;
+
+        if (relayout_needed)
+         {
+            reconfigureWindow();
+            draw_all();
+        }
+
+        while (vis->poll(&event))
+        {
+            switch(event.type)
+            {
+                case VisEvent::KEYDOWN: 
+                    handleKeyDown((ATKeyCode)event.keysym);
+                    break;
+
+                case VisEvent::KEYUP: 
+                    handleKeyUp((ATKeyCode)event.keysym);
+                    break;
+
+                case VisEvent::MOUSEBUTTONDOWN: 
+                if (event.region == render_extras) 
+                    {
+                        if ( event.abs_x >= dip_x_cpu && 
+                                event.abs_x < dip_x_cpu + dip_w_cpu && 
+                                event.abs_y >= dip_y_cpu && 
+                                event.abs_y < dip_y_cpu + dip_h_cpu)
+                        {
+                            int bitpos = (event.abs_x - dip_x_cpu) / (MPSVIS_DIP_WIDTH+1);
+                            bool is_set = ((event.abs_y - dip_y_cpu) < MPSVIS_DIP_WIDTH);
+                            uint32_t dips = cpu_switches.getValue();
+                            if (is_set)
+                            {
+                                dips |= (1 << bitpos);
+                            }
+                            else {
+                                dips &= ~(1 << bitpos);
+                            }
+
+                            cpu_switches.setValue(dips);
+                            draw_switches();
+                        }
+                        else if ( event.abs_x >= dip_x_dut && 
+                                event.abs_x < dip_x_dut + dip_w_dut && 
+                                event.abs_y >= dip_y_dut && 
+                                event.abs_y < dip_y_dut + dip_h_dut)
+                        {
+                            int bitpos = (event.abs_x - dip_x_dut) / (MPSVIS_DIP_WIDTH+1);
+                            bool is_set = ((event.abs_y - dip_y_dut) < MPSVIS_DIP_WIDTH);
+                            uint32_t dips = dut_switches_and_buttons.getValue();
+
+                            if (is_set) 
+                            {
+                                dips |= (1 << bitpos);
+                            }
+                            else 
+                            {
+                                dips &= ~(1 << bitpos);
+                            }
+
+                            dut_switches_and_buttons.setValue(dips);
+                            draw_switches();
+                        }
+
+                        if (event.abs_x >= rate_region_x &&
+                                event.abs_x < rate_region_x + rate_region_w &&
+                                event.abs_y >= rate_region_y &&
+                                event.abs_y < rate_region_y + rate_region_h)
+                        {
+                            disp_delay = !disp_delay;
+                            if (disp_delay)
+                            {
+                                // reset throttling mechanism
+                                throttle_last_real_time_ms = get_msTime();
+                                throttle_budget = 0;
+                            }
+                            draw_buttons();
+                            draw_labels();
+                        }
+                        else if (event.abs_x >= instr_region_x &&
+                                event.abs_x < instr_region_x + instr_region_w &&
+                                event.abs_y >= instr_region_y &&
+                                event.abs_y < instr_region_y + instr_region_h)
+                        {
+                            disp_totals = !disp_totals;
+                            draw_labels();
+                            calculateStats(true);
+                        }
+                        if (button_sdwr->clicked(event.abs_x, event.abs_y, 0))
+                        {
+                            uint32_t sys_percfg = percfg.getValue() ;
+                            uint32_t wprot = sys_percfg & 2;
+                            if (wprot)
+                            {
+                                // turning write protection off
+                                sys_percfg &= ~2; 
+                            }
+                            else
+                            {
+                                // turning write protection on
+                                sys_percfg |= 2;
+                            }
+
+                            percfg.setValue(sys_percfg);
+                            button_sdwr->setState((sys_percfg & 2) != 0);
+                            draw_buttons();
+                        }
+                        else if (button_sd->clicked(event.abs_x, event.abs_y, 0))
+                        {
+                            uint32_t sys_percfg = percfg.getValue() ;
+                            uint32_t cardin = sys_percfg & 1;
+                            if (cardin)
+                            {
+                                // card removed
+                                sys_percfg &= ~1;  
+                            }
+                            else
+                            {
+                                sys_percfg |= 1;
+                            }
+
+                            percfg.setValue(sys_percfg);
+                            button_sd->setState((sys_percfg & 1) != 0);
+                            draw_buttons();
+                        }
+                    }
+                    else if (event.region == render_panel) 
+                    {
+                        uint32_t ct = get_msTime();
+                        for (int i = 0; i < 5; i++)
+                        {
+                            if (button[i]->clicked(event.abs_x, event.abs_y, ct))
+                            {
+
+                                if ((i >= 1) && (i <=4)) // all buttons except reset
+                                {
+                                    uint32_t dips = dut_switches_and_buttons.getValue();
+                                    dips |= 1 << (i -1 + 4);
+                                    dut_switches_and_buttons.setValue(dips);
+                                }
+                                draw_buttons();
+                            }
+                        }
+                    }
+                    else if (event.region == render_lcd) 
+                    {
+                        if (touch_screen.mouseButton.implemented()) {
+                            touch_screen.mouseButton(event.button, true);
+                        }
+                        if (touch_screen.mouseMove.implemented())
+                        {
+                            touch_screen.mouseMove(event.abs_x,event.abs_y);
+                        }
+                    }
+                    break;
+                case VisEvent::MOUSEBUTTONUP:
+                    if (event.region == render_lcd) {
+                        if (touch_screen.mouseButton.implemented())
+                            touch_screen.mouseButton(event.button, false);
+                    }
+                    break;
+                case VisEvent::MOUSEMOTION:
+                    if (event.region == render_lcd) {
+                        if (touch_screen.mouseMove.implemented())
+                        {
+                            touch_screen.mouseMove(event.abs_x,event.abs_y); 
+                        }
+                    }
+                    break;
+                case VisEvent::QUIT: 
+                    // When the user clicks on close, this
+                    // will quit the simulation if it's running 
+                    // headless, but just stop it if a debugger
+                    // is connected.
+                    if(!control_port.quit.empty())
+                        control_port.quit();
+                    break;
+                case VisEvent::None: break;
+            }
+        }
+    }
+
+    // LCD controller timing parameters have changed: attempt to adjust
+    // display size to match.
+    behavior resize_lcd(unsigned int w, unsigned int h)
+    {
+        if (w == lcd_width && h == lcd_height) {
+            return;
+        }
+        panel_height = MPSVIS_PANEL_HEIGHT;
+        extras_height = MPSVIS_EXTRAS_HEIGHT;
+        lcd_width = w;
+        lcd_height = h;
+        relayout_needed = true;
+    }
+
+    behavior reconfigureWindow()
+    {
+        relayout_needed = false;
+        vis->configureWindow(lcd_width, lcd_height + panel_height, 24);
+        render_panel->setLocation (0,             0, lcd_width, panel_height );
+        render_extras->setLocation(0,  panel_height, lcd_width, extras_height);
+        render_lcd->setLocation   (0, panel_height + extras_height, lcd_width, lcd_height   );
+    }
+
+    behavior ms2str(char *buf, uint32_t ms) : char *
+    {
+        int s, m, h, d;
+        s= ms/1000;
+        d = s/(60*60*24);
+        s = s-(d*60*60*24);
+        h = s/(60*60);
+        s = s-(h*60*60);
+        m = s/60;
+        s = s-(m*60);
+        if (d) {
+            sprintf(buf, "%dd, %d:%d:%d",d,h,m,s);
+        } else if (h){
+            sprintf(buf, "%2d:%02d:%02d",h,m,s);
+        }  else if (m) {
+            sprintf(buf, "%dm %02ds",m,s);
+        }  else {
+            sprintf(buf, "%ds",s);
+        }
+        return(buf);
+    } 
+}

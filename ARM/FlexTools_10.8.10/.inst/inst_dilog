@@ -1,0 +1,226 @@
+install "2013-07-16T00:12:40" {
+  inst_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10";
+  inst_package_name = "Flex Licensing Tools";
+  installer_version = "2.2.025";
+
+  input {
+globals {
+  EnableUnInstall = "1";
+  Personality = "AFM";
+  ProductName = "Fast Models";
+  QueryLicenseFileLocation = "1";
+  UnixDefaultBasePath = "${HOME}/ARM/";
+  UnixPostInstallCommand = "./global_post_install.sh 1 1  \"/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1\" \"/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1\"";
+  Win32DefaultBasePath = "ARM\\";
+}
+
+package "Fast Model Tools"
+{
+  Afc = "SystemGenerator.afc";
+  DefaultSelection = "1";
+  Dir = "FastModelsTools_8.1";
+  Info = "Fast Model Tools: This package contains System Generator 8.1.032, System Canvas 8.1.032 and Model Debugger 8.1.022";
+  UnixPostInstallCommand = "./post_install_scripts.sh \"/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1\" \"/home/sxcheng/Workspace/kvm/license.dat\"";
+  ui_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1";
+  executable {
+    Win32Arguments = "";
+    Win32DesktopShortCut = "1";
+    Win32MenuShortCut = "1";
+    Win32Path = "bin\\SGCanvas.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32SetVistaWinXPSP2Flag = "1";
+    Win32ShortCutName = "System Canvas";
+  }
+  executable {
+    Win32Arguments = "";
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "0";
+    Win32Path = "bin\\SimGen.exe";
+    Win32SetVistaWinXPSP2Flag = "1";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32IconId = "ext";
+    Win32MenuShortCut = "1";
+    Win32Path = "doc\\FastModelsTools_ReleaseNotes_8.1.txt";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "Release Notes for Fast Models Tools";
+  }
+  executable {
+    Win32Arguments = "--reloc --uiinf \"/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1/.inst/inst_dilog\"";
+    Win32DesktopShortCut = "0";
+    Win32IconId = "1";
+    Win32MenuShortCut = "1";
+    Win32Path = ".inst\\setup.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "Uninstall Fast Models Tools";
+  }
+  envvar {
+    Win32Name = "MAXCORE_HOME";
+    Win32Value = "/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1";
+  }
+
+
+inner_package "Model Shell"
+{
+  Afc = "ModelShell.afc";
+  Dir = "";
+  UnixPostInstallCommand = "";
+  ui_inner_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1/";
+  executable {
+    Win32Path = "bin\\model_shell.exe";
+    Win32SetVistaWinXPSP2Flag = "1";
+  }
+
+}
+
+inner_package "Model Debugger"
+{
+  Afc = "ModelDebugger.afc";
+  Dir = "";
+  UnixPostInstallCommand = "";
+  ui_inner_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1/";
+  executable {
+    Win32DesktopShortCut = "1";
+    Win32MenuShortCut = "1";
+    Win32Path = "bin\\ModelDebugger.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32SetVistaWinXPSP2Flag = "1";
+    Win32ShortCutName = "Model Debugger";
+  }
+  envvar {
+    Win32Name = "MAXVIEW_HOME";
+    Win32Value = "/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1/";
+  }
+
+}
+}
+
+package "Fast Model Portfolio"
+{
+  Afc = "model_library.afc";
+  AllowDirEdit = "1";
+  DefaultSelection = "1";
+  Dir = "FastModelsPortfolio_8.1";
+  Info = "Fast Model Portfolio: This package contains the Fast Model Portfolio 8.1.037";
+  UnixPostInstallCommand = "\"/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1/etc/install.sh\" \"/home/sxcheng/Workspace/kvm/license.dat\"";
+  Win32PostInstallCommand = "\"\"/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1\\etc\\excopy.bat\" \"/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1\"\"";
+  ui_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1";
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32Path = "Docs\\FastModelsCollection.pdf";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "Fast Models 8.1 Documentation Index";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32Path = "Docs\\FastModelsPortfolio_ReleaseNotes_8.1.txt";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "Release Notes for the Fast Model Portfolio";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32Path = "Docs\\CADIClientIntegrationKit_ReleaseNotes_2.0.txt";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "CADI Client Integration Kit Release Notes";
+  }
+  executable {
+    Win32Arguments = "--reloc --uiinf \"/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1/.inst/inst_dilog\"";
+    Win32DesktopShortCut = "0";
+    Win32IconId = "1";
+    Win32MenuShortCut = "1";
+    Win32Path = ".inst\\Setup.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "Uninstall Fast Model Portfolio";
+  }
+  envvar {
+    Win32Name = "PVLIB_HOME";
+    Win32Value = "/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1";
+  }
+
+}
+
+package "MTI Plugin Development Kit"
+{
+  Afc = "MTIPDK.afc";
+  AllowDirEdit = "1";
+  DefaultSelection = "0";
+  Dir = "MTIPDK_1.1";
+  Info = "This package contains the Model Trace Interface (MTI) headers for trace plugins to Fast models, documentation and examples.";
+  ui_package_dir = "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1";
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32IconId = "ext";
+    Win32MenuShortCut = "1";
+    Win32Path = "doc\\ModelTraceInterface-ReferenceManual.pdf";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\MTI Plugin Development Kit";
+    Win32ShortCutName = "Model Trace Interface Reference Manual";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32IconId = "ext";
+    Win32MenuShortCut = "1";
+    Win32Path = "doc\\TraceSources_Cortex-A8.txt";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\MTI Plugin Development Kit";
+    Win32ShortCutName = "ARM_Cortex-A8 model Trace sources";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32IconId = "ext";
+    Win32MenuShortCut = "1";
+    Win32Path = "README.txt";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\MTI Plugin Development Kit";
+    Win32ShortCutName = "MTI Plugin Development Kit Release Notes";
+  }
+  executable {
+    Win32Arguments = "--reloc --uiinf \"/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/.inst/inst_dilog\"";
+    Win32DesktopShortCut = "0";
+    Win32IconId = "1";
+    Win32MenuShortCut = "1";
+    Win32Path = ".inst\\setup.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\MTI Plugin Development Kit";
+    Win32ShortCutName = "Uninstall MTI Plugin Development Kit";
+  }
+
+}
+
+package "Flex Licensing Tools"
+{
+  Afc = "FlexTools.afc";
+  AllowDirEdit = "1";
+  DefaultSelection = "0";
+  Dir = "FlexTools_10.8.10";
+  Info = "Fast Model Portfolio: This package contains the Flex Licensing tools";
+  ui_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10";
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32Path = "lmtools.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\flex licensing tools";
+    Win32ShortCutName = "lmtools";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32Path = "DUI0209I_flexnet_guide.pdf";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\flex licensing tools";
+    Win32ShortCutName = "FLEXnet for ARM Tools License Management Guide";
+  }
+
+}
+  }
+
+  files (
+    "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10/armlmd", "ceb029a50a7ddb25579e1eca48c48276",
+    "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10/DUI0209I_flexnet_guide.pdf", "a3e5c1e02ec433fbaa7f1f4c8c607a30",
+    "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10/enduser.pdf", "f694c9b5a8ea0749c16438d6dd664852",
+    "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10/lmgrd", "7513d293e8e4b96fa1dd5a306140dd28",
+    "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10/lmutil", "b9882cce71cd87f09c848b10aeaa0d57",
+    "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10/makelinks.sh", "063bfe8a0bb604f91514ec6033e09419",
+    "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10/rmlinks.sh", "1ac4cbe3ad80426901d9e2d0a90664ea",
+    "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10/EULA.htm", "c2607c00ddfe9e8b1163482382c6a1e4",
+  )
+}

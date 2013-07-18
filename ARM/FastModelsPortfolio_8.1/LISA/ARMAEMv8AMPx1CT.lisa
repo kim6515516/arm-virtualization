@@ -1,0 +1,176 @@
+/*
+ * Copyright (C) 2009 ARM Limited. All rights reserved.
+ */
+
+
+extern component ARMAEMv8AMPx1CT
+{
+    properties {
+        executes_software = 1; 
+        version = "8.1.37";
+        component_type = "Core";
+        description = "ARM AEM v8-A(MP)x1 CPU component";
+    }
+
+    resources
+    {
+
+        // Processor component parameters
+        PARAMETER { name("PERIPHBASE"), type(uint64_t), default(0x13080000), min(0x0), max(0xFFFFFFFFFF) } PERIPHBASE;
+        PARAMETER { name("CLUSTER_ID"), type(uint32_t), default(0x0), min(0x0), max(0xFFFF) } CLUSTER_ID;
+        PARAMETER { name("auxilliary_feature_register0"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Value for AFR0 ID register") } auxilliary_feature_register0;
+        PARAMETER { name("dcache-state_modelled"), type(bool), default(false) } dcache_state_modelled;
+        PARAMETER { name("icache-state_modelled"), type(bool), default(false) } icache_state_modelled;
+        PARAMETER { name("has_el2"), type(bool), default(true) } has_el2;
+        PARAMETER { name("has_el3"), type(bool), default(true) } has_el3;
+        PARAMETER { name("has_thumb2ee"), type(bool), default(true) } has_thumb2ee;
+        PARAMETER { name("max_32bit_el"), type(uint32_t), default(3), min(-1), max(3) } max_32bit_el;
+        PARAMETER { name("el0_el1_only_non_secure"), type(bool), default(true) } el0_el1_only_non_secure;
+        PARAMETER { name("non_secure_vgic_alias_when_ns_only"), type(uint64_t), default(0), min(0), max(0xFFFFffffFFFF), description("If ! has_el3 and only non-secure side exists, then the normal position of the VGIC is a secure alias.  If this parameter is non-zero then in addition a non-secure alias of the VGIC will be placed at this position (aligned to 32 KiB).") } non_secure_vgic_alias_when_ns_only;
+        PARAMETER { name("internal_vgic"), type(bool), default(true) } internal_vgic;
+        PARAMETER { name("gicv3_cpu_interface"), type(bool), default(false) } gicv3_cpu_interface;
+        PARAMETER { name("gicv3.STATUSR-implemented"), type(bool), default(true) } gicv3_statusr_implemented;
+        PARAMETER { name("gicv3.priority-bits"), type(uint32_t), default(8), min(4), max(8) } gicv3_priority_bits_implemented;
+
+        // Core subcomponents parameters
+        PARAMETER { name("cpu0.vfp-present"), type(bool), default(true) } cpu0_vfp_present;
+        PARAMETER { name("cpu0.ase-present"), type(bool), default(true) } cpu0_ase_present;
+        PARAMETER { name("cpu0.etm-present"), type(bool), default(true) } cpu0_etm_present;
+        PARAMETER { name("cpu0.CFGEND"), type(bool), default(false) } cpu0_CFGEND;
+        PARAMETER { name("cpu0.CFGNMFI"), type(bool), default(false) } cpu0_CFGNMFI;
+        PARAMETER { name("cpu0.CP15SDISABLE"), type(bool), default(false) } cpu0_CP15SDISABLE;
+        PARAMETER { name("cpu0.TEINIT"), type(bool), default(false) } cpu0_TEINIT;
+        PARAMETER { name("cpu0.VINITHI"), type(bool), default(false) } cpu0_VINITHI;
+        PARAMETER { name("cpu0.SMPnAMP"), type(bool), default(false) } cpu0_SMPnAMP;
+        PARAMETER { name("cpu0.POWERCTLI"), type(uint32_t), default(0), min(0), max(3) } cpu0_POWERCTLI;
+        PARAMETER { name("cpu0.vfp-enable_at_reset"), type(bool), default(false) } cpu0_vfp_enable_at_reset;
+        PARAMETER { name("cpu0.dcache-size"), type(uint32_t), default(0x8000), min(0x4000), max(0x10000) } cpu0_dcache_size;
+        PARAMETER { name("cpu0.icache-size"), type(uint32_t), default(0x8000), min(0x4000), max(0x10000) } cpu0_icache_size;
+        PARAMETER { name("cpu0.semihosting-enable"), type(bool), default(true) } cpu0_semihosting_enable;
+        PARAMETER { name("cpu0.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF) } cpu0_semihosting_ARM_SVC;
+        PARAMETER { name("cpu0.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF) } cpu0_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu0.semihosting-cmd_line"), type(string), default("") } cpu0_semihosting_cmd_line;
+        PARAMETER { name("cpu0.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF) } cpu0_semihosting_heap_base;
+        PARAMETER { name("cpu0.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF) } cpu0_semihosting_heap_limit;
+        PARAMETER { name("cpu0.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF) } cpu0_semihosting_stack_base;
+        PARAMETER { name("cpu0.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF) } cpu0_semihosting_stack_limit;
+        PARAMETER { name("cpu0.semihosting-cwd"), type(string), default("")} cpu0_semihosting_cwd;
+        PARAMETER { name("cpu0.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu0_min_sync_level;
+        PARAMETER { name("cpu0.CONFIG64"), type(bool), default(true) } cpu0_CONFIG64;
+        PARAMETER { name("cpu0.MPIDR-override"), type(uint64_t), default(0), min(0), max(0xffFFFFffff) } cpu0_MPIDR_override;
+    }
+
+    // The clock signal connected to the clk_in port is used to determine
+    // the rate at which the core executes instructions.
+    slave port<ClockSignal> clk_in;
+
+    // The core will generate bus requests on this port.
+    master port<PVBus> pvbus_m0;
+
+    master port<PVBus> pvbus_m1;
+
+    // The virtio coherent port, hooks directly into the L2 system and
+    // becomes coherent (assuming attributes are set correctly).
+    slave port<PVBus> virtio_s;
+
+    // Raising this signal will put the core into reset mode.
+    slave port<Signal> reset[1];
+
+    // This peer port of event input (and output) is for wakeup from WFE
+    peer port<Signal> event;
+
+    // This signal indicates if a core is in WFE state
+    master port<Signal> standbywfe[1];
+
+    // This signal indicates if a core is in WFI state
+    master port<Signal> standbywfi[1];
+
+    // This port sets reset value for scu CPU status register
+    slave port<Value> pwrctli[1];
+
+    // This port sends scu CPU status register bits
+    master port<Value> pwrctlo[1];
+
+    // This signal resets SCU
+    slave port<Signal> scureset;
+
+    // This signal resets individual watchdog
+    slave port<Signal> wdreset[1];
+
+    // This signal resets timer and interrupt controller
+    slave port<Signal> periphreset;
+
+    // This signal disables write access to some secure Interrupt Controller registers
+    slave port<Signal> cfgsdisable;
+
+    // This signals AMP or SMP mode for each Cortex-A9 processor
+    master port<Signal> smpnamp[1];
+
+    // This signal drives the CPU's interrupt handling.
+    slave port<Signal> irq[1];
+
+    // This signal drives the CPU's fast-interrupt handling.
+    slave port<Signal> fiq[1];
+
+    // Virtual IRQ/FIQ inputs.  Note that the irq/fiq pins above are wired
+    // directly to the core if there is no internal VGIC.  If there is an
+    // internal VGIC then these are ignored.
+    slave port<Signal> virq[1];
+    slave port<Signal> vfiq[1];
+
+    // This signal drives the CPU's fast-interrupt handling.
+    slave port<Signal> ints[224];
+
+    // Interrupt signal from performance monitoring unit.
+    master port<Signal> pmuirq[1];
+
+    // The port reads the value in CPU ID register field, bits[11:8] of the MPIDR.
+    slave port<Value> clusterid;
+
+    // This signal disables write access to some system control processor registers
+    slave port<Signal> cp15sdisable[1];
+
+    // This signal provides default exception handling state
+    slave port<Signal> teinit[1];
+
+    // This port should be connected to one of the two ticks ports
+    // on a 'visualisation' component, in order to display a running
+    // instruction count.
+    master port<InstructionCount> ticks[1];
+    
+    // This signal controls of the location of the exception vectors at reset
+    slave port<Signal> vinithi[1];
+
+    // This signal disables FIQ mask in CPSR
+    slave port<Signal> cfgnmfi[1];
+
+    // This signal if for EE bit initialisation
+    slave port<Signal> cfgend[1];
+
+    // This port sets the base address of private peripheral region
+    slave port<Value_64> periphbase;
+    
+    // Reset vector base address
+    slave port<Value_64> rvbar[1];
+   
+    // Register Width after reset
+    slave port<Signal> config64[1];
+
+    // External debug interface
+    slave port<Signal> dbgen[1];
+    slave port<Signal> spiden[1];
+    slave port<Signal> niden[1];
+    slave port<Signal> spniden[1];
+    slave port<PVBus> dev_debug_s;
+    slave port<PVBus> memorymapped_debug_s;
+
+    // Embedded trace macrocell port.
+    master port<PVBus> etm[1];
+
+    // Cross trigger matrix port
+    master port<v8EmbeddedCrossTrigger_controlprotocol> cti[1];
+    slave port<Signal>  cti0extin[4];
+    master port<Signal> cti0extout[4];
+    master port<Signal> ctidbgirq[1];
+}
+

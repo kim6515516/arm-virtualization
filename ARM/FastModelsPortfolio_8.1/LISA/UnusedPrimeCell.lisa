@@ -1,0 +1,47 @@
+/*
+ * Copyright 2006-2008 ARM Limited. All rights reserved.
+ */
+
+component UnusedPrimeCell
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "A dummy component. It can be used to represent any unimplemented PrimeCell components.";
+    }
+    
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+    }
+
+    slave port<PVDevice> device
+    {
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return tx.setReturnData32(0);
+        }
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+    }
+    
+    slave port<PVBus>   pvbus;
+}

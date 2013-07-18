@@ -1,0 +1,1351 @@
+/*
+ * Copyright 2007-2009 ARM Limited. All rights reserved.
+ */
+
+// Demonstration of using the Visualisation library to create a skinnable
+// display window.
+
+component VEVisualisation
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Display window for VE using Visualisation library.";
+        documentation_file = "../../../#DUI0423#";
+    }
+    includes
+    {
+        #include <assert.h>
+
+        #include "sg/SystemInclude.h"
+        #include "sg/MSCFixes.h"
+        #include "UIClass/UIClass.h"
+        #include "UIClass/UIIcon.h"
+
+        #define EBVIS_TRACE if (!0) ; else printf
+
+        #ifdef WIN32
+            #define pvis_sleep(x) Sleep(x)
+        #else
+            #include <sys/time.h>
+            #define pvis_sleep(x) usleep((x)*1000)
+        #endif
+
+        #define  MAX_CLUSTERS           2
+        #define  MAX_CORES_PER_CLUSTER  4
+
+
+        enum CoreRunState
+        {
+            CORE_RUN_STATE_UNKNOWN     = 0x0,  // Run status currently unknown (i.e. simulation has not started)
+            CORE_RUN_STATE_RUNNING     = 0x1,  // None of the below, core is not idle and is executing instructions
+            CORE_RUN_STATE_HALTED      = 0x2,  // External halt signal asserted
+            CORE_RUN_STATE_STANDBY_WFE = 0x3,  // Last instruction executed was WFE and standby mode has been entered
+            CORE_RUN_STATE_STANDBY_WFI = 0x4,  // Last instruction executed was WFI and standby mode has been entered
+            CORE_RUN_STATE_IN_RESET    = 0x5,  // External reset signal asserted
+            CORE_RUN_STATE_DORMANT     = 0x6,  // Partial core power down 
+            CORE_RUN_STATE_SHUTDOWN    = 0x7,  // Complete core power down
+            CORE_RUN_STATE_LIMIT
+        };
+
+        class ClusterStateDisplay : public Cui
+        {
+        private:
+            unsigned          num_cores;
+            CoreRunState      core[MAX_CORES_PER_CLUSTER];
+            UIIcon**          crs_icon;
+            VisRenderRegion*  rr;
+
+            void renderCore(unsigned x, unsigned y, CoreRunState state)
+            {
+                UIIcon* icon = crs_icon[state];
+
+                if (icon)
+                {
+                    icon->render(rr, x, y);
+                }
+            }
+
+        public:
+            ClusterStateDisplay(VisRenderRegion* render_reg,
+                                int x, int y,
+                                unsigned num_cores_,
+                                UIIcon** crs_icon_) :
+                Cui(render_reg, x, y, num_cores * 8 + 1, 13), 
+                num_cores(num_cores_),
+                crs_icon(crs_icon_),
+                rr(render_reg)
+            {
+                assert(num_cores <= MAX_CORES_PER_CLUSTER);
+
+                for(unsigned idx = 0; idx < MAX_CORES_PER_CLUSTER; idx++)
+                {
+                    core[idx] = CORE_RUN_STATE_UNKNOWN;
+                }
+            }
+
+            void setCoreState(unsigned idx, uint32_t state_)
+            {
+                CoreRunState state = CoreRunState(state_);
+                
+                assert(idx < num_cores);
+
+                if (core[idx] != state)
+                {
+                    assert(state < CORE_RUN_STATE_LIMIT);
+
+                    core[idx] = state;
+                    redraw();
+                }
+            }
+
+            void redraw()
+            {
+                for(unsigned idx = 0; idx < num_cores; idx++)
+                {
+                    renderCore(pos.x + idx * 8 + 2, pos.y + 4, core[idx]);
+                }
+
+                update();
+            }
+        };
+
+
+        class ClusterState
+        {
+        private:
+            unsigned     index;           // Cluster index
+            const char*  name;
+            unsigned     num_cores;
+
+            Clabel*    label_id;          // Label text for cluster id
+            Clabel*    label_instr_count; // Label text for instruction count
+            Cicount*   value_instr_count; // Value text for instruction count
+            UIPos      min, max;          // Graphical extent (pixels)
+
+            uint64_t   total_inst;
+            uint64_t   delta_ticks;
+            uint64_t   inst_per_sec;
+            bool       running;
+
+            ClusterStateDisplay*  state_display;
+            uint32_t              core_run_state[MAX_CORES_PER_CLUSTER];
+
+        public:
+            ClusterState() { init(0,0,0); }
+
+            ~ClusterState()
+            {
+                delete  label_id;
+                delete  label_instr_count;
+                delete  value_instr_count;
+                delete  state_display;
+            }
+
+            void init(unsigned index_, unsigned num_cores_, const char* name_)
+            {
+                index     = index_;
+                name      = name_;
+                num_cores = num_cores_;
+
+                label_id          = 0;
+                label_instr_count = 0;
+                value_instr_count = 0;
+                state_display     = 0;
+
+                reset();
+            }
+
+            void reset()
+            {
+                total_inst   = 0;
+                delta_ticks  = 0;
+                inst_per_sec = 0;
+                running      = false;
+
+                for(unsigned i=0; i<MAX_CORES_PER_CLUSTER; i++)
+                {
+                    core_run_state[i] = 0;
+                }
+            }
+
+            bool update(uint64_t inst_count, uint32_t elapsed_time_ms, bool multiple_clusters)
+            {
+                delta_ticks = inst_count - total_inst;
+                total_inst  = inst_count;
+
+                if (elapsed_time_ms)
+                {
+                    // calculate ips here to get a decent sample period
+                    inst_per_sec = (((uint64_t)1000) * delta_ticks) / elapsed_time_ms;
+                }
+
+                bool new_running = (delta_ticks != 0);
+
+                if (new_running != running)
+                {
+                    running = new_running;
+
+                    if (multiple_clusters)
+                    {
+                        // Highlight running clusters
+                        UIColour fg, bg;
+
+                        // White and grey
+                        fg = running ? UIColour(0xFF, 0xFF, 0xFF) : UIColour(0x90, 0x90, 0x90);
+                        bg = UIColour(0x00, 0x00, 0x00);
+
+                        if (label_id)
+                           label_id->setColours(fg, bg);
+
+                        if (label_instr_count)
+                           label_instr_count->setColours(fg, bg);
+
+                        if (value_instr_count)
+                           value_instr_count->setColours(fg, bg);
+                    }
+                }
+
+                return running;
+            }
+
+            unsigned getNumCores() const
+            {
+                return num_cores;
+            }
+
+            void setCoreRunState(int i, uint32_t state)
+            {
+                core_run_state[i] = state;
+            }
+
+            bool hit_gui(int x, int y) const
+            {
+                return (num_cores > 0) && (x >= min.x) && (x <= max.x) && (y >= min.y) && (y <= max.y);
+            }
+
+            int build_gui(VisRenderRegion *render_region, int col, int row, bool multiple_clusters,
+                          UIIcon** crs_icon)
+            {
+                if (num_cores == 0)  return 0;
+
+                min.x = col*VIS_FONT_WIDTH;
+                min.y = row*VIS_FONT_HEIGHT + 1;
+
+                if (multiple_clusters)
+                {
+                    delete label_id;
+
+                    if (name)
+                    {
+                       label_id = new Clabel(render_region, name, col*VIS_FONT_WIDTH, min.y);
+                    }
+                    else
+                    {
+                       char  ident[9];
+                       sprintf( ident, "Cluster%d", index);
+                       label_id = new Clabel(render_region, ident, col*VIS_FONT_WIDTH, min.y);
+                    }
+
+                    label_id->setWidth((label_id->getLength() + 1)* VIS_FONT_WIDTH);
+
+                    col += label_id->getLength()+1;
+                }
+
+                delete state_display;
+                state_display = new ClusterStateDisplay(render_region, col*VIS_FONT_WIDTH, min.y-2, num_cores,
+                                                        crs_icon);
+                col += num_cores + 2;
+
+                delete label_instr_count;
+                label_instr_count = new Clabel(render_region, 12, col*VIS_FONT_WIDTH, min.y);
+                label_instr_count->setWidth((12 + 1)*VIS_FONT_WIDTH);
+                col += 12+1;
+
+                delete value_instr_count;
+                value_instr_count = new Cicount(render_region, col*VIS_FONT_WIDTH, min.y);
+                value_instr_count->setLeftJustify();
+                col += value_instr_count->getLength() + 2;
+
+                int width = col*VIS_FONT_WIDTH;
+
+                max.x = min.x + width;
+                max.y = min.y + VIS_FONT_HEIGHT-1;
+
+                return col;
+            }
+
+            void redraw_labels(bool disp_totals)
+            {
+                if (label_instr_count)
+                    label_instr_count->setLabel(disp_totals ? "Total Instr:" : "Instr / sec:");
+            }
+
+            void redraw_values(bool disp_totals)
+            {
+                if (value_instr_count)
+                    value_instr_count->setCount(disp_totals ? total_inst : inst_per_sec);
+
+                if (state_display)
+                {
+                    for(unsigned i=0; i < num_cores; i++)
+                    {
+                        state_display->setCoreState(i, core_run_state[i]);
+                    }
+                }
+            }
+        };
+    }
+
+
+    resources
+    {
+        // An instance of the Visualisation library.
+        Visualisation *vis;
+
+        // LCD display region.
+        VisRenderRegion *render_lcd;
+
+        // One display region for status information.
+        VisRenderRegion *render_status;
+
+        // Core run state icons
+        UIIcon* crs_icon[CORE_RUN_STATE_LIMIT];
+
+        // Current configured size of the LCD.
+        unsigned int lcd_width;
+        unsigned int lcd_height;
+
+        // Maps keycode to a button
+        // unused - should be done in newer SDLVis
+        // MxU32 key2button[KC_MAX+1];
+
+        ClusterState  cluster_state[MAX_CLUSTERS];
+
+        Clabel        *user_dips_label;      // User dipswitch label
+        Cdipswitch    *user_dips;            // User dipswitch
+        Clabel        *boot_dips_label;      // Boot dipswitch label
+        Cdipswitch    *boot_dips;            // Boot dipswitch
+        Clabel        *led_label;            // LEDs label
+        Cled          *user_led;             // LEDs
+        Clabel        *daughter_label;       // Daughterboard LEDs/dipswitch label
+        Cdipswitch    *daughter_dips;        // Daughterboard dipswitch
+        Cled          *daughter_led;         // Daughterboard LEDs
+        Clabel        *rl_label;             // Rate Limit label
+        Cbutton       *rl_button;            // Rate Limit button
+        Clabel        *label_time_perf;      // Label text for total time or performance index
+        Clabel        *value_time_perf;      // Value text for total time or performance index
+        Clabel        *mouse_label;          // Grab/Release mouse text
+        Cseparateline *white_line;           // White divider
+
+        // Current configured height of the status area.
+        int status_height;
+
+        // Cursor position, for rendering parts of the status area.
+        int sx, sy;
+
+        // True if the window layout needs to be reconfigured on the
+        // next screen redraw.
+        bool relayout_needed;
+
+        // status of the ctrl key
+        bool ctrl_key;
+
+        // toggle mouse
+        bool toggle_mouse;
+
+        // current absolute mouse position (to calc relative changes)
+        int mouse_abs_x, mouse_abs_y;
+
+        bool    disp_totals;
+        bool    disp_delay;
+        bool    stopped;
+
+        unsigned num_clusters;
+
+        // Used by the performance calculation routines
+        // Outputs
+        float    sim_pidx;
+
+        // Intermediate values
+        uint32_t start_time;          // Aggr. sim time calculated on the fly
+        uint32_t last_time;
+        uint32_t perf_index_real_time_ms;     // accumulated real time elapsed between calculateStats() (in ms)
+        uint32_t perf_index_sim_time_ms;      // accumulated sim  time elapsed between calculateStats() (in ms)
+        uint32_t throttle_last_real_time_ms;  // last absolte real time timer::timer_callback_handler.signal() was called (for throttling, in ms)
+        // time in ms that simulator is ahead of real time (this is the budget we can sleep from)
+        // (this does the whole averaging magic and compensation for sleep() inaccuracies)
+        // (x<0 == sim time is x ms behind real time, x>0 sim time is x ms ahead of real time)
+        int throttle_budget;
+        int calculate_stats_phase;
+
+        VisRasterLayout* fake_layout;  // fake area for pl11x when visualisation is disabled
+
+        PARAMETER { description("Trap key that works with left Ctrl to toggle mouse display."), type(uint32_t), default(74) }  trap_key; // 74 = KC_LALT = Left Alt (press Left Ctrl plus Left Alt to lock/unlock mouse)
+        PARAMETER { name("rate_limit-enable"), description("Rate limit simulation."), type(bool), default("true") } rate_limit_enable;
+        PARAMETER { description("Enable/disable visualisation"), type(bool), default("false") } disable_visualisation;
+        PARAMETER { description("Window title (%cpu% is replaced by cpu_name)"), type(string), default("Fast Models - CLCD %cpu%") } window_title;
+
+        PARAMETER { description("Cpu name displayed in window title"), type(string), default("") } cpu_name;
+        PARAMETER { description("Cluster0 name"), type(string), default("Cluster0") } cluster0_name;
+        PARAMETER { description("Cluster1 name"), type(string), default("Cluster1") } cluster1_name;
+
+        PARAMETER { name("daughter_led_count"), description("Number of LEDs that the daughter board has"),
+                    type(uint32_t), default(0), max(32), min(0) } number_of_daughter_leds;
+        PARAMETER { name("daughter_user_switch_count"), description("Number of switches that the daughter board has"),
+                    type(uint32_t), default(0), max(32), min(0) } number_of_daughter_user_switches;
+
+        uint32_t daughter_user_switches_value;
+        uint32_t daughter_leds_value;
+
+        bool     redraw_daughter_switches;
+
+    }
+
+    composition
+    {
+        // Visualisation subcomponent responsible for generating real-time callbacks.
+        idler : GUIPoll(delay_ms = 20);
+
+        // Timer for perf calculation
+        timer : ClockTimer;
+
+        // event recorder functionality
+        recorder: VisEventRecorder;
+    }
+
+    internal slave  port <TimerCallback> timer_callback_handler
+    {
+        // called every 100 simulated ms
+        behavior signal() : uint32_t
+        {
+            // get simulated time slice length in ms
+            int sim_ms_per_tick = 100; // 100ms
+
+            // get real time slice length in ms
+            uint32_t ct = get_msTime();
+            int real_ms_per_tick = ct - throttle_last_real_time_ms;
+            throttle_last_real_time_ms = ct;
+
+            // update performance index nominator and denominator
+            perf_index_sim_time_ms += sim_ms_per_tick;
+            perf_index_real_time_ms += real_ms_per_tick;
+
+            // do not sleep when throttling is disabled
+            uint32_t timer_ticks_per_callback = 5; // 100ms
+            if (!disp_delay)
+                return timer_ticks_per_callback;
+
+            // limit real time passed to one second to avoid extreme cases
+            if (real_ms_per_tick > 1000)
+                real_ms_per_tick = 1000;
+
+            // update time budget (the ms we have been too fast recently)
+            throttle_budget += sim_ms_per_tick;
+            throttle_budget -= real_ms_per_tick;
+
+            // limit time budget to catch up for at most 1 second
+            // (we can catch up at most 1 second of simulation time during slow simulation speed by running faster than real time)
+            // (this gets rid of all short term performance drops while not allowing the simulation to catch up indedinitely)
+            if (throttle_budget < -1000)
+                throttle_budget = -1000;
+
+            // limit time budget to at most 500ms of sleep
+            // (this would never occur if the OS sleep() is 100% accurate, but it isn't so this is an emergency exit:
+            // never wait for more than one second no matter what we calculated above, in practice throttle_budget
+            // will always be below 100 (ms))
+            if (throttle_budget > 500)
+                throttle_budget = 500;
+
+            // if our time budget is positive: sleep, if it is negavtive or 0: continue as fast as possible
+            if (throttle_budget > 0)
+                pvis_sleep(throttle_budget);
+
+            // call us back next clock tick (100ms == 10Hz simulated time)
+            return timer_ticks_per_callback;
+        }
+    }
+    slave port<ClockSignal> clock_50Hz;
+
+    master port<MouseStatus> touch_screen;
+
+    master port<LCDLayoutInfo> lcd_layout;
+
+    // called every 20ms by GUIPoll
+    behavior calculateStats(bool force)
+    {
+        // every 100ms
+        calculate_stats_phase++;
+        if ((calculate_stats_phase < 5) && (!force))
+            return;
+        calculate_stats_phase = 0;
+
+        // update leds more often than the rest
+        draw_leds();
+        if (redraw_daughter_switches)
+        {
+            draw_switches();
+        }
+
+        uint32_t ct = get_msTime(); // don't rely on polled time
+        uint32_t elapsed_time_ms = ct - last_time;
+
+        // update stats at most every 500ms
+        if ((elapsed_time_ms < 500) && (!force))
+            return;
+
+        bool running = false;
+
+        for(unsigned cluster=0; cluster<num_clusters; cluster++)
+        {
+            uint64_t       ticks=0;
+            ClusterState*  cl_state = &cluster_state[cluster];
+
+            for(unsigned core=0; core<cl_state->getNumCores(); core++)
+            {
+                switch(cluster)
+                {
+                case 0:
+                   ticks += cluster0_ticks[core].getValue();
+                   cl_state->setCoreRunState(core, cluster0_ticks[core].getRunState());
+                   break;
+
+                case 1:
+                   ticks += cluster1_ticks[core].getValue();
+                   cl_state->setCoreRunState(core, cluster1_ticks[core].getRunState());
+                   break;
+
+                default:
+                   assert(!"Case for additional cluster(s) required");
+                   break;
+                }
+            }
+
+            running |= cl_state->update(ticks, elapsed_time_ms, num_clusters > 1);
+        }
+
+
+        // calculate performance index (1.0 == real time, < 1.0 == sim is running too slow, > 1.0 sim is running too fast)
+        if (perf_index_real_time_ms)
+            sim_pidx  = float(perf_index_sim_time_ms) / perf_index_real_time_ms;
+        perf_index_sim_time_ms = 0;
+        perf_index_real_time_ms = 0;
+
+        if (!running)
+        {
+            start_time += elapsed_time_ms;
+            sim_pidx = 0.0;
+        }
+
+        last_time  = ct;
+
+        draw_status(ct);
+    }
+
+    connection
+    {
+        idler.gui_callback => self.gui_callback;
+
+        self.clock_50Hz => timer.clk_in;
+        timer.timer_callback => self.timer_callback_handler;
+        self.recorderControl => recorder.control;
+        self.cluster0_ticks[0] => recorder.ticks;
+    }
+
+    // Handle real-time callback events from the GUIPoll subcomponent.
+    internal slave port<GUIPollCallback> gui_callback
+    {
+        behavior gui_callback()
+        {
+            if (disable_visualisation)
+                return;
+            processMessages(false);
+            calculateStats(false);
+        }
+    }
+
+
+    // Implement the PL110 FrameBuffer protocol for each display.
+    slave port<LCD> lcd
+    {
+        behavior lock() : const VisRasterLayout *
+        {
+            if (disable_visualisation)
+                return fake_layout;
+            return render_lcd->lock();
+        }
+        behavior unlock()
+        {
+            if (disable_visualisation)
+                return;
+            return render_lcd->unlock();
+        }
+        behavior update(int x, int y, unsigned int w, unsigned int h)
+        {
+            if (disable_visualisation)
+                return;
+            if (lcd_layout.setLayoutInfo.implemented())
+                lcd_layout.setLayoutInfo(x, y, w, h); // Send LCD layout info to touch screen
+            return render_lcd->update(x, y, w, h);
+        }
+        behavior setPreferredLayout(unsigned int w, unsigned int h, unsigned int d)
+        {
+            if (disable_visualisation)
+                return;
+            // Ignore requested depth - request 24-bits.
+            (void)d;
+            resize_lcd(w, h);
+        }
+    }
+
+    slave port<InstructionCount> cluster0_ticks[4];   // [MAX_CORES_PER_CLUSTER]
+    slave port<InstructionCount> cluster1_ticks[4];   // [MAX_CORES_PER_CLUSTER]
+
+    slave port<ValueState>       leds;
+    slave port<ValueState>       daughter_leds
+    {
+        behaviour setValue( uint32_t value_ )
+        {
+            // Note no need to redraw as the GUI pulse will redraw it.
+            daughter_leds_value = value_;
+        }
+
+        behaviour getValue() : uint32_t
+        {
+            return daughter_leds_value;
+        }
+    }
+    slave port<ValueState>       daughter_user_switches
+    {
+        behaviour setValue( uint32_t value_ )
+        {
+            daughter_user_switches_value = value_;
+            // Trigger the redraw of the switches in a normal GUI pulse.
+            redraw_daughter_switches = true;
+        }
+
+        behaviour getValue() : uint32_t
+        {
+            return daughter_user_switches_value;
+        }
+    }
+    slave port<ValueState>       user_switches;
+    slave port<ValueState>       boot_switch;
+
+    // Send keypress events to a PS2Keyboard device.
+    master port<KeyboardStatus>  keyboard;
+
+    // Send mouse events to a PS2Mouse device.
+    master port<MouseStatus>     mouse;
+
+    behavior init()
+    {
+        composition.init(); // Pass the call down to subcomponents.
+
+        // Determine number of clusters and number of cores in each cluster
+        // based on connected instruction tick ports.
+
+        num_clusters=0;
+        for(unsigned cluster=0; cluster<MAX_CLUSTERS; cluster++)
+        {
+            unsigned core;
+
+            for(core=0; core<MAX_CORES_PER_CLUSTER; core++)
+            {
+                if (cluster == 0)
+                {
+                    if( !cluster0_ticks[core].getValue.implemented() ||
+                        !cluster0_ticks[core].getRunState.implemented())  break;
+                }
+                else if (cluster == 1)
+                {
+                    if( !cluster1_ticks[core].getValue.implemented() ||
+                        !cluster1_ticks[core].getRunState.implemented())  break;
+                }
+                else
+                {
+                    assert(!"Case for additional cluster(s) required");
+                }
+            }
+
+            if (core > 0)
+            {
+                const char* name = 0;
+
+                switch(cluster)
+                {
+                case 0:  name = cluster0_name.c_str(); break;
+                case 1:  name = cluster1_name.c_str(); break;
+                // default case for additional clusters is optional, null name ptr is ok
+                }
+
+                cluster_state[cluster].init(cluster, core, name);
+                num_clusters++;
+            }
+        }
+
+        //
+        // It is _very_ important to set these to zero first otherwise we
+        // try freeing something we never allocated.
+        //
+
+        user_dips_label    = 0;
+        user_dips          = 0;
+        boot_dips_label    = 0;
+        boot_dips          = 0;
+        led_label          = 0;
+        user_led           = 0;
+        daughter_label     = 0;
+        daughter_dips      = 0;
+        daughter_led       = 0;
+        rl_label           = 0;
+        rl_button          = 0;
+        label_time_perf    = 0;
+        value_time_perf    = 0;
+        mouse_label        = 0;
+        white_line         = 0;
+
+        if (disable_visualisation)
+        {
+            fake_layout = new VisRasterLayout();
+            return;
+        }
+
+        ctrl_key = false;
+        toggle_mouse = false;
+        start_time     = get_msTime();
+        last_time      = start_time;
+        perf_index_real_time_ms = 0;
+        perf_index_sim_time_ms = 0;
+        throttle_last_real_time_ms = start_time;
+        throttle_budget = 0;
+        calculate_stats_phase = 0;
+        sim_pidx = 0.0;
+
+        disp_delay  = rate_limit_enable;
+        disp_totals = true;
+        stopped     = false;
+
+        daughter_user_switches_value = 0x0;
+        redraw_daughter_switches     = false;
+        daughter_leds_value          = 0x0;
+
+        lcd_width = 320;
+        lcd_height = 240;
+        init_gui();
+    }
+
+    behavior init_gui()
+    {
+        // Initialise the visualisation library and the display window.
+        vis = createVisualisation(cpu_name.c_str(), window_title.c_str());
+
+        // Create display regions for the LCD panel.
+        render_lcd = vis->createRenderRegion();
+        recorderControl.registerVisRegion(render_lcd, "render_lcd");
+
+        render_status = vis->createRenderRegion();
+        recorderControl.registerVisRegion(render_status, "render_status");
+
+        resize_lcd(640, 40);
+
+        reconfigureWindow();
+
+        render_lcd->setVisible(true);
+        render_status->setVisible(true);
+
+        init_icons();
+
+        init_status();
+    }
+
+    // Initialise core run state icons
+    behaviour init_icons()
+    {
+        for(unsigned i=0; i<CORE_RUN_STATE_LIMIT; i++)
+        {
+           crs_icon[i] = 0;
+        }
+
+        // Core run state icons 6x6 pixels
+        static const char* unknown_bitmap[6] =
+        { " ###  ",
+          "#   # ",
+          "   #  ",
+          "  #   ",
+          "      ",
+          "  #   " };
+
+        static const char* run_bitmap[6] =
+        { " #    ",
+          " ##   ",
+          " ###  ",
+          " ##   ",
+          " #    ",
+          "      " };
+
+        static const char* halt_bitmap[6] =
+        { "      ",
+          "## ## ",
+          "## ## ",
+          "## ## ",
+          "## ## ",
+          "      " };
+
+        static const char* wfe_bitmap[6] =
+        { " #### ",
+          " #    ",
+          " ###  ",
+          " #    ",
+          " #### ",
+          "      " };
+
+        static const char* wfi_bitmap[6] =
+        { " ###  ",
+          "  #   ",
+          "  #   ",
+          "  #   ",
+          " ###  ",
+          "      " };
+
+        static const char* reset_bitmap[6] =
+        { "      ",
+          " #### ",
+          " #### ",
+          " #### ",
+          " #### ",
+          "      " };
+
+        static const char* dormant_bitmap[6] =
+        { " #### ",
+          "##  ##",
+          "#    #",
+          "######",
+          "######",
+          "      " };
+
+        static const char* shutdown_bitmap[6] =
+        { " #### ",
+          "##  ##",
+          "#    #",
+          "#    #",
+          "######",
+          "      " };
+
+        uint32_t bg = render_status->mapRGB(0, 0, 0);
+        uint32_t fg;
+
+        fg = render_status->mapRGB(0xFF, 0xFF, 0xFF); // Blue
+        crs_icon[CORE_RUN_STATE_UNKNOWN]     = new UIMonoIcon(vis, 6, 6, fg, bg, unknown_bitmap);
+
+        fg = render_status->mapRGB(0x00, 0xFF, 0x00); // Green
+        crs_icon[CORE_RUN_STATE_RUNNING]     = new UIMonoIcon(vis, 6, 6, fg, bg, run_bitmap); 
+
+        fg = render_status->mapRGB(0xA0, 0xA0, 0xA0); // White
+        crs_icon[CORE_RUN_STATE_HALTED]      = new UIMonoIcon(vis, 6, 6, fg, bg, halt_bitmap);
+
+        fg = render_status->mapRGB(0xFF, 0xC0, 0x00); // Yellow
+        crs_icon[CORE_RUN_STATE_STANDBY_WFE] = new UIMonoIcon(vis, 6, 6, fg, bg, wfe_bitmap);
+
+        fg = render_status->mapRGB(0xFF, 0x80, 0x00); // Orange
+        crs_icon[CORE_RUN_STATE_STANDBY_WFI] = new UIMonoIcon(vis, 6, 6, fg, bg, wfi_bitmap);
+
+        fg = render_status->mapRGB(0xA0, 0xA0, 0xA0); // White
+        crs_icon[CORE_RUN_STATE_IN_RESET]    = new UIMonoIcon(vis, 6, 6, fg, bg, reset_bitmap);
+
+        fg = render_status->mapRGB(0xE0, 0x40, 0x20); // Magenta
+        crs_icon[CORE_RUN_STATE_DORMANT]     = new UIMonoIcon(vis, 6, 6, fg, bg, dormant_bitmap);
+
+        fg = render_status->mapRGB(0xFF, 0x00, 0x00); // Red
+        crs_icon[CORE_RUN_STATE_SHUTDOWN]    = new UIMonoIcon(vis, 6, 6, fg, bg, shutdown_bitmap);
+    }
+
+    behavior init_status()
+    {
+        // Black background
+        render_status->fillRect(render_status->mapRGB(0, 0, 0),
+                                0, 0, lcd_width, status_height);
+
+        // Status region layout
+        // First line
+
+        delete user_dips_label;
+        user_dips_label = new Clabel(render_status, "^ON USERSW 1..8", VIS_FONT_WIDTH, 2);
+
+        // \todo If the user_switches port, etc. are not connected then the delegate
+        //       will assert fail.
+        delete user_dips;
+        user_dips = new Cdipswitch(render_status,
+                                   user_dips_label->getMaxX() + VIS_FONT_WIDTH*2, 1,
+                                   8, user_switches.getValue());
+
+        delete led_label;
+        led_label = new Clabel(render_status, "S6LED0..7",
+                               user_dips->getMaxX() + VIS_FONT_WIDTH*4, 2);
+
+
+        delete daughter_label;
+        if ( (number_of_daughter_leds != 0) || (number_of_daughter_user_switches !=0) )
+        {
+            daughter_label = new Clabel(render_status, "Daughter", 
+                                        led_label->getMaxX() + VIS_FONT_WIDTH*4, 2);
+        }
+
+        delete daughter_dips;
+        if (number_of_daughter_user_switches != 0)
+        {
+            daughter_dips = new Cdipswitch(render_status,
+                                           daughter_label->getMaxX() + VIS_FONT_WIDTH, 1,
+                                           number_of_daughter_user_switches,
+                                           daughter_user_switches_value);
+        }
+
+        // Second line
+        delete boot_dips_label;
+        boot_dips_label = new Clabel(render_status, "^ON BOOTSW 1..8",
+                                     user_dips_label->getX(), VIS_FONT_HEIGHT + 1);
+
+        delete boot_dips;
+        boot_dips = new Cdipswitch(render_status, user_dips->getX(), VIS_FONT_HEIGHT + 1,
+                                   8,  0);
+
+        delete user_led;
+        user_led = new Cled(render_status, led_label->getX(), VIS_FONT_HEIGHT + 2,
+                            8, 0);
+
+        delete daughter_led;
+        if (number_of_daughter_leds != 0)
+        {
+            daughter_led = new Cled( render_status,
+                                     daughter_label->getMaxX() + VIS_FONT_WIDTH, VIS_FONT_HEIGHT + 2,
+                                     number_of_daughter_leds, daughter_leds_value);
+        }
+
+        // Third line
+
+        // Cluster performance
+        unsigned col  = 1;
+        unsigned line = 2;
+        for(unsigned cluster=0; cluster<num_clusters; cluster++)
+        {
+            col = cluster_state[cluster].build_gui(render_status, 1, line++, num_clusters > 1, crs_icon) + 3;
+        }
+
+        delete label_time_perf;
+        label_time_perf  = new Clabel(render_status, 12,
+                               VIS_FONT_WIDTH*col, 1 + VIS_FONT_HEIGHT*2);
+        col += 12+1;
+
+        delete value_time_perf;
+        value_time_perf = new Clabel(render_status, 10,
+                               VIS_FONT_WIDTH*col, 1 + VIS_FONT_HEIGHT*2);
+        value_time_perf->setLeftJustify();
+
+        // Rate Limiting
+        delete rl_label;
+        rl_label = new Clabel(render_status, 14,
+                              lcd_width - VIS_FONT_WIDTH*(14+1), 2);
+        delete rl_button;
+        rl_button = new Cbutton(render_status,
+                                lcd_width - VIS_FONT_WIDTH - 15, VIS_FONT_HEIGHT,
+                                15, 11, disp_delay, VIS_RED);
+
+        // passive Grab/Release mouse text
+        delete mouse_label;
+        mouse_label = new Clabel(render_status, 31,
+                                 lcd_width - VIS_FONT_WIDTH*(31+1), VIS_FONT_HEIGHT*2);
+        mouse_label->setRightJustify();
+
+        // White divider
+        delete white_line;
+        white_line = new Cseparateline(render_status, 0, status_height - 2, lcd_width, 1);
+
+        draw_labels();
+        draw_leds();
+        draw_switches();
+        draw_buttons();
+        draw_divider();
+        draw_status(get_msTime());
+    }
+
+    behavior draw_buttons(void)
+    {
+        rl_button->setState(disp_delay);
+    }
+
+    behavior draw_leds(void)
+    {
+        bool led_change = false;
+
+        if (leds.getValue.implemented())
+            led_change = led_change || user_led->setState(leds.getValue());
+
+        if (daughter_led != 0)
+            led_change = led_change || daughter_led->setState(daughter_leds_value);
+
+        if (led_change)
+            calculateStats(true);
+    }
+
+    behavior draw_divider(void)
+    {
+        white_line->redraw();
+    }
+
+    behavior draw_labels(void)
+    {
+        for(unsigned i=0; i<MAX_CLUSTERS; i++)
+            cluster_state[i].redraw_labels(disp_totals);
+
+        label_time_perf->setLabel(disp_totals ? "Total Time: " : "Perf Index:");
+
+        user_dips_label->redraw();
+        boot_dips_label->redraw();
+        led_label->redraw();
+        if (daughter_label != 0)
+        {
+            daughter_label->redraw();
+        }
+        rl_label->setLabel(disp_delay ? "Rate Limit  ON" : "Rate Limit OFF" );
+        mouse_label->setLabel(toggle_mouse ? "Release mouse: LeftCtrl+LeftAlt" :
+                                             "Grab mouse: LeftCtrl+LeftAlt" );
+    }
+
+    behavior draw_switches(void)
+    {
+        if (user_switches.getValue.implemented())
+            user_dips->setState(user_switches.getValue());
+
+        if (daughter_dips != 0)
+            daughter_dips->setState(daughter_user_switches_value);
+
+        if (boot_switch.getValue.implemented())
+            boot_dips->setState(boot_switch.getValue());
+
+        redraw_daughter_switches = false;
+    }
+
+    behavior draw_status(uint32_t msTime)
+    {
+        char buf[30];
+
+        for(unsigned i=0; i<MAX_CLUSTERS; i++)
+            cluster_state[i].redraw_values(disp_totals);
+
+        if (disp_totals) {
+            value_time_perf->setLabel(ms2str(buf, msTime - start_time));
+        } else {
+            sprintf(buf,"%01.2f",sim_pidx);
+            value_time_perf->setLabel(buf);
+        }
+        draw_switches();
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        if (disable_visualisation)
+            return;
+
+        timer.timer_control.cancel();
+        timer.timer_control.set(5);
+
+        for(unsigned i=0; i<MAX_CLUSTERS; i++)
+            cluster_state[i].reset();
+
+        start_time     = get_msTime();
+        last_time      = start_time;
+        perf_index_real_time_ms = 0;
+        perf_index_sim_time_ms = 0;
+        throttle_last_real_time_ms = start_time;
+        throttle_budget = 0;
+        calculate_stats_phase = 0;
+
+        sim_pidx = 0.0;
+        mouse_abs_x = mouse_abs_y = 0;
+    }
+
+    behavior delete_gui_elements
+    {
+        if (disable_visualisation)
+            return;
+        delete user_dips_label;
+        delete user_dips;
+        delete boot_dips_label;
+        delete boot_dips;
+        delete led_label;
+        delete user_led;
+        delete daughter_label;
+        delete daughter_dips;
+        delete daughter_led;
+        delete rl_label;
+        delete rl_button;
+        delete label_time_perf;
+        delete value_time_perf;
+        delete mouse_label;
+        delete white_line;
+
+        delete render_status;
+        delete render_lcd;
+
+        delete vis;
+    }
+
+    behavior terminate()
+    {
+        delete_gui_elements();
+        if (disable_visualisation)
+            delete fake_layout;
+        // Explicitly invoke subcomponent's terminate() behavior.
+        composition.terminate();
+    }
+
+    behavior get_msTime(void) : uint32_t
+    {
+        #ifdef WIN32
+        return (GetTickCount());
+        #else
+        struct timeval tv;
+        if (gettimeofday(&tv, NULL) != 0) {
+            return 0;
+        }
+        return (tv.tv_sec*1000)+(tv.tv_usec/1000);
+        #endif
+    }
+
+    behavior toggleMouse(void)
+    {
+        toggle_mouse = !toggle_mouse;
+        toggle_mouse?vis->lockMouse(render_lcd):vis->unlockMouse();
+        draw_labels();
+    }
+
+    // Helper functions for processMessages
+    behavior handleKeyDown(ATKeyCode key)
+    {
+        if ( key < 256 )
+            keyboard.keyDown(key);
+
+        if ( key == KC_LCONTROL )
+            ctrl_key = true;
+
+        if ( key == (ATKeyCode)trap_key )
+            if (ctrl_key)
+                toggleMouse();
+    }
+
+    behavior handleKeyUp(ATKeyCode key)
+    {
+        if (key < 256)
+            keyboard.keyUp(key);
+
+        if ( key == KC_LCONTROL )
+            ctrl_key = false;
+    }
+
+    // process messages from and control VisEventRecorder subcomponent
+    internal master port<VisEventRecorderProtocol> recorderControl
+    {
+        master behavior processEvents()
+        {
+            processMessages(true);
+        }
+    }
+
+    // Process the GUI message loop
+    behavior processMessages(bool playback)
+    {
+        VisEvent event;
+
+        if (relayout_needed) {
+            reconfigureWindow();
+        }
+
+        while (((!playback) && vis->poll(&event)) || (playback && recorderControl.getEvent(&event)))
+        {
+            recorderControl.putEvent(&event);
+            switch(event.type)
+            {
+                case VisEvent::KEYDOWN:
+                    handleKeyDown((ATKeyCode)event.keysym);
+                    break;
+
+                case VisEvent::KEYUP:
+                    handleKeyUp((ATKeyCode)event.keysym);
+                    break;
+
+                case VisEvent::MOUSEBUTTONDOWN:
+                    if (event.region == render_status) {
+                        if (user_dips->isHit(event.abs_x, event.abs_y))
+                        {
+                            if (user_switches.setValue.implemented())
+                                user_switches.setValue(user_dips->getState());
+                        }
+                        else if (daughter_dips != 0 &&
+                                 daughter_dips->isHit(event.abs_x, event.abs_y))
+                        {
+                            daughter_user_switches_value = daughter_dips->getState();
+                        }
+                        else if (boot_dips->isHit(event.abs_x, event.abs_y))
+                        {
+                            if (boot_switch.setValue.implemented())
+                                boot_switch.setValue(boot_dips->getState());
+                        }
+                        else if (rl_button->isHit(event.abs_x, event.abs_y))
+                        {
+                            disp_delay = !disp_delay;
+                            if (disp_delay)
+                            {
+                                // reset throttling mechanism
+                                throttle_last_real_time_ms = get_msTime();
+                                throttle_budget = 0;
+                            }
+                            draw_buttons();
+                            draw_labels();
+                        }
+                        else
+                        {
+                            for(unsigned cluster=0; cluster<MAX_CLUSTERS; cluster++)
+                            {
+                                if (cluster_state[cluster].hit_gui(event.abs_x, event.abs_y))
+                                {
+                                    disp_totals = !disp_totals;
+                                    draw_labels();
+                                    calculateStats(true);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (event.region == render_lcd) {
+                        emit_mouse_move(event);
+                        if (mouse.mouseButton.implemented()) {
+                            mouse.mouseButton(event.button, true);
+                        }
+                        if (touch_screen.mouseButton.implemented()) {
+                            touch_screen.mouseButton(event.button, true);
+                        }
+                    }
+                    break;
+                case VisEvent::MOUSEBUTTONUP:
+                    if (event.region == render_lcd) {
+                        emit_mouse_move(event);
+                        if (mouse.mouseButton.implemented()) {
+                            mouse.mouseButton(event.button, false);
+                        }
+                        if (touch_screen.mouseButton.implemented())
+                            touch_screen.mouseButton(event.button, false);
+                    }
+                    break;
+                case VisEvent::MOUSEMOTION:
+                    if (event.region == render_lcd) {
+                        emit_mouse_move(event);
+                    }
+                    break;
+                case VisEvent::QUIT:
+                    // When the user clicks on close, this
+                    // will quit the simulation if it's running
+                    // headless, but just stop it if a debugger
+                    // is connected.
+                    if(!control_port.quit.empty())
+                        control_port.quit();
+                    break;
+                case VisEvent::None: break;
+            }
+        }
+    }
+
+    // emit mouse move event on render_lcd
+    behavior emit_mouse_move(const VisEvent &event)
+    {
+        // This functions does two non obvious things:
+        // - emit mouse.mouseMove() with a maximum step size of 100
+        //   (Some OSes can get out of sync when the step size is more than about 200.
+        //   This is rather harmless, as such big step sizes only occur when the mouse leaves
+        //   the LCD window and enters it again at a totally different location.)
+        // - emit relative move events based on differences of absolute values emitted through this interface
+        //   instead of the relative information in 'event'
+        //   (The absolute coordinates implicitly capture also mouse moves in the 'render_status' area.
+        //   The relative info in 'event' does not.)
+
+        // calculate relative mouse movements
+        int rel_x = event.abs_x - mouse_abs_x;
+        int rel_y = event.abs_y - mouse_abs_y;
+        mouse_abs_x = event.abs_x;
+        mouse_abs_y = event.abs_y;
+
+        // emit mouse.mouseMove() with a maximum step size of 100
+        int step = 100; // The value doesn't matter much. Some OSes can't deal with steps bigger than roughly 200.
+        if (mouse.mouseMove.implemented()) {
+            for (; rel_x | rel_y; )
+            {
+                int step_x = rel_x;
+                if (step_x < -step)
+                    step_x = -step;
+                else if (step_x > step)
+                    step_x = step;
+                int step_y = rel_y;
+                if (step_y < -step)
+                    step_y = -step;
+                else if (step_y > step)
+                    step_y = step;
+                mouse.mouseMove(step_x, step_y);
+                rel_x -= step_x;
+                rel_y -= step_y;
+            }
+        }
+        if (touch_screen.mouseMove.implemented()) {
+            touch_screen.mouseMove(event.abs_x,event.abs_y);
+        }
+    }
+
+    // LCD controller timing parameters have changed: attempt to adjust
+    // display size to match.
+    behavior resize_lcd(unsigned int w, unsigned int h)
+    {
+        if (w == lcd_width && h == lcd_height) {
+            return;
+        }
+        unsigned num_lines = 2 + num_clusters;
+        if (num_lines < 3) num_lines = 3;
+        status_height = VIS_FONT_HEIGHT*num_lines + 4;
+        lcd_width = w;
+        lcd_height = h;
+        relayout_needed = true;
+    }
+
+    behavior reconfigureWindow()
+    {
+        relayout_needed = false;
+        vis->configureWindow(lcd_width,
+                             lcd_height + status_height,
+                             24);
+        render_lcd->setLocation(0, status_height, lcd_width, lcd_height);
+        render_status->setLocation(0, 0, lcd_width, status_height);
+
+        init_status();
+    }
+
+    behavior ms2str(char *buf, uint32_t ms) : char *
+    {
+        int s, m, h, d;
+        s= ms/1000;
+        d = s/(60*60*24);
+        s = s-(d*60*60*24);
+        h = s/(60*60);
+        s = s-(h*60*60);
+        m = s/60;
+        s = s-(m*60);
+        if (d) {
+            sprintf(buf, "%dd, %d:%d:%d",d,h,m,s);
+        } else if (h){
+            sprintf(buf, "%2d:%02d:%02d",h,m,s);
+        }  else if (m) {
+            sprintf(buf, "%dm %02ds",m,s);
+        }  else {
+            sprintf(buf, "%ds",s);
+        }
+        return(buf);
+    }
+}

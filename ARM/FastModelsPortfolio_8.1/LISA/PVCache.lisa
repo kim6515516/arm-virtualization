@@ -1,0 +1,248 @@
+/*
+ * Copyright 2010,2011 ARM Limited. All rights reserved.
+ *
+ * This defines protocols and components that are private, subject to change
+ * and that should not be used outside of ARM.
+ */
+extern component PVCache
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "A PVCache is a cache implementation.";
+        hidden = true;
+    }
+
+    resources
+    {
+        PARAMETER {
+                name("number_of_sets"),
+                description("Number of sets"),
+                type(uint32_t),
+                default(2),
+                min(1)
+                } number_of_sets;
+        PARAMETER {
+                name("number_of_ways"),
+                description("Number of ways"),
+                type(uint32_t),
+                default(2),
+                min(1)
+                } number_of_ways;
+
+        PARAMETER {
+                name("cache_line_length_in_bytes"),
+                description("Number of bytes in a cache line"),
+                type(uint32_t),
+                default(8),
+                min(8)
+                } cache_line_length_in_bytes;
+
+        PARAMETER {
+                name("allow_prefetch_responses"),
+                description("Reduce accuracy of counting but speed up simulation performance"),
+                type(bool),
+                default(true)
+                } allow_prefetch_responses;
+
+        PARAMETER {
+                name("cache_state_modelled"),
+                description("Model the cache state."),
+                type(bool),
+                default(true)
+                    } cache_state_modelled;
+
+        PARAMETER {
+            name("ignore_local_dvm_messages"),
+                description("If this is the D-side cache then we should ignore the DVM messages passed to us."),
+                type(bool),
+        default(false)
+                } ignore_local_dvm_message;
+
+        PARAMETER {
+            name("percent_of_stexes_to_fail"),
+                description("The percent of store-exclusives to fail, even if they might have passed."),
+                type(uint32_t),
+                min(0),max(99),
+                runtime(false),
+        default(0)
+                } percent_of_stexes_to_fail;
+
+        PARAMETER {
+            name("bitmap_of_downstream_ports_with_a_snoop_channel"),
+                description("Bitmap of which downstream ports have a snoop channel.  Thus ACE-Lite ports do not have a snoop channel, neither do I-side caches."),
+                type(uint32_t),
+                min(0),max(0xFFFFffff),
+                runtime(false),
+        default(0xFFFFffff)
+                } bitmap_of_downstream_ports_with_a_snoop_channel;
+    }
+
+    // Connections in from bus master.
+    slave port<PVBus>               upstream[16];
+
+    // Connections out to bus slaves.
+    master port<PVBus>              downstream[16];
+
+    // Reset signal
+    slave port<Signal>              reset_in;
+
+    // Normally the cache is automatically cleared on reset, if this is high at
+    // the falling edge of reset then the RAMs will not be cleared.  This is
+    // used for implementing sleep where the RAM contents are valid and are
+    // retained.  If this is unconnected, then default is determined by the
+    // personality of the cache.  Some caches may not have this facility and
+    // calling this may invoke an error.
+    slave port<Signal>              ram_clear_on_reset_disable;
+
+    // Perform cache maintenance operations.
+    slave port<PVCacheMaintenance>  maintenance;
+
+    //
+    // ACE defined pins
+    //
+    slave port<Signal>  broadcastinner;
+    slave port<Signal>  broadcastouter;
+    slave port<Signal>  broadcastcachemaint;
+
+    // Debug port.
+    slave port<PVCacheDebugRam>  debug_ram;
+}
+
+protocol CCIInterconnectControl
+{
+    includes
+    {
+        namespace CCIInterconnect { class control_if; }
+    }
+
+    properties {
+        version = "8.1.37";
+        description = "A protocol for obtaining the control interface for the CCIInterconnect component.";
+    }
+
+
+    //
+    // The 'slave' is the CCIInterconnect component
+    //
+
+    slave behavior getControlIf() : CCIInterconnect::control_if*;
+}
+
+extern component CCIInterconnect
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "Internal implementation of the CCI400 interconnect.";
+        hidden = true;
+    }
+
+    ///
+    /// Limitations:
+    ///     - pending snoop requests not modelled.
+    ///     - imprecise error responses are not modelled
+    ///     - some events related to micro-architecture are not modelled.
+    ///
+
+    resources
+    {
+        PARAMETER {
+            name("cache_line_length_in_bytes"),
+                description("Number of bytes in a cache line"),
+                type(uint32_t),
+        default(8),
+                min(8)
+                } cache_line_length_in_bytes;
+
+        PARAMETER {
+            name("cache_state_modelled"),
+                description("Model the cache state."),
+                type(bool),
+        default(true)
+                } cache_state_modelled;
+
+        PARAMETER {
+            name("broadcastcachemain"),
+                description("For each downstream port a bit determines if broadcast cache maintenance operations are forwarded down that port."),
+                type(uint32_t),
+                min(0), max(7),
+        default(0)
+                } broadcastcachemain_parameter;
+
+        PARAMETER {
+            name("acchannelen"),
+                description("For each upstream port, determine if it is enabled or not w.r.t. snoop requests."),
+                type(uint32_t),
+                min(0), max(31),
+        default(31)
+                } acchannelen_parameter;
+
+        PARAMETER {
+            name("barrierterminate"),
+                description("For each downstream port, determine if barriers will be terminated at that port."),
+                type(uint32_t),
+                min(0), max(7),
+        default(7)
+                } barrierterminate_parameter;
+
+        PARAMETER {
+            name("bufferableoverride"),
+                description("For each downstream port, determine if all transactions will be forced to non-bufferable."),
+                type(uint32_t),
+                min(0), max(7),
+        default(0)
+                } bufferableoverride_parameter;
+
+        PARAMETER {
+            name("force_on_from_start"),
+                description("The CCI will normally start up with snooping disabled, however, using this then we allow the model to start up as enabled without having to program it.  This is only setup at simulation reset and not at signal reset."),
+                type(bool),
+        default(false)
+                } force_on_from_start;
+    }
+
+    // Connections in from bus master.
+    //
+    // The upstream connections 4 and 5 are full ACE, the rest are I/O coherent
+    // with DVM (ACE-Lite + DVM).
+    slave port<PVBus>               upstream[5];
+
+    // Connections out to bus slaves.
+    master port<PVBus>              downstream[1];
+
+    // Reset signal
+    slave port<Signal>              reset_in;
+
+    /// A three bit signal saying whether to broadcast cache maintenance down
+    /// each of the downstream masters.  As we only have a single downstream
+    /// port then setting any of the bits will make it work.
+    slave port<Value>               broadcastcachemain;
+
+    /// A three bit signal saying whether to terminate barriers at the
+    /// downstream ports.
+    slave port<Value>               barrierterminate;
+
+    /// A three bit signal saying whether to force all transactions out of this
+    /// port to be non-bufferable (AWCACHE[0] is forced to 0).
+    slave port<Value>               bufferableoverride;
+
+    /// A signal saying that the imprecise error register is non-zero
+    master port<Signal>             errorirq;
+
+    /// A signal saying which of the channels are enabled.
+    slave port<Value>               acchannelen;
+
+    /// A port that is used to control the CCIInterconnect from the register
+    /// file implementation.
+    slave port<CCIInterconnectControl>  control;
+
+    /// Export events from the CCIInterconnect to the register file
+    /// implementation.
+    master port<EventBus>               event_bus;
+
+    /// For informational purposes we can tell the CCI the reset state of the
+    /// upstream system attached to the corresponding upstream[] port.
+    slave port<Signal>                  reset_state_of_upstream_port_3;
+    slave port<Signal>                  reset_state_of_upstream_port_4;
+}

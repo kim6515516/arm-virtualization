@@ -1,0 +1,146 @@
+/*
+ * Copyright 2009 ARM Limited. All rights reserved.
+ *
+ * This defines protocols and components that are private, subject to change
+ * and that should not be used outside of PL310 model.
+ */
+
+// This protocol defines behaviors that are private, subject to change and
+// that should not be used outside of PVBusCache component.
+protocol PVBusCacheControl
+{
+    properties { 
+        version = "8.1.37";
+        description = "PVBusCacheControl Protocol";
+    }
+
+    includes
+    {
+        #include "pv/PVBusCache.h"
+        #include "pv/PVBusMaster.h"
+    }
+
+    // Get a transaction generator on the given output port. See PVBusMaster.
+    slave behavior createTransactionGenerator(unsigned output_port) 
+                   : pv::TransactionGenerator *;
+
+    // Revoke all responses given from the routeTransaction() callback
+    slave behavior revokeRoutingDecisions();
+
+    // Pass through an unmodified read request.
+    // If a burst transaction spans more than one line, this will only
+    // handle one line's worth of the burst.
+    slave behavior passThroughRead(unsigned output_port,
+                                   pv::ReadTransaction tx)
+                   : pv::Tx_Result;
+
+    // Pass through an unmodified write request.
+    // If a burst transaction spans more than one line, this will only
+    // handle one line's worth of the burst.
+    slave behavior passThroughWrite(unsigned output_port,
+                                    pv::WriteTransaction tx)
+                   : pv::Tx_Result;
+
+    // Mark the current read transaction as hitting a cache line.
+    // All future transactions with the same attributes may be handled
+    // efficiently by PVBusCache, rather than being sent to the device
+    // cacheRead()/cacheWrite() handlers.
+    slave behavior readFromLine(pv::ReadTransaction tx, 
+                                unsigned hit_line_index)
+                   : pv::Tx_Result;
+
+    // Mark the current write transaction as hitting a cache line.
+    // All future transactions with the same attributes may be handled
+    // efficiently by PVBusCache, rather than being sent to the device
+    // cacheRead()/cacheWrite() handlers.
+    slave behavior writeToLine(pv::WriteTransaction tx, 
+                               unsigned hit_line_index)
+                   : pv::Tx_Result;
+
+    // Write the transaction data into a cache line, but also pass it 
+    // through to a slave port.
+    // If a burst transaction spans more than one line, this will only
+    // handle one line's worth of the burst.
+    slave behavior writeToLineAndPassThrough(pv::WriteTransaction tx, 
+                                             unsigned hit_line_index,
+                                             unsigned output_port)
+                   : pv::Tx_Result;
+
+    // Revoke a line that has been marked as hitting.
+    slave behavior invalidateLineHit(unsigned hit_line_index,
+                                     pv::CacheRevocation revoke_type);
+
+    // Get temporary write-access to the line-data managed by PVBusCache.
+    // Allocates new storage for lines as needed.
+    slave behavior getLineContentsForWrite(unsigned line_index) : char *;
+
+    // Get temporary read-access to the line-data managed by PVBusCache.
+    // The line must have already been previously initialised by
+    // calling getLineContentsForWrite.
+    slave behavior getLineContentsForRead(unsigned line_index) : const char *;
+}
+
+// This protocol defines behaviors that are private, subject to change and
+// that should not be used outside of PVBusCache component.
+protocol PVBusCacheDevice
+{
+    properties { 
+        version = "8.1.37";
+        description = "PVBusCacheDevice Protocol";
+    }
+
+    includes
+    {
+        #include "pv/PVBus.h"
+        #include "pv/PVBusCache.h"
+    }
+
+    // Handle a read request to the cache.
+    // For burst transactions, the cache can return after handling one
+    // line's worth of transaction data, and it will be called back for the
+    // first beat on the next cache line.
+    slave behavior cacheRead(unsigned            in_port, 
+                             pv::ReadTransaction tx) 
+                   : pv::Tx_Result;
+
+    // Handle a write request to the cache
+    slave behavior cacheWrite(unsigned             in_port, 
+                              pv::WriteTransaction tx) 
+                   : pv::Tx_Result;
+
+    // Determine whether this transaction is cacheable; if not, decide
+    // which output port should forward the transaction.
+    slave behavior routeTransaction(unsigned        in_port, 
+                                    pv::Transaction tx)
+                   : pv::CacheRoutingDecision;
+}
+
+// This component defines parameters and ports that are private, subject to
+// change and that should not be used outside of PL310 model.
+extern component PVBusCache
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "A PVBusCache manages cache-line data and supports forwarding of transactions.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    resources
+    {
+        PARAMETER { description("Size of cache lines in bytes"), type(uint32_t), default(32) } line_size;
+        PARAMETER { description("Number of cache lines to manage"), type(uint32_t) } line_count;
+    }
+
+    // Connections in from bus master.
+    slave port<PVBus> bus_in[4];
+
+    // Connections out to bus slaves.
+    master port<PVBus> bus_out[4];
+
+    // Connection out to cache device.
+    master port<PVBusCacheDevice> device;
+
+    // Configuration/control port.
+    slave port<PVBusCacheControl> control;
+}

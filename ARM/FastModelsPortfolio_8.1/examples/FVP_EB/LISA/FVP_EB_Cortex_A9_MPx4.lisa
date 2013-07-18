@@ -1,0 +1,167 @@
+/*
+ * Copyright 2008-2009 ARM Limited. All rights reserved.
+ */
+
+component FVP_EB_Cortex_A9_MPx4
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Top level component of Cortex-A9_MPx4 EB model.";
+    }
+    composition
+    {
+                virtualethernetcrossover : VirtualEthernetCrossover();
+                hostbridge : HostBridge();
+        clk50hz : ClockDivider(mul=50);
+        visualisation : EBVisualisation(cpu_name="Cortex-A9 MPx4 EB");
+        terminal_0 : TelnetTerminal();
+        terminal_1 : TelnetTerminal();
+        terminal_2 : TelnetTerminal();
+        terminal_3 : TelnetTerminal();
+        audioout : AudioOut_SDL();
+        coretile : EBCortexA9MPx4CoreTile();
+        baseboard : EmulationBaseboard(proc_id_tile_site1 = 0x0C000000, proc_id_tile_site2 = 0xFF000000,
+                                       tile1 = 1, tile2 = 0);
+        tick : MasterClock();
+    }
+    connection
+    {
+        tick.clk_out => baseboard.clk_in_master;
+        baseboard.display => visualisation.lcd;
+        baseboard.aaci_audio_out => audioout.audio;
+        baseboard.terminal[0] => terminal_0.serial;
+        baseboard.terminal[1] => terminal_1.serial;
+        baseboard.terminal[2] => terminal_2.serial;
+        baseboard.terminal[3] => terminal_3.serial;
+        coretile.hdr => baseboard.hdr;
+        coretile.ticks => visualisation.ticks;
+        visualisation.mouse => baseboard.mouse;
+        visualisation.keyboard => baseboard.keyboard;
+        baseboard.leds => visualisation.leds;
+        baseboard.user_switches => visualisation.user_switches;
+        baseboard.boot_switch => visualisation.boot_switch;
+        tick.clk_out => clk50hz.clk_in;
+        clk50hz.clk_out => visualisation.clock_50Hz;
+        visualisation.touch_screen => baseboard.touch_screen;
+        visualisation.lcd_layout => baseboard.lcd_layout;
+        hostbridge.eth => virtualethernetcrossover.devb;
+        baseboard.ethernet[0] => virtualethernetcrossover.deva;
+    }
+    behavior setupGlobalSystemAttributes()
+    {
+#ifdef HIDE_PARAMS
+        hideParameter("coretile.pl310_l2cc.cache-state_modelled");
+        hideParameter("coretile.pl310_l2cc.ASSOCIATIVITY");
+        hideParameter("coretile.pl310_l2cc.CACHEID");
+        hideParameter("coretile.pl310_l2cc.CFGADDRFILTEN");
+        hideParameter("coretile.pl310_l2cc.CFGADDRFILTEND");
+        hideParameter("coretile.pl310_l2cc.CFGADDRFILTSTART");
+        hideParameter("coretile.pl310_l2cc.REGFILEBASE");
+        hideParameter("coretile.pl310_l2cc.WAYSIZE");
+        hideParameter("coretile.pl310_l2cc.CFGBIGEND");
+        hideParameter("coretile.pl310_l2cc.LOCKDOWN_BY_MASTER");
+        hideParameter("coretile.pl310_l2cc.LOCKDOWN_BY_LINE");
+
+        hideParameter("coretile.eb_intmapper.num_interrupts");
+
+        hideParameter("coretile.core.CLUSTER_ID");
+        hideParameter("coretile.core.dic-spi_count");
+        hideParameter("coretile.core.FILTEREN");
+        hideParameter("coretile.core.FILTERSTART");
+        hideParameter("coretile.core.FILTEREND");
+        hideParameter("coretile.core.CFGSDISABLE");
+        hideParameter("coretile.core.icache-state_modelled");
+        hideParameter("coretile.core.dcache-state_modelled");
+        hideParameter("coretile.core.device-accurate-tlb");
+
+        hideParameter("coretile.core.cpu0.vfp-present");
+        hideParameter("coretile.core.cpu0.ase-present");
+        hideParameter("coretile.core.cpu0.CFGEND");
+        hideParameter("coretile.core.cpu0.CFGNMFI");
+        hideParameter("coretile.core.cpu0.CP15SDISABLE");
+        hideParameter("coretile.core.cpu0.TEINIT");
+        hideParameter("coretile.core.cpu0.VINITHI");
+        hideParameter("coretile.core.cpu0.SMPnAMP");
+        hideParameter("coretile.core.cpu0.POWERCTLI");
+        hideParameter("coretile.core.cpu0.vfp-enable_at_reset");
+        hideParameter("coretile.core.cpu0.dcache-size");
+        hideParameter("coretile.core.cpu0.icache-size");
+
+        hideParameter("coretile.core.cpu1.vfp-present");
+        hideParameter("coretile.core.cpu1.ase-present");
+        hideParameter("coretile.core.cpu1.CFGEND");
+        hideParameter("coretile.core.cpu1.CFGNMFI");
+        hideParameter("coretile.core.cpu1.CP15SDISABLE");
+        hideParameter("coretile.core.cpu1.TEINIT");
+        hideParameter("coretile.core.cpu1.VINITHI");
+        hideParameter("coretile.core.cpu1.SMPnAMP");
+        hideParameter("coretile.core.cpu1.POWERCTLI");
+        hideParameter("coretile.core.cpu1.vfp-enable_at_reset");
+        hideParameter("coretile.core.cpu1.dcache-size");
+        hideParameter("coretile.core.cpu1.icache-size");
+
+        hideParameter("coretile.core.cpu2.vfp-present");
+        hideParameter("coretile.core.cpu2.ase-present");
+        hideParameter("coretile.core.cpu2.CFGEND");
+        hideParameter("coretile.core.cpu2.CFGNMFI");
+        hideParameter("coretile.core.cpu2.CP15SDISABLE");
+        hideParameter("coretile.core.cpu2.TEINIT");
+        hideParameter("coretile.core.cpu2.VINITHI");
+        hideParameter("coretile.core.cpu2.SMPnAMP");
+        hideParameter("coretile.core.cpu2.POWERCTLI");
+        hideParameter("coretile.core.cpu2.vfp-enable_at_reset");
+        hideParameter("coretile.core.cpu2.dcache-size");
+        hideParameter("coretile.core.cpu2.icache-size");
+
+        hideParameter("coretile.core.cpu3.vfp-present");
+        hideParameter("coretile.core.cpu3.ase-present");
+        hideParameter("coretile.core.cpu3.CFGEND");
+        hideParameter("coretile.core.cpu3.CFGNMFI");
+        hideParameter("coretile.core.cpu3.CP15SDISABLE");
+        hideParameter("coretile.core.cpu3.TEINIT");
+        hideParameter("coretile.core.cpu3.VINITHI");
+        hideParameter("coretile.core.cpu3.SMPnAMP");
+        hideParameter("coretile.core.cpu3.POWERCTLI");
+        hideParameter("coretile.core.cpu3.vfp-enable_at_reset");
+        hideParameter("coretile.core.cpu3.dcache-size");
+        hideParameter("coretile.core.cpu3.icache-size");
+
+        hideParameter("visualisation.window_title");
+
+        hideParameter("visualisation.recorder.recordingFileName");
+        hideParameter("visualisation.recorder.playbackFileName");
+        hideParameter("visualisation.recorder.recordingTimeBase");
+        hideParameter("visualisation.recorder.verbose");
+        hideParameter("visualisation.daughter_led_count");
+        hideParameter("visualisation.daughter_user_switch_count");
+        hideParameter("visualisation.recorder.checkInstructionCount");
+
+        hideParameter("baseboard.uart_3.clock_rate");
+        hideParameter("baseboard.uart_3.baud_rate");
+        hideParameter("baseboard.uart_3.uart_enable");
+        hideParameter("baseboard.uart_3.out_file");
+        hideParameter("baseboard.uart_3.in_file");
+        hideParameter("baseboard.uart_3.in_file_escape_sequence");
+        hideParameter("baseboard.uart_2.clock_rate");
+        hideParameter("baseboard.uart_2.baud_rate");
+        hideParameter("baseboard.uart_2.uart_enable");
+        hideParameter("baseboard.uart_2.out_file");
+        hideParameter("baseboard.uart_2.in_file");
+        hideParameter("baseboard.uart_2.in_file_escape_sequence");
+        hideParameter("baseboard.uart_1.clock_rate");
+        hideParameter("baseboard.uart_1.baud_rate");
+        hideParameter("baseboard.uart_1.uart_enable");
+        hideParameter("baseboard.uart_1.out_file");
+        hideParameter("baseboard.uart_1.in_file");
+        hideParameter("baseboard.uart_1.in_file_escape_sequence");
+        hideParameter("baseboard.uart_0.clock_rate");
+        hideParameter("baseboard.uart_0.baud_rate");
+        hideParameter("baseboard.uart_0.uart_enable");
+        hideParameter("baseboard.uart_0.out_file");
+        hideParameter("baseboard.uart_0.in_file");
+        hideParameter("baseboard.uart_0.in_file_escape_sequence");
+#endif
+    }
+}

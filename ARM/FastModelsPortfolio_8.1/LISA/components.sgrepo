@@ -1,0 +1,413 @@
+component "AudioOut_File"
+{
+        path="../LISA/AudioOut_File.lisa";
+}
+component "AudioOut_SDL"
+{
+        path="../LISA/AudioOut_SDL.lisa";
+}
+component "CounterModule"
+{
+        path="../LISA/CounterModule.lisa";
+}
+component "FlashLoader"
+{
+        path="../LISA/FlashLoader.lisa";
+}
+component "OrGate"
+{
+        path="../LISA/Gate.lisa";
+}
+component "AndGate"
+{
+        path="../LISA/Gate.lisa";
+}
+component "GUIPoll"
+{
+        path="../LISA/GUIPoll.lisa";
+}
+
+component "CCI400"
+{
+        path="../LISA/CCI400.lisa";
+}
+component "CCIRegisters"
+{
+        path="../LISA/CCIRegisters.lisa";
+}
+component "ICS307"
+{
+        path="../LISA/ICS307.lisa";
+}
+component "PL011_Uart"
+{
+        path="../LISA/PL011_Uart.lisa";
+}
+component "PL022_SSP"
+{
+        path="../LISA/PL022_SSP.lisa";
+}
+component "PL030_RTC"
+{
+        path="../LISA/PL030_RTC.lisa";
+}
+component "PL050_KMI"
+{
+        path="../LISA/PL050_KMI.lisa";
+}
+component "PL080_DMAC"
+{
+        path="../LISA/PL080_DMAC.lisa";
+}
+component "PL110_CLCD"
+{
+        path="../LISA/PL110_CLCD.lisa";
+}
+component "PL111_CLCD"
+{
+        path="../LISA/PL111_CLCD.lisa";
+}
+component "PL11x_CLCD"
+{
+        path="../LISA/PL11x_CLCD.lisa";
+}
+component "PL370_HDLCD"
+{
+        path="../LISA/PL370_HDLCD.lisa";
+}
+component "PS2Keyboard"
+{
+        path="../LISA/PS2Keyboard.lisa";
+}
+component "PS2Mouse"
+{
+        path="../LISA/PS2Mouse.lisa";
+}
+component "RAMDevice"
+{
+        path="../LISA/RAMDevice.lisa";
+}
+component "SMSC_91C111"
+{
+        path="../LISA/SMSC_91C111.lisa";
+}
+component "SerialCrossover"
+{
+        path="../LISA/SerialCrossover.lisa";
+}
+component "TelnetTerminal"
+{
+        path="../LISA/TelnetTerminal.lisa";
+}
+component "UnusedPrimeCell"
+{
+        path="../LISA/UnusedPrimeCell.lisa";
+}
+component "TZIC"
+{
+        path="../LISA/TZIC.lisa";
+}
+component "PL031_RTC"
+{
+        path="../LISA/PL031_RTC.lisa";
+}
+component "PL041_AACI"
+{
+        path="../LISA/PL041_AACI.lisa";
+}
+component "SP804_Timer"
+{
+        path="../LISA/SP804_Timer.lisa";
+}
+component "SP810_SysCtrl"
+{
+        path="../LISA/SP810_SysCtrl.lisa";
+}
+component "BP147_TZPC"
+{
+        path="../LISA/BP147_TZPC.lisa";
+}
+component "BP141_TZMA"
+{
+        path="../LISA/BP141_TZMA.lisa";
+}
+component "BP135_AXI2APB"
+{
+        path="../LISA/BP135_AXI2APB.lisa";
+}
+component "MMC"
+{
+        path="../LISA/MMC.lisa";
+}
+component "PL180_MCI"
+{
+        path="../LISA/PL180_MCI.lisa";
+}
+component "PL192_VIC"
+{
+        path="../LISA/PL192_VIC.lisa";
+}
+component "PL061_GPIO"
+{
+        path="../LISA/PL061_GPIO.lisa";
+}
+component "PL310_L2CC"
+{
+        path="../LISA/PL310_L2CC.lisa";
+}
+component "PL340_DMC"
+{
+        path="../LISA/PL340_DMC.lisa";
+}
+component "PL350_SMC"
+{
+        path="../LISA/PL350_SMC.lisa";
+}
+component "PL350_SMC_NAND_FLASH"
+{
+        path="../LISA/PL350_SMC_NAND_FLASH.lisa";
+}
+component "PL390_GIC"
+{
+        path="../LISA/PL390_GIC.lisa";
+}
+component "BP135TZSwitchControl"
+{
+        path="../LISA/BP135TZSwitchControl.lisa";
+}
+component "SP805_Watchdog"
+{
+        path="../LISA/SP805_Watchdog.lisa";
+}
+component "VisEventRecorder"
+{
+        path="../LISA/VisEventRecorder.lisa";
+}
+component "PL330_DMAC"
+{
+        path = "../LISA/PL330_DMAC.lisa";
+}
+
+protocol "VisEventRecorderProtocol"
+{
+        path="../LISA/VisEventRecorderProtocol.lisa";
+}
+protocol "MMC_Protocol"
+{
+        path="../LISA/MMC_Protocol.lisa";
+}
+protocol "AudioControl"
+{
+        path="../LISA/AudioControlProtocol.lisa";
+}
+protocol "CompoundPortLisa"
+{
+        path="../LISA/CompoundPort.lisa";
+}
+protocol "FlashLoaderPort"
+{
+        path="../LISA/FlashLoaderPort.lisa";
+}
+protocol "LCD"
+{
+        path="../LISA/LCDPort.lisa";
+}
+protocol "GUIPollCallback"
+{
+        path="../LISA/GUIPollCallbackPort.lisa";
+}
+protocol "ICS307Configuration"
+{
+        path="../LISA/ICS307ConfigurationPort.lisa";
+}
+protocol "KeyboardStatus"
+{
+        path="../LISA/KeyboardStatusProtocol.lisa";
+}
+protocol "MouseStatus"
+{
+        path="../LISA/MouseStatusProtocol.lisa";
+}
+protocol "PS2Data"
+{
+        path="../LISA/PS2DataProtocol.lisa";
+}
+protocol "SerialData"
+{
+        path="../LISA/SerialData.lisa";
+}
+protocol "PL080_DMAC_DmaPortProtocol"
+{
+        path="../LISA/PL080_DMAC_DmaPortProtocol.lisa";
+}
+protocol "PL330_DMAC_DmaPortProtocol"
+{
+        path="../LISA/PL330_DMAC_DmaPortProtocol.lisa";
+}
+
+# Virtual Ethernet
+protocol "VirtualEthernet"
+{
+        path="../LISA/VirtualEthernetProtocol.lisa";
+}
+component "VirtualEthernetCrossover"
+{
+        path="../LISA/VirtualEthernetCrossover.lisa";
+}
+component "VirtualEthernetHub3"
+{
+        path="../LISA/VirtualEthernetHub3.lisa";
+}
+component "HostBridge"
+{
+        path="../LISA/HostBridge.lisa";
+}
+# End Virtual Ethernet
+
+component "v7_VGIC"
+{
+        path="../LISA/v7_VGIC.lisa";
+}
+protocol "v7_VGIC_Configuration_Protocol"
+{
+        path="../LISA/v7_VGIC_Configuration_Protocol.lisa";
+}
+component "GIC_400"
+{
+        path="../LISA/GIC_400.lisa";
+}
+protocol "GICv3Comms"
+{
+        path="../LISA/GICv3Comms.lisa";
+}
+
+component "MemoryMappedCounterModule"
+{
+        path="../LISA/MemoryMappedCounterModule.lisa";
+}
+component "RealtimeClockTimer"
+{
+        path="../LISA/RealtimeClockTimer_Linux.lisa", platform="Linux|Linux64";
+        path="../LISA/RealtimeClockTimer_Windows.lisa", platform="Win32|Win32D|Win64|Win64D";
+}
+
+protocol "EventBus"
+{
+        path="../LISA/EventBus.lisa";
+}
+
+component "ElfLoader"
+{
+        path="../LISA/ElfLoader.lisa";
+        path = "../include/fmruntime/";
+}
+
+component "Labeller"
+{
+        path="../LISA/Labeller.lisa";
+}
+
+component "WarningMemory"
+{
+        path="../LISA/WarningMemory.lisa";
+}
+
+component "DMC_400"
+{
+        path="../LISA/DMC_400.lisa";
+}
+
+component "TZC_400"
+{
+        path="../LISA/TZC_400.lisa";
+}
+
+component "TZFilterUnit"
+{
+        path="../LISA/TZFilterUnit.lisa";
+}
+
+component "TZDummyDevice"
+{
+        path="../LISA/TZFilterUnit.lisa";
+}
+
+component "VirtioBlockDevice"
+{
+    path = "VirtioBlockDevice.lisa";
+}
+
+files
+(
+        path = "../include/";
+        
+        path = "../lib/Linux_GCC-4.1/liblan91c111.a", platform="linux",compiler="gcc|gcc-4.1";
+        path = "../lib/Linux_GCC-4.1/libcomponents.a", platform="linux",compiler="gcc|gcc-4.1";
+        path = "../lib/Linux_GCC-4.1/libz.a", platform="linux",compiler="gcc|gcc-4.1";
+        path = "../lib/Linux_GCC-4.1/libSDL-1.2.so.0.11.2", platform="linux",compiler="gcc|gcc-4.1";
+
+        path = "../lib/Linux64_GCC-4.1/libcomponents.a", platform="linux64",compiler="gcc|gcc-4.1";
+        path = "../lib/Linux64_GCC-4.1/liblan91c111.a", platform="linux64",compiler="gcc|gcc-4.1";
+        path = "../lib/Linux64_GCC-4.1/libz.a", platform="linux64",compiler="gcc|gcc-4.1";
+        path = "../lib/Linux64_GCC-4.1/libSDL-1.2.so.0.11.2", platform="linux64",compiler="gcc|gcc-4.1";
+
+        path = "../lib/Linux_GCC-4.4/liblan91c111.a", platform="linux",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+        path = "../lib/Linux_GCC-4.4/libcomponents.a", platform="linux",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+        path = "../lib/Linux_GCC-4.4/libz.a", platform="linux",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+        path = "../lib/Linux_GCC-4.4/libSDL-1.2.so.0.11.2", platform="linux",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+
+        path = "../lib/Linux64_GCC-4.4/libcomponents.a", platform="linux64",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+        path = "../lib/Linux64_GCC-4.4/liblan91c111.a", platform="linux64",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+        path = "../lib/Linux64_GCC-4.4/libz.a", platform="linux64",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+        path = "../lib/Linux64_GCC-4.4/libSDL-1.2.so.0.11.2", platform="linux64",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+
+        path = "../lib/Win32_VC2005/Release/components.lib", platform="win32",compiler="VC2005";
+        path = "../lib/Win32_VC2005/Debug/components.lib", platform="win32d",compiler="VC2005";
+        path = "../lib/Win32_VC2005/Release/lan91c111.lib", platform="win32",compiler="VC2005";
+        path = "../lib/Win32_VC2005/Debug/lan91c111.lib", platform="win32d",compiler="VC2005";
+        path = "../lib/Win32_VC2005/Release/zlib.lib", platform="win32",compiler="VC2005";
+        path = "../lib/Win32_VC2005/Debug/zlib.lib", platform="win32d",compiler="VC2005";
+
+        path = "../lib/Win32_VC2005/Release/SDL.dll", platform="win32",compiler="VC2005";
+        path = "../lib/Win32_VC2005/Debug/SDL.dll", platform="win32d",compiler="VC2005";
+
+        path = "../lib/Win32_VC2008/Release/components.lib", platform="win32",compiler="VC2008";
+        path = "../lib/Win32_VC2008/Debug/components.lib", platform="win32d",compiler="VC2008";
+        path = "../lib/Win32_VC2008/Release/lan91c111.lib", platform="win32",compiler="VC2008";
+        path = "../lib/Win32_VC2008/Debug/lan91c111.lib", platform="win32d",compiler="VC2008";
+        path = "../lib/Win32_VC2008/Release/zlib.lib", platform="win32",compiler="VC2008";
+        path = "../lib/Win32_VC2008/Debug/zlib.lib", platform="win32d",compiler="VC2008";
+
+        path = "../lib/Win32_VC2008/Release/SDL.dll", platform="win32",compiler="VC2008";
+        path = "../lib/Win32_VC2008/Debug/SDL.dll", platform="win32d",compiler="VC2008";
+
+        path = "../lib/Win64_VC2008/Release/components.lib", platform="win64",compiler="VC2008";
+        path = "../lib/Win64_VC2008/Debug/components.lib", platform="win64d",compiler="VC2008";
+        path = "../lib/Win64_VC2008/Release/lan91c111.lib", platform="win64",compiler="VC2008";
+        path = "../lib/Win64_VC2008/Debug/lan91c111.lib", platform="win64d",compiler="VC2008";
+        path = "../lib/Win64_VC2008/Release/zlib.lib", platform="win64",compiler="VC2008";
+        path = "../lib/Win64_VC2008/Debug/zlib.lib", platform="win64d",compiler="VC2008";
+
+        path = "../lib/Win64_VC2008/Release/SDL.dll", platform="win64",compiler="VC2008";
+        path = "../lib/Win64_VC2008/Debug/SDL.dll", platform="win64d",compiler="VC2008";
+
+        path = "../lib/Win32_VC2010/Release/components.lib", platform="win32",compiler="VC2010";
+        path = "../lib/Win32_VC2010/Debug/components.lib", platform="win32d",compiler="VC2010";
+        path = "../lib/Win32_VC2010/Release/lan91c111.lib", platform="win32",compiler="VC2010";
+        path = "../lib/Win32_VC2010/Debug/lan91c111.lib", platform="win32d",compiler="VC2010";
+        path = "../lib/Win32_VC2010/Release/zlib.lib", platform="win32",compiler="VC2010";
+        path = "../lib/Win32_VC2010/Debug/zlib.lib", platform="win32d",compiler="VC2010";
+
+        path = "../lib/Win32_VC2010/Release/SDL.dll", platform="win32",compiler="VC2010";
+        path = "../lib/Win32_VC2010/Debug/SDL.dll", platform="win32d",compiler="VC2010";
+
+        path = "../lib/Win64_VC2010/Release/components.lib", platform="win64",compiler="VC2010";
+        path = "../lib/Win64_VC2010/Debug/components.lib", platform="win64d",compiler="VC2010";
+        path = "../lib/Win64_VC2010/Release/lan91c111.lib", platform="win64",compiler="VC2010";
+        path = "../lib/Win64_VC2010/Debug/lan91c111.lib", platform="win64d",compiler="VC2010";
+        path = "../lib/Win64_VC2010/Release/zlib.lib", platform="win64",compiler="VC2010";
+        path = "../lib/Win64_VC2010/Debug/zlib.lib", platform="win64d",compiler="VC2010";
+
+        path = "../lib/Win64_VC2010/Release/SDL.dll", platform="win64",compiler="VC2010";
+        path = "../lib/Win64_VC2010/Debug/SDL.dll", platform="win64d",compiler="VC2010";
+)

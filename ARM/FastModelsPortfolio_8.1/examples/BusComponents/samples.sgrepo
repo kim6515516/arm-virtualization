@@ -1,0 +1,12 @@
+component "RAM_16MB"
+{
+    path="RAM.lisa";
+}
+component "BitLatch"
+{
+    path="BitLatch.lisa";
+}
+component "DmaTransfer"
+{
+    path="DmaTransfer.lisa";
+}

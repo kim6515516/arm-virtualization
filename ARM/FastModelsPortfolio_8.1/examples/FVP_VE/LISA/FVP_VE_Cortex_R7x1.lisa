@@ -1,0 +1,32 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+ 
+component FVP_VE_Cortex_R7x1
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Top level component of the Cortex_R7x1 Versatile Express inspired model.";
+    }
+
+    composition
+    {
+        masterclock : MasterClock();
+        clockdivider : ClockDivider("mul"=100000000);
+        daughterboard : VEDaughterBoardCortex_R7x1();
+        vemotherboard : VEMotherBoardR();
+    }
+    connection
+    {
+        masterclock.clk_out => clockdivider.clk_in;
+        masterclock.clk_out => vemotherboard.masterclk;
+        clockdivider.clk_out => daughterboard.clk_in;
+
+        daughterboard.pvbus_m0 => vemotherboard.core_pvbus;
+        daughterboard.ticks => vemotherboard.cluster0_ticks[0];
+
+        vemotherboard.interrupts => daughterboard.interrupts;
+    }
+}

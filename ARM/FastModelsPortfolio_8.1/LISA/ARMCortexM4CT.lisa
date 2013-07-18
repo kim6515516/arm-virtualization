@@ -1,0 +1,107 @@
+/*
+ * Copyright 2007-2009 ARM Limited. All rights reserved.
+ */
+
+extern component ARMCortexM4CT
+{
+    properties {
+        executes_software = 1; 
+        version = "8.1.37";
+        component_type = "Core";
+        description = "ARMCortexM4CT CPU component";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    resources
+    {
+        PARAMETER { description("Set whether model has VFP support"), name("vfp-present"), type(bool), default(true) } vfp_present;
+        PARAMETER { description("Enable semihosting SVN traps"), name("semihosting-enable"), type(bool), default(true) } semihosting_enable;
+        PARAMETER { description("Thumb SVC number for semihosting"), name("semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFFFFFFFF) } semihosting_Thumb_SVC;
+        PARAMETER { description("Command line available to semihosting SVC calls"), name("semihosting-cmd_line"), type(string), default("") } semihosting_cmd_line;
+        PARAMETER { description("Virtual address of heap base"), name("semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF) } semihosting_heap_base;
+        PARAMETER { description("Virtual address of top of heap"), name("semihosting-heap_limit"), type(uint32_t), default(0x10700000), min(0x0), max(0xFFFFFFFF) } semihosting_heap_limit;
+        PARAMETER { description("Virtual address of base of descending stack"), name("semihosting-stack_base"), type(uint32_t), default(0x10700000), min(0x0), max(0xFFFFFFFF) } semihosting_stack_base;
+        PARAMETER { description("Virtual address of stack limit"), name("semihosting-stack_limit"), type(uint32_t), default(0x10800000), min(0x0), max(0xFFFFFFFF) } semihosting_stack_limit;
+        PARAMETER { name("semihosting-cwd"), type(string), default("")} semihosting_cwd;
+        PARAMETER { name("min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } min_sync_level;
+        PARAMETER { description("Number of MPU regions"), name("NUM_MPU_REGION"), type(uint32_t), default(0x8), min(0x0), max(0x8) } NUM_MPU_REGION;
+        PARAMETER { description("Number of user interrupts"), name("NUM_IRQ"), type(uint32_t), default(0x10), min(0x0), max(0xF0) } NUM_IRQ;
+        PARAMETER { description("Number of bits of interrupt priority"), name("LVL_WIDTH"), type(uint32_t), default(0x3), min(0x3), max(0x8) } LVL_WIDTH;
+        PARAMETER { description("Initialize core to bigendian mode"), name("BIGENDINIT"), type(bool), default(false) } BIGENDINIT;
+        PARAMETER { description("Support bit-banding"), name("BB_PRESENT"), type(bool), default(true) } BB_PRESENT;
+        PARAMETER { description("Master ID presented in bus transactions"), name("master_id"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF) } master_id;
+    }
+    
+    // The clock signal connected to the clk_in port is used to determine
+    // the rate at which the core executes instructions.
+    slave port<ClockSignal> clk_in;
+
+    // This is the reference clock for the SysTick timer
+    slave port<ClockSignal> stclk;
+
+    // This is the calibration value for the SysTick timer
+    slave port<Value> stcalib;
+
+    // The core will generate bus requests on this port.
+    master port<PVBus> pvbus_m;
+
+    // The core will generate External Private Peripheral Bus requests on this port.
+    master port<PVBus> pv_ppbus_m;
+
+    // Asserted when the processor is in sleep
+    master port<Signal> sleeping;
+
+    // Asserted when the processor is in deep sleep
+    master port<Signal> sleepdeep;
+
+    // Asserted when the processor is in lockup state
+    master port<Signal> lockup;
+        
+    // Raising this signal will do a power-on reset of the core
+    slave port<Signal> poreset;
+
+    // Raising this signal will put the core into reset mode
+    // (but does not reset the debug logic)
+    slave port<Signal> sysreset;
+
+    // Asserted to indicate that a reset is required
+    master port<Signal> sysresetreq;
+
+    // This peer port of event input (and output) is for wakeup from WFE
+    // and corresponds to the RTL TXEV and RXEV signals
+    peer port<Signal> event;
+
+    // This signal array delivers signals to the NVIC
+    slave port<Signal> intisr[240];
+
+    // Configure non maskable interrupt
+    slave port<Signal> intnmi;
+
+    // Configure big endian data format
+    slave port<Signal> bigend;
+
+    // Configure core with no FPU on reset
+    slave port<Signal> fpudisable;
+
+    // Configure core with no MPU on reset
+    slave port<Signal> mpudisable;
+
+    // This is wired to the Auxiliary Fault Status Register
+    slave port<Value> auxfault;
+
+    // Disallow (DAP) debugger access
+    slave port<Signal> dbgen;
+
+    // Current execution priority
+    master port<Value> currpri;
+
+    // External debug request
+    slave port<Signal> edbgrq;
+
+    // Port allowing the number of instructions since startup to be read from the CPU.
+    master port<InstructionCount> ticks;
+
+    // Send the value of the FPXXC cumulative exception flags
+    master port<Value> fpxxc;
+}
+

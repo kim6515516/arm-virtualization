@@ -1,0 +1,16 @@
+component "IntelStrataFlashJ3"
+{
+        path="../LISA/IntelStrataFlashJ3.lisa";
+}
+component "RemapDecoder"
+{
+        path="../LISA/RemapDecoder.lisa";
+}
+component "RealTimeLimiter"
+{
+        path="../LISA/RealTimeLimiter.lisa";
+}
+component "DummyAPB"
+{
+        path="../LISA/DummyAPB.lisa";
+}

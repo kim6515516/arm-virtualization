@@ -1,0 +1,54 @@
+/*!
+ * \file    PL330_DMAC_DmaPortProtocol.lisa
+ * \brief   Protocol definition for communication between DMAC and peripherals
+ * \date    Copyright 2007-2008 ARM Limited. All rights reserved.
+ */
+ 
+// The DmaPortProtocol is used to communicate handshake signals between the PL330_DMAC
+// controller and other peripherals in the system
+//
+// Depending on the PL330_DMAC configuration, the PL330_RES_CLR signal may not be used
+
+protocol PL330_DMAC_DmaPortProtocol
+{
+    includes
+    {
+
+    // Not all versions of the tool support enums in include sections, or include guards
+    
+        // request signal bits
+        
+        #define PL330_REQ_BURST   1
+        #define PL330_REQ_SINGLE  2
+        #define PL330_REQ_LBURST  4
+        #define PL330_REQ_LSINGLE 8
+            
+        #define PL330_REQ_MASK 0xf
+
+        // response signal bits
+
+        #define PL330_RES_TC  1
+        #define PL330_RES_CLR 2
+            
+        #define PL330_RES_MASK 0xf
+
+    }
+
+    properties {
+        version = "8.1.37";
+        description = "PL330_DMAC_DmaPortProtocol protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    // Requests from the external periperhal to the DMA controller
+    // These are level sensitive and sampled by the DMA controller at specific
+    // points during the handshake. See the PL330_DMAC.lisa implementation for more
+    // details
+    
+    slave behaviour request(uint32_t request);
+    
+    // Responses from the DMA controller to the external component
+    // These are transient
+    
+    master behaviour response(uint32_t response);    
+}

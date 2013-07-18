@@ -1,0 +1,490 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ *
+ * Based on:
+ * TZIC.cpp and TZIC.h by Ben James, Copyright ARM 2005
+ */
+
+// LISA Implementation of a TrustZone Interrupt Controller SP890
+
+component TZIC
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM TrustZone Interrupt Controller(SP890)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes
+    {
+        #include "pv/PVBus.h"
+   
+        #define TZIC_TRACE_REG if (!0) ; else printf
+        #define TZIC_TRACE_IRQ if (!0) ; else printf
+    }
+    
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+    }
+    
+    resources
+    {             
+        uint32_t irq_out_state;                  // irq_out output state       
+        bool fiq_out_state;                      // fiq_out output state
+        bool SFIQ_input;                         // SFIQ input state
+        bool NSFIQ_input;                        // NSFIQ input state
+
+        REGISTER { description("FIQ status"),           read_function(debug_read), write_function(debug_write), reg_number(0x00) } FIQStatus;  // Status of FIQ output
+        REGISTER { description("Raw Interrupts"),       read_function(debug_read), write_function(debug_write), reg_number(0x04) } RawIntr;    // Status of raw interrupts
+        REGISTER { description("FIQ/IRQ select"),       read_function(debug_read), write_function(debug_write), reg_number(0x08) } IntSelect;  // IRQ/FIQ selection bits, 0 = IRQ, 1 = FIQ
+        REGISTER { description("FIQ enable/set"),       read_function(debug_read), write_function(debug_write), reg_number(0x0c) } FIQEnable;  // Masking bits for interrupt generation
+        REGISTER { description("FIQ clear"),            read_function(debug_read), write_function(debug_write), reg_number(0x10) } FIQEnClear; // Masking bits for interrupt generation
+        REGISTER { description("FIQ Bypass control"),   read_function(debug_read), write_function(debug_write), reg_number(0x14) } Bypass;     // Bypass register
+        REGISTER { description("Protection"),           read_function(debug_read), write_function(debug_write), reg_number(0x18) } Protection; // Protection register
+        REGISTER { description("Lock control"),         read_function(debug_read), write_function(debug_write), reg_number(0x1c) } Lock;       // Lock register
+        REGISTER { description("Lock status"),          read_function(debug_read), write_function(debug_write), reg_number(0x20) } LockStatus; // Lock register
+
+        bool bypass;                             // Bypass status
+        bool protection;                         // Protection status (CURRENTLY IGNORED)
+        bool locked;                             // Lock status
+    }
+    
+    master port<Signal> fiq_out;    
+    master port<Signal> irq_out[32];
+    
+    slave port<PVBus> pvbus;
+
+    internal slave port<PVDevice> device
+    {
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32(registerRead(tx.getAddress() & ~3));
+        }
+        
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+
+            registerWrite(tx.getAddress(), tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }    
+    
+    slave port<Signal> nsfiq_in
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            TZIC_TRACE_IRQ("%s: nsfiq_in <- %s\n", getInstanceName().c_str(), state==sg::Signal::Set ? "set" : "clear");
+            
+            NSFIQ_input = (state==sg::Signal::Set) ? true : false;
+            
+            update_fiq_outputs();
+        }    
+    }
+
+    slave port<Signal> sfiq_in
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            TZIC_TRACE_IRQ("%s: sfiq_in <- %s\n", getInstanceName().c_str(), state==sg::Signal::Set ? "set" : "clear");
+            
+            SFIQ_input = (state==sg::Signal::Set) ? true : false;
+            
+            update_fiq_outputs();
+        }    
+    }
+    
+    slave port<Signal> input[32]
+    {
+        behavior setValue(uint32_t index, sg::Signal::State state)
+        {
+            TZIC_TRACE_IRQ("%s: input[%d] <- %s\n", getInstanceName().c_str(), index, state==sg::Signal::Set ? "set" : "clear");
+             
+            uint32_t mask = 1<<index;
+
+            if (state == sg::Signal::Set)
+            {
+                RawIntr |= mask;
+            }
+            else
+            {
+                RawIntr &= ~mask;
+            }
+            
+            if (IntSelect & mask)
+            {
+                update_fiq_outputs();
+            }
+            else
+            {
+                set_irq_out(index, (state==sg::Signal::Set) ? true : false);
+            }
+        }
+    }
+
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+    }
+    
+    behavior init()     // initialization of the resources
+    {
+       composition.init();
+       irq_out_state = 0;
+       fiq_out_state = false;
+       NSFIQ_input = false;
+       SFIQ_input  = false;
+
+       RawIntr = 0;
+
+       common_reset();
+    }
+    
+    behavior reset(int level)    // simulation reset
+    {
+        composition.reset(level);
+        // here we assume the input (RawIntr) state is still correct
+        
+        common_reset();
+        
+        update_irq_outputs(0xffffffff);
+        update_fiq_outputs();
+    }
+    
+    behavior common_reset()
+    {
+        // here we assume the input (RawIntr) state is correct
+        
+       IntSelect = 0;
+       FIQEnable = 0;
+       Bypass    = 0;
+       Protection= 0;
+       LockStatus= 1;
+       
+       bypass       = false;
+       protection   = false;
+       locked       = true;  
+    }
+    
+    behavior set_fiq_out(bool state)
+    {
+        TZIC_TRACE_IRQ("%s: fiq_out -> %s\n", getInstanceName().c_str(), state ? "set" : "clear");
+    
+        if (fiq_out_state != state)
+        {
+            fiq_out_state = state;
+            
+            if (fiq_out.setValue.implemented())
+                fiq_out.setValue(state ? sg::Signal::Set : sg::Signal::Clear);
+        }
+    }
+
+    behavior set_irq_out(uint32_t index, bool state)
+    {
+        TZIC_TRACE_IRQ("%s: irq_out[%d] -> %s\n", getInstanceName().c_str(), index, state ? "set" : "clear");
+    
+        uint32_t mask = (1<<index);
+        
+        bool current = (irq_out_state & mask) != 0;
+        
+        if (current != state)
+        {
+            if (state)
+                irq_out_state |= mask;
+            else
+                irq_out_state &= ~mask;
+            
+            if (irq_out[index].setValue.implemented())
+                irq_out[index].setValue(state ? sg::Signal::Set : sg::Signal::Clear);
+        }
+    }
+       
+    behavior update_fiq_outputs()
+    {   
+        if (bypass)
+        {
+            set_fiq_out(NSFIQ_input);
+        }
+        else if (SFIQ_input)
+        {
+            set_fiq_out(true);
+        }
+        else
+        {
+            set_fiq_out((RawIntr & IntSelect & FIQEnable) != 0);
+        }
+    }
+    
+    behaviour update_irq_outputs(uint32_t changed)
+    {
+        for (int i=0; i<32; ++i)
+        {
+            uint32_t mask = 1<<i;
+            
+            if (changed & mask)
+            {
+                if (IntSelect & mask) // Generate FIQ from interrupt
+                {
+                    set_irq_out(i, false);
+                }
+                else // Generate IRQ from interrupt
+                {
+                    set_irq_out(i, (RawIntr & mask) != 0);
+                }   
+            }
+        }
+    }
+        
+//=========================================================================//
+//          registerRead() - a sub-behavior of device port                 //
+//=========================================================================//       
+    behavior registerRead(pv::bus_addr_t device_addr) : uint32_t
+    {               
+        uint32_t addr = (uint32_t)device_addr;
+        uint32_t data = 0;
+        
+        switch(addr)
+        {
+        case 0x000:
+            data = (RawIntr & FIQEnable);
+            
+            TZIC_TRACE_REG("%s: FIQStatus -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x004:
+            data = RawIntr;
+            
+            TZIC_TRACE_REG("%s: RawIntr -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x008:
+            data = IntSelect;
+            
+            TZIC_TRACE_REG("%s: IntSelect -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+           
+        case 0x00c:
+            data = FIQEnable;
+            
+            TZIC_TRACE_REG("%s: FIQEnable -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+
+        case 0x010:
+            TZIC_TRACE_REG("%s: FIQENClear (WO)\n", getInstanceName().c_str());
+        break;
+
+        case 0x014:
+            data = Bypass;
+            
+            TZIC_TRACE_REG("%s: FIQBypass -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+
+        case 0x018:
+            data = Protection;
+            
+            TZIC_TRACE_REG("%s: Protection -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+
+        case 0x01c:
+            data = 0;
+            
+            TZIC_TRACE_REG("%s: Lock (WO)\n", getInstanceName().c_str());
+        break;
+
+        case 0x020:
+            data = LockStatus;
+            
+            TZIC_TRACE_REG("%s: LockStatus -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+            
+        // Device ID registers ---
+        
+        case 0xfe0:
+            data = 0x90;
+            
+            TZIC_TRACE_REG("%s: PeripID0 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+            
+        case 0xfe4:
+            data = 0x18;
+            
+            TZIC_TRACE_REG("%s: PeripID1 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+
+        case 0xfe8:
+            data = 0x04;
+            
+            TZIC_TRACE_REG("%s: PeripID2 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+            
+        case 0xfec:
+            data = 0x00;
+            
+            TZIC_TRACE_REG("%s: PeripID3 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+            
+        case 0xff0:
+            data = 0x0d;
+            
+            TZIC_TRACE_REG("%s: PCellID0 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+            
+        case 0xff4:
+            data = 0xf0;
+            
+            TZIC_TRACE_REG("%s: PCellID1 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+            
+        case 0xff8:
+            data = 0x05;
+            
+            TZIC_TRACE_REG("%s: PCellID2 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+
+        case 0xffc:
+            data = 0xb1;
+            
+            TZIC_TRACE_REG("%s: PCellID3 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        default:
+            TZIC_TRACE_REG("%s: Read Unknown Register (0x%x)\n", getInstanceName().c_str(), addr);
+        break;
+        }
+        
+        return data;    
+    } // end of registerRead()
+ 
+ 
+//=========================================================================//
+//          registerWrite() - a sub-behavior of device port                //
+//=========================================================================//    
+    behavior registerWrite(pv::bus_addr_t device_addr, uint32_t data)
+    {
+        uint32_t addr = (uint32_t)device_addr;
+        
+        if (LockStatus && (addr != 0x01c))
+        {
+            TZIC_TRACE_REG("%s: Register write to 0x%x when locked <- 0x%x\n", getInstanceName().c_str(), addr, data);
+        
+            return;
+        }
+       
+        switch (addr)
+        {
+        case 0x000:
+            TZIC_TRACE_REG("%s: FIQStatus (RO) <- 0x%x\n", getInstanceName().c_str(), data);
+        break;                   
+             
+        case 0x004:
+            TZIC_TRACE_REG("%s: RawIntr (RO) <- 0x%x\n", getInstanceName().c_str(), data);
+        break;            
+                    
+        case 0x008:
+            TZIC_TRACE_REG("%s: IntSelect <- 0x%x\n", getInstanceName().c_str(), data);
+            {
+                uint32_t changed = data ^ IntSelect;
+
+                IntSelect = data;
+
+                if (changed)
+                {
+                    update_irq_outputs(changed);  
+                    update_fiq_outputs();
+                }
+            }
+            break;
+
+        case 0x00C:
+            TZIC_TRACE_REG("%s: FIQEnable <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            FIQEnable |= data;
+
+            update_fiq_outputs();
+
+            break;
+
+        case 0x010:
+            TZIC_TRACE_REG("%s: FIQENClear <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            FIQEnable &= ~data;
+            
+            update_fiq_outputs();
+
+            break;
+
+        case 0x014:
+            TZIC_TRACE_REG("%s: FIQBypass <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            Bypass = data & 1;
+            
+            bypass = (Bypass != 0);
+                
+            update_fiq_outputs();
+
+            break;
+
+        case 0x018:
+            TZIC_TRACE_REG("%s: FIQProtection <- 0x%x\n", getInstanceName().c_str(), data);
+
+            Protection = data & 1;
+            
+            protection = (Protection != 0);
+            
+            break;
+
+        case 0x01c:
+            TZIC_TRACE_REG("%s: Lock <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            LockStatus = (data == 0x0acce550) ? 0 : 1;
+             
+            locked = (LockStatus != 0);
+
+            break;
+
+        case 0x020:
+            TZIC_TRACE_REG("%s: LockStatus (RO) <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            break;
+            
+        default:
+            TZIC_TRACE_REG("%s: Wrote Unknown Register (0x%x) <- 0x%x\n", getInstanceName().c_str(), addr, data);
+        break;
+        }
+        
+        return;    
+    }
+    
+    // debugger support
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+        
+        return ACCESS_FUNC_OK;
+    }
+    
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+        
+        return ACCESS_FUNC_OK;
+    }
+}

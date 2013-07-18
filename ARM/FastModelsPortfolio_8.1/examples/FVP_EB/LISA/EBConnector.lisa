@@ -1,0 +1,55 @@
+
+
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// A component that condenses a number of signals into a single EB header
+// connection.
+// Connector down from the core tile
+extern component EBConnector
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "A component that condenses a number of signals into \
+        a single EB header connection. Connector down from the core tile.";        
+        documentation_file = "../../../#DUI0423#";
+    }
+
+    // Broken-out signals
+    slave port<PVBus>       pvbus;
+    slave port<Signal>       reset_board;
+    master port<Signal>      reset_coretile;
+    master port<ClockSignal>  clk_bus;
+    master port<ValueState> intr_num;
+    master port<Signal> intr;
+    master port<EBSysRegs> sysreg_overrides;
+
+    // Multiplexed header connector plug
+    master port<CompoundPortLisa>  connector;
+}
+
+// Socket that receives the connection from the core core tile.
+extern component EBSocket
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "A component that condenses a number of signals into \
+        a single EB header connection. Socket receives the connection from the core core tile.";
+    }
+
+    // Broken-out signals
+    master port<PVBus>       pvbus;
+    master port<Signal>      reset_board;
+    slave port<Signal>       reset_coretile;
+    slave port<ClockSignal> clk_bus;
+    slave port<ValueState> intr_num;
+    slave port<Signal> intr;
+    slave port<EBSysRegs> sysreg_overrides;
+
+    // Multiplexed header connector socket
+    slave port<CompoundPortLisa>   connector;
+}

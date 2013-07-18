@@ -1,0 +1,131 @@
+/*
+ *  \file   ElfLoader.lisa
+ *  \brief  component for loading ELF images into a platform
+ *  \date   Copyright (c) 2009-2012 ARM. All Rights Reserved.
+ */
+
+// Load an elf file and apply transformations,
+// e.g. duplicate accesses in SECURE and NON_SECURE memory spaces
+
+component ElfLoader
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "ELF loader component";
+    }
+
+    includes {
+        #include "components/ElfLoaderObjectLoaderInterface.h"
+        #include <string>
+    }
+
+
+    resources
+    {
+        PARAMETER { description("ELF file"), type(string) }  elf;
+        PARAMETER { description("load file for large address mapping"), type(string) }  lfile;
+        PARAMETER { description("copy whole file to NS memory space"), type(bool), default(true) }  ns_copy;
+    }
+
+    composition
+    {
+        pvbus_decoder : PVBusDecoder;
+        pvbus_busmaster : PVBusMaster;
+    }
+    
+    connection
+    {
+        pvbus_busmaster.pvbus_m => pvbus_decoder.pvbus_s;
+        self.pvbus_control => pvbus_busmaster.control;
+        pvbus_decoder.pvbus_m_range[0x00000000..0xffffffffffff] => self.pvbus_m; // 48 bits
+    }   
+
+    // external ports
+    
+    master port<PVBus>                  pvbus_m;
+    internal master port<PVTransactionMaster>    pvbus_control;
+    
+    master port<Value_64> start_address;
+
+    behaviour interconnect()
+    {
+        composition.interconnect();
+
+        if (!elf.empty())
+        {
+            ElfLoaderObjectLoaderInterface myInterface(pvbus_control.createTransactionGenerator());
+            myInterface.set_ns_copy(ns_copy);
+            
+            ObjectLoader loader( 0, &myInterface);
+            loader.setLoaderParameter("ObjectLoader", "putPacketChunks", "1");
+            std::string elfile;
+            std::string local_lfile;
+
+            std::string::size_type startposition = 0;
+            std::string::size_type endposition;
+            
+            std::string::size_type lfileposition;
+            
+            while ( startposition != std::string::npos )
+            {
+                endposition = elf.find(',', startposition);
+                lfileposition = elf.find(':', startposition);
+
+                if (endposition != std::string::npos)
+                {
+                    if (lfileposition < endposition)
+                    {
+                        elfile = elf.substr(startposition, lfileposition - startposition);
+                        local_lfile = elf.substr(lfileposition+1, endposition - lfileposition - 1);
+                    }
+                    else
+                    {
+                        elfile = elf.substr(startposition, endposition - startposition);
+                    }
+                    
+                    startposition = endposition+1;
+                }
+                else
+                {
+                    if (lfileposition < endposition)
+                    {
+                        elfile = elf.substr(startposition, lfileposition - startposition);
+                        local_lfile = elf.substr(lfileposition+1, std::string::npos);
+                    }
+                    else
+                    {
+                        elfile = elf.substr(startposition, std::string::npos);
+                    }
+
+                    startposition = std::string::npos;
+                }
+
+                myInterface.use_lfile( (lfileposition != std::string::npos) ? local_lfile : lfile);
+                FileInterface *my_file_interface;
+                try
+                {
+                    my_file_interface = new GzFileInterface(elfile.c_str());
+                }
+                catch(...)
+                {
+                   try
+                    {
+                        my_file_interface = new RawFileInterface(elfile.c_str());
+                    }
+                    catch (...)
+                    {
+                         throw ObjectLoaderErrorCouldNotOpenFile("Could not open file " + elfile);
+                    }
+                }
+                loader.loadFile(my_file_interface);
+            }
+            
+            if (start_address.setValue.implemented())
+            {
+                start_address.setValue(myInterface.get_start_address());
+            }
+         
+        }
+    }
+}

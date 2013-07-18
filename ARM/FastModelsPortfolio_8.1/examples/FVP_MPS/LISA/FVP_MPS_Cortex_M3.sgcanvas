@@ -1,0 +1,1128 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    MPS_CortexM3.sgcanvas
+#//  Created: Wed Mar  4 09:43:51 2009
+#//  By: Fast Models  System Canvas 0.0.051  (Feb  6 2009)
+#//
+# *  Do NOT modify this file. It is for internal use by System Canvas only.
+#//
+#//  Copyright (c) 2004-2008 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "audioout_sdl"
+        (
+            x = 240;
+            y = 250;
+            width = 171;
+            height = 62;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "audio"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clk50Hz"
+        (
+            x = -220;
+            y = 190;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = -20;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = -20;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 220;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "mps_dut"
+        (
+            x = 10;
+            y = 10;
+            width = 171;
+            height = 441;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "aaci_audio_out"
+                (
+                x = 170;
+                y = 242;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clk_in_master"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "display"
+                (
+                x = 20;
+                y = 302;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "display_char_lcd"
+                (
+                x = -30;
+                y = 382;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "int_num"
+                (
+                x = 0;
+                y = 82;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "int_out"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "leds"
+                (
+                x = -30;
+                y = 342;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "leds_7seg"
+                (
+                x = -70;
+                y = 362;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "percfg"
+                (
+                x = -20;
+                y = 402;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "terminal"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "terminal[0]"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "terminal[1]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "terminal[2]"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "user_switches"
+                (
+                x = -30;
+                y = 322;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "coretile"
+        (
+            x = -220;
+            y = 10;
+            width = 171;
+            height = 161;
+            sheight = 40;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "ahb"
+                (
+                x = 160;
+                y = 23;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_in"
+                (
+                x = 160;
+                y = 43;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "int_num"
+                (
+                x = 170;
+                y = 63;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "lcd_layout"
+                (
+                x = -10;
+                y = 83;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "leds"
+                (
+                x = 200;
+                y = 83;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "terminal"
+                (
+                x = 230;
+                y = 3;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ticks"
+                (
+                x = 0;
+                y = 63;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "touch_screen"
+                (
+                x = 0;
+                y = 103;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "user_switches"
+                (
+                x = 160;
+                y = 103;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "mpsvisualisation"
+        (
+            x = -220;
+            y = 260;
+            width = 171;
+            height = 191;
+            sheight = 30;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "char_lcd"
+                (
+                x = 180;
+                y = 123;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clock_50Hz"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "cpu_leds"
+                (
+                x = 350;
+                y = 23;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "cpu_switches"
+                (
+                x = 210;
+                y = 3;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "dut_led_7seg"
+                (
+                x = 200;
+                y = 103;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "dut_leds"
+                (
+                x = 320;
+                y = 83;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "dut_switches_and_buttons"
+                (
+                x = 160;
+                y = 63;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "lcd"
+                (
+                x = 250;
+                y = 43;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "lcd_layout"
+                (
+                x = -200;
+                y = 83;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "percfg"
+                (
+                x = 170;
+                y = 143;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ticks"
+                (
+                x = 0;
+                y = 102;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "touch_screen"
+                (
+                x = -80;
+                y = 33;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "telnetterminal0"
+        (
+            x = 250;
+            y = 10;
+            width = 171;
+            height = 92;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "telnetterminal1"
+        (
+            x = 240;
+            y = 120;
+            width = 171;
+            height = 92;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "telnetterminal2"
+        (
+            x = 460;
+            y = 120;
+            width = 171;
+            height = 92;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "telnetterminal3"
+        (
+            x = 460;
+            y = 10;
+            width = 171;
+            height = 92;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "tick"
+        (
+            x = 170;
+            y = -90;
+            width = 171;
+            height = 41;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_out"
+                (
+                x = -20;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+    )
+    ports
+    (
+    )
+    connections
+    (
+        define "clk50Hz.clk_out=>mpsvisualisation.clock_50Hz"
+        (
+            point
+            (
+                x = -240;
+                y = 240;
+                automatic = false;
+            )
+            point
+            (
+                x = -240;
+                y = 299;
+                automatic = false;
+            )
+        )
+        define "mps_dut.aaci_audio_out=>audioout_sdl.audio"
+        (
+            point
+            (
+                x = 210;
+                y = 280;
+                automatic = false;
+            )
+        )
+        define "mps_dut.display=>mpsvisualisation.lcd"
+        (
+        )
+        define "mps_dut.display_char_lcd=>mpsvisualisation.char_lcd"
+        (
+        )
+        define "mps_dut.int_num=>coretile.int_num"
+        (
+        )
+        define "mps_dut.int_out=>coretile.int_in"
+        (
+        )
+        define "mps_dut.leds=>mpsvisualisation.dut_leds"
+        (
+        )
+        define "mps_dut.leds_7seg=>mpsvisualisation.dut_led_7seg"
+        (
+        )
+        define "mps_dut.percfg=>mpsvisualisation.percfg"
+        (
+        )
+        define "mps_dut.terminal=>telnetterminal0.serial"
+        (
+        )
+        define "mps_dut.terminal=>telnetterminal1.serial"
+        (
+            point
+            (
+                x = 190;
+                y = 40;
+                automatic = true;
+            )
+            point
+            (
+                x = 190;
+                y = 150;
+                automatic = true;
+            )
+        )
+        define "mps_dut.terminal=>telnetterminal2.serial"
+        (
+            point
+            (
+                x = 190;
+                y = 40;
+                automatic = true;
+            )
+            point
+            (
+                x = 190;
+                y = 110;
+                automatic = true;
+            )
+            point
+            (
+                x = 450;
+                y = 110;
+                automatic = true;
+            )
+            point
+            (
+                x = 450;
+                y = 150;
+                automatic = true;
+            )
+        )
+        define "mps_dut.terminal[0]=>telnetterminal0.serial"
+        (
+        )
+        define "mps_dut.terminal[1]=>telnetterminal1.serial"
+        (
+            point
+            (
+                x = 220;
+                y = 60;
+                automatic = false;
+            )
+            point
+            (
+                x = 220;
+                y = 150;
+                automatic = false;
+            )
+        )
+        define "mps_dut.terminal[2]=>telnetterminal2.serial"
+        (
+            point
+            (
+                x = 200;
+                y = 80;
+                automatic = true;
+            )
+            point
+            (
+                x = 200;
+                y = 220;
+                automatic = false;
+            )
+            point
+            (
+                x = 440;
+                y = 220;
+                automatic = false;
+            )
+            point
+            (
+                x = 440;
+                y = 150;
+                automatic = true;
+            )
+        )
+        define "mps_dut.user_switches=>mpsvisualisation.dut_switches_and_buttons"
+        (
+        )
+        define "coretile.ahb=>mps_dut.pvbus_s"
+        (
+        )
+        define "coretile.leds=>mpsvisualisation.cpu_leds"
+        (
+            point
+            (
+                x = -30;
+                y = 140;
+                automatic = true;
+            )
+            point
+            (
+                x = -30;
+                y = 320;
+                automatic = true;
+            )
+        )
+        define "coretile.terminal=>telnetterminal3.serial"
+        (
+            point
+            (
+                x = -40;
+                y = 60;
+                automatic = true;
+            )
+            point
+            (
+                x = -40;
+                y = -30;
+                automatic = false;
+            )
+            point
+            (
+                x = 440;
+                y = -30;
+                automatic = false;
+            )
+            point
+            (
+                x = 440;
+                y = 40;
+                automatic = false;
+            )
+        )
+        define "coretile.ticks=>mpsvisualisation.ticks"
+        (
+            point
+            (
+                x = -290;
+                y = 120;
+                automatic = false;
+            )
+            point
+            (
+                x = -290;
+                y = 399;
+                automatic = false;
+            )
+        )
+        define "coretile.user_switches=>mpsvisualisation.cpu_switches"
+        (
+            point
+            (
+                x = -40;
+                y = 160;
+                automatic = true;
+            )
+            point
+            (
+                x = -40;
+                y = 300;
+                automatic = true;
+            )
+        )
+        define "mpsvisualisation.lcd_layout=>coretile.lcd_layout"
+        (
+            point
+            (
+                x = -270;
+                y = 380;
+                automatic = false;
+            )
+            point
+            (
+                x = -270;
+                y = 140;
+                automatic = false;
+            )
+        )
+        define "mpsvisualisation.touch_screen=>coretile.touch_screen"
+        (
+            point
+            (
+                x = -250;
+                y = 330;
+                automatic = true;
+            )
+            point
+            (
+                x = -250;
+                y = 160;
+                automatic = false;
+            )
+            point
+            (
+                x = -250;
+                y = 330;
+                automatic = false;
+            )
+            point
+            (
+                x = -250;
+                y = 160;
+                automatic = true;
+            )
+        )
+        define "tick.clk_out=>clk50Hz.clk_in"
+        (
+            point
+            (
+                x = -240;
+                y = -60;
+                automatic = false;
+            )
+            point
+            (
+                x = -240;
+                y = 220;
+                automatic = true;
+            )
+        )
+        define "tick.clk_out=>mps_dut.clk_in_master"
+        (
+            point
+            (
+                x = -30;
+                y = -60;
+                automatic = false;
+            )
+            point
+            (
+                x = -30;
+                y = 40;
+                automatic = false;
+            )
+        )
+        define "tick.clk_out=>coretile.clk_in"
+        (
+            point
+            (
+                x = -240;
+                y = -60;
+                automatic = false;
+            )
+            point
+            (
+                x = -240;
+                y = 59;
+                automatic = true;
+            )
+        )
+    )
+    portmaps
+    (
+    )
+    labels
+    (
+        instance "Label 0"
+        (
+            text  = "Microcontroller Prototyping Board";
+            x = -220;
+            y = -280;
+            width = 591;
+            height = 41;
+            font_family  = "Helvetica [Adobe]";
+            font_size = 16;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 1"
+        (
+            text  = "";
+            x = -320;
+            y = -240;
+            width = 961;
+            height = 711;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8349258;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 2"
+        (
+            text  = "Top Level:\10Builds an Microcontroller Prototyping System, containing an ARM Cortex M3 Core Tile";
+            x = -220;
+            y = -200;
+            width = 367;
+            height = 97;
+            font_family  = "Helvetica [Adobe]";
+            font_size = 12;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -5254664;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 4;
+            draw_below = false;
+        )
+        instance "Label 3"
+        (
+            text  = "DUT.lisa";
+            x = 10;
+            y = -20;
+            width = 171;
+            height = 31;
+            font_family  = "Helvetica [Adobe]";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 4"
+        (
+            text  = "CPU.lisa";
+            x = -220;
+            y = -20;
+            width = 171;
+            height = 31;
+            font_family  = "Helvetica [Adobe]";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+    )
+)

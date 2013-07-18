@@ -1,0 +1,312 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component TSC2200
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "PDA Analog Interface Circuit(TSC2200)";
+        documentation_file = "../../../#DUI0423#";
+    }
+    
+    includes {
+        #define TSC2200_TRACE if (!0) ; else printf
+    }
+    
+    resources {
+        // PAGE 0
+        uint16_t reg_x;
+        uint16_t reg_y;
+        uint16_t reg_z1;
+        uint16_t reg_z2;
+        uint16_t reg_kpdata;
+        uint16_t reg_bat1;
+        uint16_t reg_bat2;
+        uint16_t reg_aux1;
+        uint16_t reg_aux2;
+        uint16_t reg_temp1;
+        uint16_t reg_temp2;
+        uint16_t reg_dac;
+        uint16_t reg_zero;
+        // PAGE 1
+        uint16_t reg_adc;
+        uint16_t reg_key;
+        uint16_t reg_dacctl;
+        uint16_t reg_ref;
+        uint16_t reg_reset;
+        uint16_t reg_config;
+        uint16_t reg_kpmask;
+        
+        bool psm_st;       // PSM bit False for No Screen Touch Detected
+                           //         True for Screen Touch Detected
+        bool psm_ctl;      // PSM bit False for conversions controlled by host
+                           //         True for conversions controlled by TSC2200
+        bool sts_complete; // STS bit False for Converter is Busy
+                           //         True for Conversions are Complete, Data is Available
+        bool sts_stop;     // STS bit False for Normal Operation
+                           //         True for Stop Conversion and Power Down
+
+        uint32_t screen_width;
+        uint32_t screen_height;
+        
+        enum ACCESS_T {
+            CMD = 0,
+            READ = 1,
+            WRITE = 2
+        };
+        
+        ACCESS_T access;
+        
+        uint8_t page;
+        uint8_t addr;
+        
+        bool read_x;
+        bool read_y;
+
+        PARAMETER { description("Maximum x value that could be returned by TS."), type(uint32_t), default(3900) } touch_max_x;
+        PARAMETER { description("Minimum x value that could be returned by TS."), type(uint32_t), default(250)  } touch_min_x;
+        PARAMETER { description("Maximum y value that could be returned by TS."), type(uint32_t), default(3550) } touch_max_y;
+        PARAMETER { description("Minimum y value that could be returned by TS."), type(uint32_t), default(270)  } touch_min_y;
+    }
+    
+    composition {
+        
+    }
+    
+    // Ports
+    
+    master port<Signal>  DAV;     // Indicate data available
+    master port<Signal>  PENIRQ;  // IRQ signal to the host
+    master port<Value>   MOSI;    // Serial Data in
+    
+    slave port<MouseStatus> touch_screen
+    {
+        behavior mouseMove(int dx, int dy)
+        {
+            if(psm_st)
+            {
+                reg_x = (uint16_t)(dx & 0xFFFF); 
+                reg_y = (uint16_t)(dy & 0xFFFF); 
+             
+                reg_x = ((reg_x * (touch_max_x - touch_min_x)) / screen_width) + touch_min_x + 1;
+                reg_y = touch_max_y - (reg_y * (touch_max_y - touch_min_y) / screen_height);
+   
+                sts_complete = true;
+                if(DAV.setValue.implemented())
+                    DAV.setValue(sg::Signal::Set);
+                reg_config &= ~(0x1 << 6); // Clear DAVB indicate new data is available
+                TSC2200_TRACE("TSC2200: mouseMove(x = %d, y = %d)\n",dx, dy);
+            }
+            else
+            {
+                sts_complete = false;
+                if(DAV.setValue.implemented())
+                    DAV.setValue(sg::Signal::Clear);
+                reg_config |= 0x1 << 6;
+            }
+        }
+        
+        behavior mouseButton(uint8_t button, bool down)
+        {
+            TSC2200_TRACE("TSC2200: mouse button down? %s\n", down? "Yes" : "NO");
+            psm_st = down;
+            if(psm_st)
+                {
+                if(PENIRQ.setValue.implemented())
+                    PENIRQ.setValue(sg::Signal::Set);
+                        sts_complete = true;
+                }
+            else
+            {
+                sts_complete = false;
+                if(PENIRQ.setValue.implemented())
+                            PENIRQ.setValue(sg::Signal::Clear);
+            }
+        }
+    }
+
+    slave port<LCDLayoutInfo> lcd_layout
+    {
+        behavior setLayoutInfo(int /* x */, int /* y */, uint32_t w, uint32_t h)
+        {
+            screen_width = w;
+            screen_height = h;
+        }
+    }
+    
+    slave port<Value> MISO  // Serial Data out
+    {   
+        behavior setValue(uint32_t data)
+        {
+            data &= 0xFFFF;
+            if(access == CMD)
+            {
+                access = ((data & 0x8000) == 0)? WRITE : READ; // Read or Write
+                page = (uint8_t)((data & 0x7800) >> 11); // Page number
+                addr = (uint8_t)((data & 0x07E0) >> 5);  // Address number
+                const char* trace = "";
+                if(access == READ) trace = "READ"; else if(access == WRITE) trace = "WRITE";
+                TSC2200_TRACE("TSC2200 - Received %s command\n", trace);
+            } else if(access == WRITE) {
+                TSC2200_TRACE("TSC2200 - Perform Write at page 0x%x, addr 0x%x, data 0x%x\n", page, addr, data);
+                writeRegister(page, addr, data);
+                access = CMD; // Not same as hardware. In real hardware, device increases access point automatically.
+            }
+            if(access == READ) {
+                TSC2200_TRACE("TSC2200 - Perform Read at page 0x%x, addr 0x%x\n", page, addr);
+                if(MOSI.setValue.implemented())
+                    MOSI.setValue(readRegister(page, addr));
+                if((read_x) && (read_y) && !psm_st)
+                {
+                    reg_config |= 0x1 << 6; // Set DAVB No new data is available
+                    // If no touch detected and conversions controlled by TSC2200
+                    if(!psm_st && psm_ctl)
+                        if(PENIRQ.setValue.implemented())
+                            PENIRQ.setValue(sg::Signal::Clear);
+                }
+                access = CMD; // Not same as hardware.
+            }
+        }
+    }
+    
+    behavior readRegister(uint8_t page, uint8_t addr) : uint16_t
+    {
+        if(page == 0) {
+            switch(addr)
+            {
+            case 0x00: read_x = true; return reg_x;
+            case 0x01: read_y = true; return reg_y;
+            case 0x02: return reg_z1;
+            case 0x03: return reg_z2;
+            case 0x04: return reg_kpdata;
+            case 0x05: return reg_bat1;
+            case 0x06: return reg_bat2;
+            case 0x07: return reg_aux1;
+            case 0x08: return reg_aux2;
+            case 0x09: return reg_temp1;
+            case 0x0A: return reg_temp2;
+            case 0x0B: return reg_dac;
+            case 0x10: return reg_zero;
+            default: 
+                 TSC2200_TRACE("TSC2200 - readRegister : ERROR - PAGE 0 WRONG ADDR\n");
+                 return 0xFFFF;
+            }
+        } else if(page == 1) {
+            switch(addr)
+            {
+            case 0x00:
+                if(psm_st)
+                    reg_adc |= 0x1 << 15;
+                else
+                    reg_adc &= 0x7FFF;
+
+                if(sts_complete)
+                    reg_adc |= 0x1 <<14;
+                else
+                    reg_adc &= 0xBFFF;
+                return reg_adc;
+            case 0x01: return reg_key;
+            case 0x02: return reg_dacctl;
+            case 0x03: return reg_ref;
+            case 0x04: return reg_reset;
+            case 0x05: return reg_config;
+            case 0x10: return reg_kpmask;
+            default: 
+                 TSC2200_TRACE("TSC2200 - readRegister : ERROR - PAGE 1 WRONG ADDR\n");
+                 return 0xFFFF;
+            }
+        } else {
+            TSC2200_TRACE("TSC2200 - readRegister : ERROR - WRONG PAGE NUM\n");
+            return 0xFFFF;
+        }
+        
+    }
+    
+    behavior writeRegister(uint8_t page, uint8_t addr, uint16_t data)
+    {
+        if(page == 0) {
+            switch(addr)
+            {
+            case 0x00: reg_x       = data;   break;
+            case 0x01: reg_y       = data;   break;
+            case 0x02: reg_z1      = data;   break;
+            case 0x03: reg_z2      = data;   break;
+            case 0x04: reg_kpdata  = data;   break;
+            case 0x05: reg_bat1    = data;   break;
+            case 0x06: reg_bat2    = data;   break;
+            case 0x07: reg_aux1    = data;   break;
+            case 0x08: reg_aux2    = data;   break;
+            case 0x09: reg_temp1   = data;   break;
+            case 0x0A: reg_temp2   = data;   break;
+            case 0x0B: reg_dac     = data;   break;
+            case 0x10: break; // Zero is reserved, always zero
+            default: TSC2200_TRACE("TSC2200 - writeRegister : ERROR - PAGE 0 WRONG ADDR\n");
+            }
+        } else if(page == 1) {
+            switch(addr)
+            {
+            case 0x00:
+                if(!psm_ctl)
+                    if(PENIRQ.setValue.implemented())
+                        PENIRQ.setValue(sg::Signal::Clear);
+                psm_ctl = ((data & 0x8000) >> 15) == 0x1;
+                sts_stop = ((data & 0x40000) >> 14) == 0x1;
+                reg_adc = data;
+                break;
+            case 0x01: reg_key    = 0; break;
+            case 0x02: reg_dacctl = 0; break;
+            case 0x03: reg_ref    = 0; break;
+            case 0x04: if((data & 0xFF00) == 0xBB00) reset(1); break;
+            case 0x05: reg_config = 0; break;
+            case 0x10: reg_kpmask = 0; break;
+            default: TSC2200_TRACE("TSC2200 - writeRegister : ERROR - PAGE 1 WRONG ADDR\n");
+            }
+        } else {
+            TSC2200_TRACE("TSC2200 - writeRegister : ERROR - WRONG PAGE NUM\n");
+        }
+    }
+    
+    
+    behavior reset(int /*level*/) {
+        reg_x      = 0x0000;
+        reg_y      = 0x0000;
+        reg_z1     = 0x0000;
+        reg_z2     = 0x0000;
+        reg_kpdata = 0x0000;
+        reg_bat1   = 0x0000;
+        reg_bat2   = 0x0000;
+        reg_aux1   = 0x0000;
+        reg_aux2   = 0x0000;
+        reg_temp1  = 0x0000;
+        reg_temp2  = 0x0000;
+        reg_dac    = 0x007F;
+        reg_zero   = 0x0000;
+        
+        reg_adc    = 0x4000;
+        reg_key    = 0x4000;
+        reg_dacctl = 0x8000;
+        reg_ref    = 0x0002;
+        reg_reset  = 0xFFFF;
+        reg_config = 0xFFC0;
+        reg_kpmask = 0x0000;
+        
+        page = 0xFF;
+        addr = 0xFF;
+        
+        psm_st       = false;
+        psm_ctl      = false;
+        sts_complete = false;
+        sts_stop     = false;    
+        
+        read_x = false;
+        read_y = false;
+        
+        screen_width = 640;
+        screen_height = 480;
+
+        access = CMD;
+        TSC2200_TRACE("TSC2200 - Performed Reset!\n");
+    }
+}

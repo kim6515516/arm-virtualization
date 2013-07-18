@@ -1,0 +1,42 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component EBCortexR4CoreTile
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "CortexR4 Core Tile for Emulation Baseboard.";        
+    }
+    composition
+    {
+        clockdivider : ClockDivider(div=24,mul=100);
+        fvp_gic_irq : FVP_GIC();
+        fvp_gic_fiq : FVP_GIC();
+        pvbusdecoder : PVBusDecoder();
+        connector : EBConnector();
+        core : ARMCortexR4CT();
+    }
+    connection
+    {
+        core.ticks => self.ticks;
+        connector.connector => self.hdr;
+        pvbusdecoder.pvbus_m_range[0x0..0xffffffff] => connector.pvbus;
+        pvbusdecoder.pvbus_m_range[0x10041000..0x10041fff] => fvp_gic_irq.pvbus_distributor;
+        pvbusdecoder.pvbus_m_range[0x10040000..0x10040fff] => fvp_gic_irq.pvbus_core;
+        pvbusdecoder.pvbus_m_range[0x10051000..0x10051fff] => fvp_gic_fiq.pvbus_distributor;
+        pvbusdecoder.pvbus_m_range[0x10050000..0x10050fff] => fvp_gic_fiq.pvbus_core;
+        core.pvbus_m => pvbusdecoder.pvbus_s;
+        connector.intr => fvp_gic_irq.int_in;
+        connector.intr_num => fvp_gic_irq.int_num;
+        fvp_gic_irq.irq => core.irq;
+        fvp_gic_fiq.fiq => core.fiq;
+        connector.clk_bus => clockdivider.clk_in;
+        clockdivider.clk_out => core.clk_in;
+    }
+    master port<InstructionCount> ticks;
+    master port<CompoundPortLisa> hdr;
+}

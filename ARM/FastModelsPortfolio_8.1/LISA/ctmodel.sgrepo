@@ -1,0 +1,242 @@
+component "ARM1136CT"
+{
+    path="../LISA/ARM1136CT.lisa";
+}
+
+component "ARM1176CT"
+{
+    path="../LISA/ARM1176CT.lisa";
+}
+
+component "ARM926CT"
+{
+    path="../LISA/ARM926CT.lisa";
+}
+
+component "ARM968CT"
+{
+    path="../LISA/ARM968CT.lisa";
+}
+
+component "ARMCortexM3CT"
+{
+    path="../LISA/ARMCortexM3CT.lisa";
+}
+
+component "ARMCortexM4CT"
+{
+        path="../LISA/ARMCortexM4CT.lisa";
+}
+
+component "ARMCortexA7x1CT"
+{
+    path="../LISA/ARMCortexA7x1CT.lisa";
+}
+component "ARMCortexA7x2CT"
+{
+    path="../LISA/ARMCortexA7x2CT.lisa";
+}
+component "ARMCortexA7x3CT"
+{
+    path="../LISA/ARMCortexA7x3CT.lisa";
+}
+component "ARMCortexA7x4CT"
+{
+    path="../LISA/ARMCortexA7x4CT.lisa";
+}
+
+component "ARMCortexA8CT"
+{
+    path="../LISA/ARMCortexA8CT.lisa";
+}
+
+component "ARMCortexR4CT"
+{
+    path="../LISA/ARMCortexR4CT.lisa";
+}
+
+component "ARMCortexA9MPx1CT"
+{
+    path="../LISA/ARMCortexA9MPx1CT.lisa";
+}
+
+component "ARMCortexA9MPx2CT"
+{
+    path="../LISA/ARMCortexA9MPx2CT.lisa";
+}
+
+component "ARMCortexA9MPx4CT"
+{
+    path="../LISA/ARMCortexA9MPx4CT.lisa";
+}
+
+component "ARMCortexA9UPCT"
+{
+    path="../LISA/ARMCortexA9UPCT.lisa";
+}
+
+component "ARMCortexA5MPx1CT"
+{
+    path="../LISA/ARMCortexA5MPx1CT.lisa";
+}
+
+component "ARMCortexA5MPx2CT"
+{
+    path="../LISA/ARMCortexA5MPx2CT.lisa";
+}
+
+component "ARMCortexA5MPx4CT"
+{
+    path="../LISA/ARMCortexA5MPx4CT.lisa";
+}
+
+component "ARMCortexA5CT"
+{
+    path="../LISA/ARMCortexA5CT.lisa";
+}
+
+component "ARMCortexA15x1CT"
+{
+    path="../LISA/ARMCortexA15x1CT.lisa";
+}
+component "ARMCortexA15x2CT"
+{
+    path="../LISA/ARMCortexA15x2CT.lisa";
+}
+component "ARMCortexA15x3CT"
+{
+    path="../LISA/ARMCortexA15x3CT.lisa";
+}
+component "ARMCortexA15x4CT"
+{
+    path="../LISA/ARMCortexA15x4CT.lisa";
+}
+
+component "ARMCortexR5x1CT"
+{
+    path="../LISA/ARMCortexR5x1CT.lisa";
+}
+component "ARMCortexR5x2CT"
+{
+    path="../LISA/ARMCortexR5x2CT.lisa";
+}
+
+component "ARMCortexR7x1CT"
+{
+    path="../LISA/ARMCortexR7x1CT.lisa";
+}
+component "ARMCortexR7x2CT"
+{
+    path="../LISA/ARMCortexR7x2CT.lisa";
+}
+
+component "DebugAccessPort"
+{
+    path="../LISA/DebugAccessPort.lisa";
+}
+
+component "ARMAEMv8AMPx1CT"
+{
+    path="../LISA/ARMAEMv8AMPx1CT.lisa";
+}
+component "ARMAEMv8AMPx4CT"
+{
+    path="../LISA/ARMAEMv8AMPx4CT.lisa";
+}
+component "ARMAEMv8AMPCT"
+{
+    path="../LISA/ARMAEMv8AMPCT.lisa";
+}
+
+component "VGIC_Component"
+{
+    path="../LISA/VGIC_Component.lisa";
+}
+
+protocol "InstructionCount"
+{
+    path="../LISA/InstructionCountProtocol.lisa";
+}
+
+component "MemoryMappedCounterSocket"
+{
+    path="../LISA/MemoryMappedCounterSocket.lisa";
+}
+protocol "CounterInterface"
+{
+    path="../LISA/CounterInterface.lisa";
+}
+
+protocol "Feature"
+{
+    path="../LISA/Feature.lisa";
+}
+
+component "v8EmbeddedCrossTrigger_Matrix"
+{
+    path="../LISA/v8EmbeddedCrossTrigger.lisa";
+}
+component "v8EmbeddedCrossTrigger_Interface"
+{
+    path="../LISA/v8EmbeddedCrossTrigger.lisa";
+}
+protocol "v8EmbeddedCrossTrigger_controlprotocol"
+{
+    path="../LISA/v8EmbeddedCrossTrigger.lisa";
+}
+
+component "DebugAccessPort"
+{
+    path="../LISA/DebugAccessPort.lisa";
+}
+
+protocol "GICv3Comms"
+{
+    path="../LISA/GICv3Comms.lisa";
+}
+
+files
+(
+        path = "../lib/Linux_GCC-4.1/libarmctmodel.a", platform="linux",compiler="gcc|gcc-4.1";
+        path = "../lib/Linux_GCC-4.1/libarmctmodel.so", platform="linux",compiler="gcc|gcc-4.1";
+
+        path = "../lib/Linux64_GCC-4.1/libarmctmodel.a", platform="linux64",compiler="gcc|gcc-4.1";
+        path = "../lib/Linux64_GCC-4.1/libarmctmodel.so", platform="linux64",compiler="gcc|gcc-4.1";
+
+        path = "../lib/Linux_GCC-4.4/libarmctmodel.a", platform="linux",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+        path = "../lib/Linux_GCC-4.4/libarmctmodel.so", platform="linux",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+
+        path = "../lib/Linux64_GCC-4.4/libarmctmodel.a", platform="linux64",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+        path = "../lib/Linux64_GCC-4.4/libarmctmodel.so", platform="linux64",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+
+        path = "../lib/Win32_VC2005/Release/libarmctmodel.lib", platform="win32",compiler="VC2005";
+        path = "../lib/Win32_VC2005/Debug/libarmctmodel.lib", platform="win32d",compiler="VC2005";
+
+        path = "../lib/Win32_VC2005/Release/armctmodel.dll", platform="win32",compiler="VC2005";
+        path = "../lib/Win32_VC2005/Debug/armctmodel.dll", platform="win32d",compiler="VC2005";
+
+        path = "../lib/Win32_VC2008/Release/libarmctmodel.lib", platform="win32",compiler="VC2008";
+        path = "../lib/Win32_VC2008/Debug/libarmctmodel.lib", platform="win32d",compiler="VC2008";
+
+        path = "../lib/Win32_VC2008/Release/armctmodel.dll", platform="win32",compiler="VC2008";
+        path = "../lib/Win32_VC2008/Debug/armctmodel.dll", platform="win32d",compiler="VC2008";
+
+        path = "../lib/Win64_VC2008/Release/libarmctmodel.lib", platform="win64",compiler="VC2008";
+        path = "../lib/Win64_VC2008/Debug/libarmctmodel.lib", platform="win64d",compiler="VC2008";
+
+        path = "../lib/Win64_VC2008/Release/armctmodel.dll", platform="win64",compiler="VC2008";
+        path = "../lib/Win64_VC2008/Debug/armctmodel.dll", platform="win64d",compiler="VC2008";
+
+        path = "../lib/Win32_VC2010/Release/libarmctmodel.lib", platform="win32",compiler="VC2010";
+        path = "../lib/Win32_VC2010/Debug/libarmctmodel.lib", platform="win32d",compiler="VC2010";
+
+        path = "../lib/Win32_VC2010/Release/armctmodel.dll", platform="win32",compiler="VC2010";
+        path = "../lib/Win32_VC2010/Debug/armctmodel.dll", platform="win32d",compiler="VC2010";
+
+        path = "../lib/Win64_VC2010/Release/libarmctmodel.lib", platform="win64",compiler="VC2010";
+        path = "../lib/Win64_VC2010/Debug/libarmctmodel.lib", platform="win64d",compiler="VC2010";
+
+        path = "../lib/Win64_VC2010/Release/armctmodel.dll", platform="win64",compiler="VC2010";
+        path = "../lib/Win64_VC2010/Debug/armctmodel.dll", platform="win64d",compiler="VC2010";
+)
+

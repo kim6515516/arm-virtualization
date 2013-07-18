@@ -1,0 +1,9 @@
+files
+{
+    path = "../LISA/framework.sgrepo";
+    path = "../LISA/ctmodel.sgrepo";
+    path = "../LISA/pvbus.sgrepo";
+    path = "../LISA/components.sgrepo";
+    path = "../LISA/systemc.sgrepo";
+    path = "fmruntime.sgrepo";
+}

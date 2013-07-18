@@ -1,0 +1,84 @@
+/*
+ * Copyright 2006-2007, 2013 ARM Limited. All rights reserved.
+ */
+
+// The PVBusRange component routes transactions received on pvbus_input to one
+// of two ports pvbus_port_a and pvbus_port_b. Transactions with addresses higher
+// than the range value are routed to pvbus_port_b. Transactions with addresses
+// lower than or equal to the range value are routed to pvbus_port_a.
+//
+// NOTES: 
+//
+// (1) Routing granularity is on 4K page boundaries i.e. addresses rounded to 0x1000.
+//     e.g. So a parameter or control port value anywhere between 0x4000 and 0x4FFF
+//     inclusive. Will route all transactions in the range 0x0..0x4FFF to pvbus_port_a.
+//
+// (2) A control port or parameter value of zero is a special case which means that all
+//     transactions are routed to pvbus_port_b. So to route just the first 4K of address
+//     space to pvbus_port_a values in the range 0x1..0xFFF must be used.
+//
+// (3) The default behaviour with no parameter or control port setting is to route
+//     all transactuions to pvbus_port_b
+
+component PVBusRange
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "PVBus range switching component";
+        hidden = "true";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    resources
+    {
+        PARAMETER { description("Addressable range routed to pvbus_port_a"),
+                    type(uint64_t), default(0x0), runtime(true) } range;
+    }
+
+    slave port<PVBus>     pvbus_input;
+    master port<PVBus>    pvbus_port_a;
+    master port<PVBus>    pvbus_port_b;
+
+    slave port<Value_64>  control_64
+    {
+        behaviour setValue(uint64_t range_) : void
+        {
+            if (range_ != range)
+            {
+                range = range_;
+                self.mapper_control.allBusMapChanging();
+            }
+        }
+    }
+
+    composition
+    {
+        pvbus_mapper : PVBusMapper();
+    }
+
+    connection
+    {
+        self.pvbus_input => pvbus_mapper.pvbus_s;
+        pvbus_mapper.control => self.mapper_control;
+        pvbus_mapper.pvbus_m[0] => self.pvbus_port_a;
+        pvbus_mapper.pvbus_m[1] => self.pvbus_port_b;
+    }
+
+    internal slave port<PVBusMapperControl>  mapper_control
+    {
+        behaviour remap(pv::RemapRequest& req) : unsigned
+        {
+            pv::bus_addr_t last_page = range & ~pv::bus_addr_t(0xFFF);
+
+            if ((req.getPageBase() <= last_page) && (range != 0))
+            {
+                return 0;  // Route to port A
+            }
+            else
+            {
+                return 1;  // Route to port B
+            }
+        }
+    }
+}

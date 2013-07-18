@@ -1,0 +1,26 @@
+/*
+ * Copyright 2006-2008 ARM Limited. All rights reserved.
+ * Copyright 2011 ARM Limited. All rights reserved.
+ */
+
+// Port type used to aggregate signals. All behaviours are for internal use of
+// C++ components which make use of this facility. It is not currently
+// available from LISA. 
+
+protocol CompoundPortLisa
+{
+  properties {
+    version = "8.1.37";
+    description = "CompoundPort protocol";
+    documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+  }
+    slave behavior connectFromExternalSlavePort     (const std::string & name,
+                                                     sg::Port *);
+    slave behavior connectToExternalMasterPort      (const std::string & name,
+                                                     sg::Port *);
+    slave behavior disconnectFromExternalSlavePort  (const std::string & name,
+                                                     sg::Port *);
+    slave behavior disconnectToExternalMasterPort   (const std::string & name,
+                                                     sg::Port *);
+}
+

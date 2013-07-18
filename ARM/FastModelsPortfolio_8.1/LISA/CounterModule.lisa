@@ -1,0 +1,303 @@
+/*
+ * Copyright 2006-2008, 2011 ARM Limited.
+ * All rights reserved.
+ */
+
+// A CounterModule implements a single countdown timer block.  It has an
+// input clock signal, a bus port that decodes one 0x100-byte region of
+// registers, and an output IRQ signal to indicate when the countdown is
+// complete.
+//
+// For simulation efficiency, this implementation uses the ClockTimer
+// subcomponent to schedule a timed callback, rather than count individual
+// ticks.  This means that the current counter value has to be recalculated
+// whenever the CPU tries to read it, using the following formula:
+//
+//   counter value = (timer.remaining() + clocktick_counter) >> shift.
+//
+// where clocktick_counter represents the number of clockticks still
+// to go when the timer reaches zero.  (This is necessary because
+// ClockTimers can only count up to 2^32 ticks).
+
+component CounterModule
+{
+    
+    properties {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Internal component used by SP804 Timer module";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+        hidden = true;
+    }
+   
+    includes {
+        #include "pv/PVBus.h"
+    }
+ 
+    // Externally visible ports:
+
+    // Interrupt signal from this counter module.
+    master port<Signal> intr_out;
+
+    // Input clock signal used to drive this counter module.
+    slave port<ClockSignal> clk_in;
+
+
+    // Implementation
+
+    resources {
+        enum { MODE_FREE_RUNNING, MODE_PERIODIC_RELOAD } mode;
+
+        uint32_t load;
+        uint64_t reload_time;
+        bool enabled;
+        bool ie;  // interrupt enable flag
+        int prescale;
+        int timersize;
+        bool oneshot;
+        bool rawinterrupt;
+        int shift;
+
+        // The number of clock ticks that will be remaining when the next callback from the ClockTimer is generated.
+        uint64_t clocktick_counter;
+    }
+
+    composition {
+        // Create a timer subcomponent to count ticks for us.
+        timer : ClockTimer;
+    }
+
+    // Provide access to the set/clear methods on the ClockTimer.
+    master port<TimerControl> timer_control;
+
+    // Handle event notifications from the timer.
+    slave port<TimerCallback> timer_callback_handler
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            return handleTimerSignal();
+        }
+    }
+
+    // Simulation reset.
+    behavior reset(int level) {
+        composition.reset(level);
+        reload_time = 0;
+        enabled = false;
+        mode = MODE_FREE_RUNNING;
+        ie = true;
+        prescale = 0;
+        timersize = 0;
+        oneshot = false;
+        rawinterrupt = false;
+        shift = 0;
+        load = 0x0;
+        clocktick_counter = 0xFFFFFFFFULL;
+        if (intr_out.setValue.implemented()) {
+            intr_out.setValue(sg::Signal::Clear);      // clear the interrupt
+        }
+    }
+
+    // Behaviors implementing counter logic
+
+
+    // Restart the timer with a new load value.
+    behavior setLoadRegister(uint32_t newLoadValue) {
+        load = newLoadValue;
+        initTimer();
+    }
+
+    behavior getLoadRegister() : uint32_t {
+        return load;
+    }
+
+    behavior getControlRegister() : uint32_t {
+        return (  (enabled           << 7)
+                | ((mode == MODE_PERIODIC_RELOAD) << 6)
+                | ( ie               << 5)
+                | ( 0                << 4)
+                | ( prescale         << 2)
+                | ( timersize        << 1)
+                | ( oneshot          << 0) );
+    }
+
+    behavior setControlRegister(uint32_t controlValue) {
+        enabled =   (controlValue  >> 7) & 1;
+        mode =      ((controlValue >> 6) & 1)? MODE_PERIODIC_RELOAD : MODE_FREE_RUNNING;
+        ie =        (controlValue  >> 5) & 1;
+        prescale =  (controlValue  >> 2) & 3;
+        timersize = (controlValue  >> 1) & 1;
+        oneshot =   (controlValue  >> 0) & 1;
+
+        switch (prescale) {
+        case 0: shift = 0; break; // Divide by 1
+        case 1: shift = 4; break; // Divide by 16
+        case 2: shift = 8; break; // Divide by 256
+        default:
+            shift = 8;
+            break;
+        }
+
+        initTimer();
+    }
+
+
+    // Return the current counter value.  This has to be calculated,
+    // based on how much time remains before the ClockTimer's callback
+    // will be triggered : see comments at top of this file.
+    
+    behavior getValueRegister() : uint32_t {
+        uint32_t clocks_remaining = timer_control.remaining(); 
+        return (uint32_t)((clocktick_counter + clocks_remaining) >> shift);
+    }
+
+    behavior getBGLoadRegister() : uint32_t {
+        return load;
+    }
+
+    behavior setBGLoadRegister(uint32_t loadValue) {
+        load = loadValue;
+    }
+
+    // Calculate how many ticks to count down from, as:
+    //   MIN(clocktick_counter, 0xffffffff).
+
+    behavior calculateRescheduleTicks() : uint32_t {
+        if (clocktick_counter > 0xffffffff ) {
+            return 0xffffffff;
+        } else {
+            return (uint32_t)clocktick_counter;
+        }
+    }
+
+
+    // Set the counter to start counting down from its load value.
+    behavior initTimer() {
+
+        if( load == 0){
+            load = load - 1;
+        }
+
+        clocktick_counter  = ((uint64_t)load) << shift;  // calculate the clocktick_counter, to be used in calculateRescheduleTicks()
+
+        uint32_t reschedule_ticks = calculateRescheduleTicks();
+        if (enabled) {
+            clocktick_counter -= reschedule_ticks;      // update the clocktick_counter only if we are enabled
+            timer_control.set(reschedule_ticks);
+        } else {
+            timer_control.cancel();
+        }
+    }
+
+
+    behavior getRawIntStatus() : uint32_t {
+        return rawinterrupt ? 1 : 0;
+    }
+
+    behavior getMaskedIntStatus() : bool {
+        return (rawinterrupt && ie) ? 1 : 0;
+    }
+
+    behavior clearInt() {
+        rawinterrupt = false;
+        if (intr_out.setValue.implemented()) {
+            intr_out.setValue(sg::Signal::Clear);
+        }
+    }
+
+
+    behavior setInt() {
+        rawinterrupt = true;
+        if (ie && intr_out.setValue.implemented()) {
+            intr_out.setValue(sg::Signal::Set);
+        }
+    }
+
+
+    // Timer callback handler, called when the scheduled amount of time
+    // has elapsed.
+    behavior handleTimerSignal() : uint32_t {
+        
+        uint32_t reschedule_ticks = 0x0;
+
+        // Has the counter reached zero yet?
+        if (clocktick_counter == 0) {
+            setInt();                        //set the interrupt
+
+            if(oneshot == true)              //we need to return 0 to ClockTimer
+                return 0;
+
+            getClockTickCounterValue();      //get the new clocktick_counter value
+        }
+
+
+        // Work out how long before next scheduled callback.
+        // Note that we can only schedule up to 2^32 ticks of
+        // the master clock.  Larger delays are handled by
+        // generating intermediate callbacks as needed.
+        reschedule_ticks = calculateRescheduleTicks();
+
+        clocktick_counter -= reschedule_ticks;
+        return reschedule_ticks;
+    }
+
+
+    // Counter has reached zero: recalculate the clocktick_counter value
+    behavior getClockTickCounterValue() {
+        if (mode == MODE_PERIODIC_RELOAD) {
+            clocktick_counter = ((uint64_t)load) << shift;
+        } else {
+            if (timersize == 0) {
+                clocktick_counter = (0xFFFF << shift);
+            } else {
+                clocktick_counter = (0xFFFFFFFFULL << shift);
+            }
+        }
+    }
+
+
+    // Read from a memory-mapped register.
+    behavior registerRead(pv::bus_addr_t addr) : uint32_t {
+        switch (addr & 0xff) {
+        case 0x00: return getLoadRegister();
+        case 0x04: return getValueRegister();
+        case 0x08: return getControlRegister();
+        case 0x0c: return 0; // Interrupt clear register -- WRITE-ONLY
+        case 0x10: return getRawIntStatus();
+        case 0x14: return getMaskedIntStatus();
+        case 0x18: return getBGLoadRegister();
+        default:   return 0; // Undefined register.
+        }
+    }
+
+
+    // Write to a memory-mapped register.
+    behavior registerWrite(pv::bus_addr_t addr, uint32_t data) {
+        switch (addr & 0xff) {
+        case 0x00: setLoadRegister(data);    break;
+        case 0x04: return;               // Value register -- READ-ONLY
+        case 0x08: setControlRegister(data); break;
+        case 0x0c: clearInt();
+        case 0x10: return;               // RIS register -- READ-ONLY
+        case 0x14: return;               // MIS register -- READ-ONLY
+        case 0x18: setBGLoadRegister(data);  break;
+        default:   return;               // Undefined register
+        }
+    }
+
+    
+    behavior init()
+    {
+        clocktick_counter = 0xFFFFFFFFULL;
+        ie                = 1;
+        composition.init();
+    }
+
+    // Connect up the timer subcomponent.
+    connection {
+        self.clk_in => timer.clk_in;
+        self.timer_control => timer.timer_control;
+        timer.timer_callback => self.timer_callback_handler;
+    }
+}

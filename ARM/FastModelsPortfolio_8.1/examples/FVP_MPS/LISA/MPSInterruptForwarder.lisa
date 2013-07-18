@@ -1,0 +1,35 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// LISA Implementation of Interrupt Mapper which forward interrupts from
+// MPS baseboard to core module
+
+component MPSInterruptForwarder
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "The component that forwards interrupts from MPS baseboard to core module.";
+        documentation_file = "../../../#DUI0423#";
+    }
+    
+#define MPSINTERRUPTFORWARDER_TRACE if (!0) ; else printf
+
+    master port<Signal> int_out;
+    master port<ValueState> int_num;
+    
+    slave port<Signal> int_in[239]
+    {
+        behavior setValue(uint32_t index, sg::Signal::State state)
+        {
+            MPSINTERRUPTFORWARDER_TRACE("MPSInterruptForwarder: int=%d val=%s\n", index, (state == sg::Signal::Set) ? "Set":"Clear");
+            if(int_num.setValue.implemented())
+                int_num.setValue(index);
+            if(int_out.setValue.implemented())
+                int_out.setValue(state);
+        }
+    }
+}

@@ -1,0 +1,84 @@
+/*
+ * Copyright 2010-2013 ARM Limited. All rights reserved.
+ */
+
+///
+/// Allow the construction of arbitrary routing decisions.
+///
+
+protocol PVBusRouterControl
+{
+    properties
+    {
+        version = "8.1.37";
+        description = "PVBusRouterControl Protocol";
+    }
+
+    includes
+    {
+        #include "pv/TransactionAttributes.h"
+        #include "pv/PVBusMapper.h"
+
+        enum PVBusRouter_RouteOption
+        {
+            PVBUSROUTER_ABORT  = PVBUSMAPPER_ABORT,
+            PVBUSROUTER_IGNORE = PVBUSMAPPER_IGNORE
+        };
+    }
+
+    ///
+    /// Return the port that this should be filtered to based on the attributes
+    /// and the page_address_ (address aligned to 4 KiB).
+    ///
+    /// The filter must be consistent w.r.t. its filtering decisions and so they
+    /// essentially have to be statically determined.
+    ///
+    /// The return number is a port number of pvbus_m, or the special values:
+    ///     * PVBUSROUTER_ABORT  -- abort all accesses
+    ///     * PVBUSROUTER_IGNORE -- ignore all accesses read-as-zero/write-ignored (RAZ/WI)
+    ///
+    /// Any other value is considered an error.
+    ///
+    slave behavior filter(
+        const pv::TransactionAttributes*  attributes_,
+        pv::bus_addr_t                    page_base_,
+        bool                              is_read_
+        ) : unsigned;
+}
+
+component PVBusRouter
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "Allow transactions to be routed arbitrarily.";
+    }
+
+    composition
+    {
+        mapper : PVBusMapper();
+    }
+
+    connection
+    {
+        self.pvbus_s   => mapper.pvbus_s;
+        mapper.control => self.mapper_control;
+        mapper.pvbus_m => self.pvbus_m;
+    }
+
+    slave  port<PVBus>                pvbus_s;
+    master port<PVBusRouterControl>   control;
+    master port<PVBus>                pvbus_m[64];
+
+    internal slave port<PVBusMapperControl>  mapper_control
+    {
+        behaviour remap(pv::RemapRequest& req) : unsigned
+        {
+            return control.filter(req.getTransactionAttributes(),
+                                  req.getPageBase(),
+                                  req.isRead());
+        }
+    }
+}
+

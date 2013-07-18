@@ -1,0 +1,25 @@
+/*
+ * Copyright 2006-2008 ARM Limited. All rights reserved.
+ * Copyright 2011 ARM Limited. All rights reserved.
+ */
+
+// When a ClockTimer reaches zero, it fires the signal() behavior on its
+// timer_callback port.  This allows a component to process a timed
+// callback by implementing this behavior on a slave port.  The slave
+// can also return a value in order to retrigger the timer.
+
+protocol TimerCallback64
+{
+
+    properties { 
+        version = "8.1.37";
+        description = "TimerCallback64 Protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    // Invoked when a clock timer reaches zero.  If a non-zero value
+    // is returned, the clock will restart its countdown from the
+    // given value.
+    behavior signal() : uint64_t;
+}
+

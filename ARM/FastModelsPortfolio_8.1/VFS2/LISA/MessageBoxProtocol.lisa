@@ -1,0 +1,31 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// Simple protocol for using a message box from the device side
+
+protocol MessageBoxProtocol
+{
+    properties {
+        version = "8.1.37";
+    }
+
+        // reserve a block of memory for composing a message
+        // returns an id that should be used in end_msg/cancel_msg
+        
+    slave behaviour begin_msg(void** bufferp, uint32_t reserve_len);
+    
+        // commit the message (sending it at some point) to the vm. The
+        // id becomes invalid
+        
+    slave behaviour end_msg(uint32_t actual_len);
+    
+        // back out of sending a message
+        
+    slave behaviour cancel_msg();
+    
+        // called on the master when a message is sent from the vm
+        // message data must be used within the call
+        
+    master behaviour handle_message(const void* data, uint32_t len) : int32_t;
+}

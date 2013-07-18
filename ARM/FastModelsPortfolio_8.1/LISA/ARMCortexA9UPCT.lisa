@@ -1,0 +1,100 @@
+/*
+ * Copyright (C) 2008 ARM Limited. All rights reserved.
+ */
+
+
+extern component ARMCortexA9UPCT
+{
+    properties {
+        executes_software = 1; 
+        version = "8.1.37";
+        component_type = "Core";
+        description = "ARMCortexA9UPCT CPU component";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    resources
+    {
+
+        // Processor component parameters
+        PARAMETER { name("CLUSTER_ID"), type(uint32_t), default(0x0), min(0x0), max(0xF), description("Processor cluster ID value") } CLUSTER_ID;
+        PARAMETER { name("dcache-state_modelled"), type(bool), default(false), description("Set whether D-cache has stateful implementation") } dcache_state_modelled;
+        PARAMETER { name("icache-state_modelled"), type(bool), default(false), description("Set whether I-cache has stateful implementation") } icache_state_modelled;
+        PARAMETER { name("device-accurate-tlb"), type(bool), default(false), description("Specify whether all TLBs are modeled") } device_accurate_tlb;
+
+        // Core subcomponent parameters
+        PARAMETER { name("cpu0.vfp-present"), type(bool), default(true), description("Set whether the model has VFP support") } cpu0_vfp_present;
+        PARAMETER { name("cpu0.ase-present"), type(bool), default(true), description("Set whether model has NEON support") } cpu0_ase_present;
+        PARAMETER { name("cpu0.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu0_CFGEND;
+        PARAMETER { name("cpu0.CFGNMFI"), type(bool), default(false), description("Enable nonmaskable FIQ interrupts on startup") } cpu0_CFGNMFI;
+        PARAMETER { name("cpu0.CP15SDISABLE"), type(bool), default(false), description("Initialize to disable access to some CP15 registers") } cpu0_CP15SDISABLE;
+        PARAMETER { name("cpu0.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu0_TEINIT;
+        PARAMETER { name("cpu0.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu0_VINITHI;
+        PARAMETER { name("cpu0.POWERCTLI"), type(uint32_t), default(0), min(0), max(3), description("Default power control state for processor") } cpu0_POWERCTLI;
+        PARAMETER { name("cpu0.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset") } cpu0_vfp_enable_at_reset;
+        PARAMETER { name("cpu0.dcache-size"), type(uint32_t), default(0x8000), description("Set D-cache size in bytes") } cpu0_dcache_size;
+        PARAMETER { name("cpu0.icache-size"), type(uint32_t), default(0x8000), description("Set I-cache size in bytes") } cpu0_icache_size;
+        PARAMETER { name("cpu0.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false") } cpu0_semihosting_enable;
+        PARAMETER { name("cpu0.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting") } cpu0_semihosting_ARM_SVC;
+        PARAMETER { name("cpu0.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting") } cpu0_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu0.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu0_semihosting_cmd_line;
+        PARAMETER { name("cpu0.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base") } cpu0_semihosting_heap_base;
+        PARAMETER { name("cpu0.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap") } cpu0_semihosting_heap_limit;
+        PARAMETER { name("cpu0.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack") } cpu0_semihosting_stack_base;
+        PARAMETER { name("cpu0.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit") } cpu0_semihosting_stack_limit;
+        PARAMETER { name("cpu0.semihosting-cwd"), type(string), default(""), description("virtual address of CWD") } cpu0_semihosting_cwd;
+        PARAMETER { name("cpu0.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu0_min_sync_level;
+    }
+
+    // The clock signal connected to the clk_in port is used to determine
+    // the rate at which the core executes instructions.
+    slave port<ClockSignal> clk_in;
+
+    // The core will generate bus requests on this port.
+    master port<PVBus> pvbus_m0;
+
+    // Raising this signal will put the core into reset mode.
+    slave port<Signal> reset[1];
+
+    // This peer port of event input (and output) is for wakeup from WFE
+    peer port<Signal> event;
+
+    // This signal indicates if a core is in WFE state
+    master port<Signal> standbywfe[1];
+
+    // This signal indicates if a core is in WFI state
+    master port<Signal> standbywfi[1];
+
+    // This signal drives the CPU's interrupt handling.
+    slave port<Signal> irq[1];
+
+    // This signal drives the CPU's fast-interrupt handling.
+    slave port<Signal> fiq[1];
+
+    // Interrupt signal from performance monitoring unit.
+    master port<Signal> pmuirq[1];
+
+    // The port reads the value in CPU ID register field, bits[11:8] of the MPIDR.
+    slave port<Value> clusterid;
+
+    // This signal disables write access to some system control processor registers
+    slave port<Signal> cp15sdisable[1];
+
+    // This signal provides default exception handling state
+    slave port<Signal> teinit[1];
+
+    // This port should be connected to one of the two ticks ports
+    // on a 'visualisation' component, in order to display a running
+    // instruction count.
+    master port<InstructionCount> ticks[1];
+
+    // This signal controls of the location of the exception vectors at reset
+    slave port<Signal> vinithi[1];
+
+    // This signal disables FIQ mask in CPSR
+    slave port<Signal> cfgnmfi[1];
+
+    // This signal if for EE bit initialisation
+    slave port<Signal> cfgend[1];
+}
+

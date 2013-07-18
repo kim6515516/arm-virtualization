@@ -1,0 +1,48 @@
+/*
+ * Copyright 2009 ARM Limited. All rights reserved.
+ */
+
+component EBCortexA5MPx1CoreTile
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "CortexA5MPx1 Core Tile for Emulation Baseboard.";
+    }
+    composition
+    {
+        pl310_l2cc : PL310_L2CC();
+        periph_clockdivider : ClockDivider(div=2,mul=1);
+        eb_intmapper : EB_IntMapper();
+        clockdivider : ClockDivider(div=24,mul=100);
+        pvbusdecoder : PVBusDecoder();
+        connector : EBConnector();
+        core : ARMCortexA5MPx1CT(PERIPHBASE = 0x1F000000);
+        fvp_gic_irq : FVP_GIC();
+        fvp_gic_fiq : FVP_GIC();
+    }
+    connection
+    {
+        core.ticks[0] => self.ticks;
+        connector.connector => self.hdr;
+        core.pvbus_m0 => pvbusdecoder.pvbus_s;
+        //fvp_gic.irq => core.irq;
+        //fvp_gic.fiq => core.fiq;
+        connector.clk_bus => clockdivider.clk_in;
+        clockdivider.clk_out => core.clk_in;
+        clockdivider.clk_out => periph_clockdivider.clk_in;
+        periph_clockdivider.clk_out => core.periphclk_in;   
+        connector.intr_num => eb_intmapper.int_num;
+        connector.intr => eb_intmapper.int_in;
+        eb_intmapper.irq => core.ints;
+        pl310_l2cc.pvbus_m => connector.pvbus;
+        pvbusdecoder.pvbus_m_range[0x0..0xffffffff] => pl310_l2cc.pvbus_s;   // map the whole array!
+        pvbusdecoder.pvbus_m_range[0x10041000..0x10041fff] => fvp_gic_irq.pvbus_distributor;
+        pvbusdecoder.pvbus_m_range[0x10040000..0x10040fff] => fvp_gic_irq.pvbus_core;
+        pvbusdecoder.pvbus_m_range[0x10051000..0x10051fff] => fvp_gic_fiq.pvbus_distributor;
+        pvbusdecoder.pvbus_m_range[0x10050000..0x10050fff] => fvp_gic_fiq.pvbus_core;
+    }
+    master port<InstructionCount> ticks;
+    master port<CompoundPortLisa> hdr;
+}

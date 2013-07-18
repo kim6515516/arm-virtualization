@@ -1,0 +1,92 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// An ARMCortexA8CT CPU component.
+
+extern component ARMCortexA8CT
+{
+    properties {
+        executes_software = 1; 
+        version = "8.1.37";
+        component_type = "Core";
+        description = "ARMCortexA8CT CPU component";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    resources
+    {
+        PARAMETER { name("implements_vfp"), type(bool), default(true), description("Set whether the model has been built with VFP and NEON support ") } implements_vfp;
+        PARAMETER { name("siliconID"), type(uint32_t), default(0x41000000), min(0x0), max(0xFFFFFFFF), description("Value as read by the system coprocessor siliconID register ") } siliconID;
+        PARAMETER { name("VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled ") } VINITHI;
+        PARAMETER { name("CP15SDISABLE"), type(bool), default(false), description("Initialize to disable access to some CP15 registers ") } CP15SDISABLE;
+        PARAMETER { name("vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset ") } vfp_enable_at_reset;
+        PARAMETER { name("semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false") } semihosting_enable;
+        PARAMETER { name("semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFFFF), description("A32 SVC number for semihosting")  } semihosting_ARM_SVC;
+        PARAMETER { name("semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFFFFFFFF), description("T32 SVC number for semihosting") } semihosting_Thumb_SVC;
+        PARAMETER { name("semihosting-cmd_line"), type(string), default(""), description("command line available to semihosting SVC calls") } semihosting_cmd_line;
+        PARAMETER { name("semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("virtual address of heap base") } semihosting_heap_base;
+        PARAMETER { name("semihosting-heap_limit"), type(uint32_t), default(0xF000000), min(0x0), max(0xFFFFFFFF), description("virtual address of top of heap")  } semihosting_heap_limit;
+        PARAMETER { name("semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("virtual address of base of descending stack") } semihosting_stack_base;
+        PARAMETER { name("semihosting-stack_limit"), type(uint32_t), default(0xF000000), min(0x0), max(0xFFFFFFFF), description("virtual address of stack limit") } semihosting_stack_limit;
+        PARAMETER { name("semihosting-cwd"), type(string), default(""), description("virtual address of CWD") } semihosting_cwd;
+        PARAMETER { name("min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } min_sync_level;
+        PARAMETER { name("CFGNMFI"), type(bool), default(false), description("Enable nonmaskable FIQ interrupts on startup ") } CFGNMFI;
+        PARAMETER { name("CFGTE"), type(bool), default(false), description("Initialize to take exceptions in T32 state. Model starts in T32 state ") } CFGTE;
+        PARAMETER { name("CFGEND0"), type(bool), default(false), description("Initialize to BE8 endianness ") } CFGEND0;
+        PARAMETER { name("l1_dcache-size"), type(uint32_t), default(32768), min(16384), max(32768), description("Set L1 D-cache size in bytes ") } l1_dcache_size;
+        PARAMETER { name("l1_icache-size"), type(uint32_t), default(32768), min(16384), max(32768), description("Set L1 I-cache size in bytes ") } l1_icache_size;
+        PARAMETER { name("l1_dcache-state_modelled"), type(bool), default(false), description("Include Level 1 data cache state model ") } l1_dcache_state_modelled;
+        PARAMETER { name("l1_icache-state_modelled"), type(bool), default(false), description("Include Level 1 instruction cache state model") } l1_icache_state_modelled;
+        PARAMETER { name("l2_cache-size"), type(uint32_t), default(262144), min(0), max(1048576), description("Set L2 cache size in bytes ") } l2_cache_size;
+        PARAMETER { name("l2_cache-state_modelled"), type(bool), default(false), description("Include unified Level 2 cache state model ") } l2_cache_state_modelled;
+        PARAMETER { name("device-accurate-tlb"), type(bool), default(false), description("Specify whether all TLBs are modeled ") } device_accurate_tlb;
+        PARAMETER { name("master_id"), description("Master ID presented in bus transactions"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF) } master_id;
+    }
+
+    // The clock signal connected to the clk_in port is used to determine
+    // the rate at which the core executes instructions.
+    slave port<ClockSignal> clk_in;
+
+    // The core will generate bus requests on this port.
+    master port<PVBus> pvbus_m;
+
+    // Raising this signal will put the core into reset mode.
+    slave port<Signal> reset;
+
+    // This signal drives the CPU's interrupt handling.
+    slave port<Signal> irq;
+
+    // This signal drives the CPU's fast-interrupt handling.
+    slave port<Signal> fiq;
+
+    // Interrupt signal from performance monitoring unit.
+    master port<Signal> pmuirq;
+
+    // Interrupt signal from L1 PLE.
+    master port<Signal> dmairq;
+
+    // Secure interrupt signal from L1 PLE
+    master port<Signal> dmasirq;
+
+    // L1 PLE error interrupt.
+    master port<Signal> dmaexterrirq;
+
+    // Port allowing the number of instructions since startup to be read from the CPU.
+    master port<InstructionCount> ticks;
+
+    // Configure FIQs as non-maskable after a reset
+    slave port<Signal> cfgnmfi;
+    
+    // Configure exceptions to be taken in thumb mode after a reset
+    slave port<Signal> cfgte;
+    
+    // Configure BE8 mode after a reset
+    slave port<Signal> cfgend0;
+
+    // Configure high vectors after a reset
+    slave port<Signal> vinithi;
+}
+

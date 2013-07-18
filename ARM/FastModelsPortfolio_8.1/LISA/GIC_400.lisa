@@ -1,0 +1,332 @@
+//
+// GIC-400
+//
+// Copyright 2010-2011 ARM Limited. All rights reserved.
+//
+// A component that represents the GIC-400 Generic Interrupt Controller
+// including a VGIC (Virtualised Generic Interrupt Controller).
+//
+// A wrapper that makes allows easier configuration of the v7_VGIC component
+// that supports parameterised configuration.
+//
+//
+component GIC_400
+{
+    //
+    // ----------------------------------------------------------------------
+    //                        Configure the v7_VGIC
+    // ----------------------------------------------------------------------
+    //
+    // Each pv::ReadTransaction/WriteTransaction is associated with a master_id
+    // the master_id is entirely up to the master of the transaction to assign
+    // and for the fabric to transform if it wants.
+    //
+    // We assume the fabric produces no transformation.
+    //
+    // In this case, ARM clusters assign the master id in the following way:
+    //     - bits[31:16]  reserved
+    //     - bits[5:2]    CLUSTERID
+    //     - bits[1:0]    cpu_id within cluster
+    //
+    // CLUSTERID is a four bit set of pins on the outside of the cluster and
+    // appears in the MPIDR.  It can also be set by a parameter.
+    //
+    // The ARM architecture suggests that each cluster in the system be given a
+    // different CLUSTERID and this is essential for the VGIC to identify the
+    // core.
+    //
+    // The parameters we specify in this component allow us to construct the map
+    // of master_id to interface number that the GIC expects.
+    //
+    // There are private peripheral interrupts associated with each core
+    // interface:
+    //     * legacyirq
+    //     * cntpnsirq
+    //     * cntpsirq
+    //     * legacyfiq
+    //     * cntvirq
+    //     * cnthpirq
+    // Their mapping to core interface number is also configurable so that if
+    // the number of cores in the cluster is run-time configurable then they can
+    // be remapped at the same time.
+    //
+    // This mapping is also used for all the legacy inputs irq/fiq and all the
+    // output to the cores irqcpu/fiqcpu/virqcpu/vfiqcpu.
+    //
+    // The mapping is controlled by the parameters *.inout_port_number_to_use.
+    //
+    //
+    // NOTE with care that not all of the PPIs will generate interrupts, most
+    // will be ignored.  The id of the interrupt that will be generated in the
+    // GIC is the index of the ppi port + 16.  So for example, ppi_core0[5] will
+    // map onto whichever interface has a parameter
+    // interfaceN.ppi_port_number_to_use == 0 and the interrupt id it will
+    // generate is 5 + 16 = 21.
+    //
+    // NOTE that a particular core's TRM may say 'PPI0', etc. and that might
+    // _not_ map onto id 16, but something completely different.  So take care
+    // when connecting these.
+    //
+    properties {
+        version = "8.1.37";
+    }
+
+    internal master port<v7_VGIC_Configuration_Protocol> configuration;
+
+    behaviour init
+    {
+        composition.init();
+
+        //
+        // Assert limitations on the parameters
+        //
+        if (number_of_ints % 32 != 0)
+        {
+            std::ostringstream os;
+            os << "*** ERROR: GIC_400 instance " << getHierarchicalName() << " was configured with "
+               << number_of_ints << " SPIs (Shared Peripheral Interrupts).  "
+               << "However, this number must be 0 or a multiple of 32\n\n";
+            message( os.str().c_str(), MSG_FATAL_ERROR );
+        }
+
+        //
+        // Transfer all the configuration information to the v7_VGIC component.
+        //
+        set_mapping( 0, interface0_cluster_id, interface0_core_id, interface0_ppi_port );
+        set_mapping( 1, interface1_cluster_id, interface1_core_id, interface1_ppi_port );
+        set_mapping( 2, interface2_cluster_id, interface2_core_id, interface2_ppi_port );
+        set_mapping( 3, interface3_cluster_id, interface3_core_id, interface3_ppi_port );
+        set_mapping( 4, interface4_cluster_id, interface4_core_id, interface4_ppi_port );
+        set_mapping( 5, interface5_cluster_id, interface5_core_id, interface5_ppi_port );
+        set_mapping( 6, interface6_cluster_id, interface6_core_id, interface6_ppi_port );
+        set_mapping( 7, interface7_cluster_id, interface7_core_id, interface7_ppi_port );
+    }
+    
+    composition
+    {
+    v7_vgic : v7_VGIC(
+        "number-of-ints"=number_of_ints,
+        "number-of-lrs"=4,
+        "number-of-cores"=number_of_interfaces
+        );
+    }
+
+    resources
+    {
+        /// Used for linting the parameters
+        typedef std::map< unsigned, unsigned >   masterid_to_interface_t;
+        masterid_to_interface_t                  masterid_to_interface;
+        
+        /// Used for linting the parameters
+        typedef std::map< unsigned, unsigned >   ppi_port_number_to_interface_t;
+        ppi_port_number_to_interface_t           ppi_port_number_to_interface;
+        
+        PARAMETER { name("NUM_CPUS"), description("number of interfaces to support"), type(uint32_t),  default(1),   min(1),  max(8)   } number_of_interfaces;
+        PARAMETER { name("NUM_SPIS"), description("number of interrupt pins"), type(uint32_t),  default(224),   min(0),  max(480)   } number_of_ints;
+        
+        PARAMETER { name("interface0.cluster_id"), description("The CLUSTERID of the interface you want to appear as interface0 in the VGIC."), type(uint32_t),  default(0),   min(0),  max(15)   } interface0_cluster_id;
+        PARAMETER { name("interface0.core_id"), description("The core id of interface0 in the cluster"), type(uint32_t),  default(0),   min(0),  max(15)   } interface0_core_id;
+        PARAMETER { name("interface0.inout_port_number_to_use"), description("Which ppiN port is used for this interface."), type(uint32_t),  default(0),   min(0),  max(7)   } interface0_ppi_port;
+
+        PARAMETER { name("interface1.cluster_id"), description("The CLUSTERID of the core you want to appear as interface1 in the VGIC."), type(uint32_t),  default(0),   min(0),  max(15)   } interface1_cluster_id;
+        PARAMETER { name("interface1.core_id"), description("The core id of interface1 in the cluster"), type(uint32_t),  default(0),   min(0),  max(15)   } interface1_core_id;
+        PARAMETER { name("interface1.inout_port_number_to_use"), description("Which ppiN port is used for this interface."), type(uint32_t),  default(1),   min(0),  max(7)   } interface1_ppi_port;
+
+        PARAMETER { name("interface2.cluster_id"), description("The CLUSTERID of the interface you want to appear as 'core0' in the VGIC."), type(uint32_t),  default(0),   min(0),  max(15)   } interface2_cluster_id;
+        PARAMETER { name("interface2.core_id"), description("The core id of 'core0' in the cluster"), type(uint32_t),  default(0),   min(0),  max(15)   } interface2_core_id;
+        PARAMETER { name("interface2.inout_port_number_to_use"), description("Which ppiN port is used for this interface."), type(uint32_t),  default(2),   min(0),  max(7)   } interface2_ppi_port;
+
+        PARAMETER { name("interface3.cluster_id"), description("The CLUSTERID of the interface you want to appear as interface3 in the VGIC."), type(uint32_t),  default(0),   min(0),  max(15)   } interface3_cluster_id;
+        PARAMETER { name("interface3.core_id"), description("The core id of interface3 in the cluster"), type(uint32_t),  default(0),   min(0),  max(15)   } interface3_core_id;
+        PARAMETER { name("interface3.inout_port_number_to_use"), description("Which ppiN port is used for this interface."), type(uint32_t),  default(3),   min(0),  max(7)   } interface3_ppi_port;
+
+        PARAMETER { name("interface4.cluster_id"), description("The CLUSTERID of the interface you want to appear as interface4 in the VGIC."), type(uint32_t),  default(0),   min(0),  max(15)   } interface4_cluster_id;
+        PARAMETER { name("interface4.core_id"), description("The core id of interface4 in the cluster"), type(uint32_t),  default(0),   min(0),  max(15)   } interface4_core_id;
+        PARAMETER { name("interface4.inout_port_number_to_use"), description("Which ppiN port is used for this interface."), type(uint32_t),  default(4),   min(0),  max(7)   } interface4_ppi_port;
+                                                                                                                   
+        PARAMETER { name("interface5.cluster_id"), description("The CLUSTERID of the interface you want to appear as interface5 in the VGIC."), type(uint32_t),  default(0),   min(0),  max(15)   } interface5_cluster_id;
+        PARAMETER { name("interface5.core_id"), description("The core id of interface5 in the cluster"), type(uint32_t),  default(0),   min(0),  max(15)   } interface5_core_id;
+        PARAMETER { name("interface5.inout_port_number_to_use"), description("Which ppiN port is used for this interface."), type(uint32_t),  default(5),   min(0),  max(7)   } interface5_ppi_port;
+
+        PARAMETER { name("interface6.cluster_id"), description("The CLUSTERID of the interface you want to appear as interface6 in the VGIC."), type(uint32_t),  default(0),   min(0),  max(15)   } interface6_cluster_id;
+        PARAMETER { name("interface6.core_id"), description("The core id of interface6 in the cluster"), type(uint32_t),  default(0),   min(0),  max(15)   } interface6_core_id;
+        PARAMETER { name("interface6.inout_port_number_to_use"), description("Which ppiN port is used for this interface."), type(uint32_t),  default(6),   min(0),  max(7)   } interface6_ppi_port;
+                                                          
+        PARAMETER { name("interface7.cluster_id"), description("The CLUSTERID of the interface you want to appear as interface7 in the VGIC."), type(uint32_t),  default(0),   min(0),  max(15)   } interface7_cluster_id;
+        PARAMETER { name("interface7.core_id"), description("The core id of interface7 in the cluster"), type(uint32_t),  default(0),   min(0),  max(15)   } interface7_core_id;
+        PARAMETER { name("interface7.inout_port_number_to_use"), description("Which ppiN port is used for this interface."), type(uint32_t),  default(7),   min(0),  max(7)   } interface7_ppi_port;
+
+    }
+   
+    //
+    // ----------------------------------------------------------------------
+    //                   Shared Peripheral Interrupts (SPIs)
+    // ----------------------------------------------------------------------
+    //
+    slave port<Signal> irqs[/*VGIC_MAX_SPIS */ 480];
+    
+    //
+    // ----------------------------------------------------------------------
+    //                    Only a single reset signal
+    // ----------------------------------------------------------------------
+    //
+
+    slave port<Signal> reset_signal;
+
+    //
+    // ----------------------------------------------------------------------
+    // CFGSDISABLE prevents some registers being changed even by Secure mode
+    // ----------------------------------------------------------------------
+    //
+    slave port<Signal> cfgsdisable;
+
+    //
+    // ----------------------------------------------------------------------
+    //            Export the actual interrupts back to the core
+    // ----------------------------------------------------------------------
+    //
+    master port<Signal> irqcpu[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> fiqcpu[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> virqcpu[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> vfiqcpu[/*VGIC_MAX_CPUS*/ 8];
+
+    //
+    // ----------------------------------------------------------------------
+    //                 Private Peripheral Interrupt Connectors
+    // ----------------------------------------------------------------------
+    //
+    // The core's private peripherals export a series of events that can
+    // be connected to the VGIC.
+    //
+    // NOTE that a particular core's TRM may say 'PPI0', etc. and that might
+    // _not_ map onto id 16, but something completely different.  So take care
+    // when connecting these.
+    //
+    slave port<Signal>  legacyirq[/*VGIC_MAX_CPUS*/ 8];      // PPI interrupt id 31
+    slave port<Signal>  cntpnsirq[/*VGIC_MAX_CPUS*/ 8];      // PPI interrupt id 30
+    slave port<Signal>  cntpsirq[/*VGIC_MAX_CPUS*/8];        // PPI interrupt id 29
+    slave port<Signal>  legacyfiq[/*VGIC_MAX_CPUS*/ 8];      // PPI interrupt id 28
+    slave port<Signal>  cntvirq[/*VGIC_MAX_CPUS*/ 8];        // PPI interrupt id 27
+    slave port<Signal>  cnthpirq[/*VGIC_MAX_CPUS*/ 8];       // PPI interrupt id 26
+    
+    
+    //
+    // ----------------------------------------------------------------------
+    // This component has a single PV bus port in that then decodes it to one of
+    // several device ports.
+    // ----------------------------------------------------------------------
+    //
+    slave port<PVBus>             pvbus_s;
+
+    debug
+    {
+        // This section pretends that the v7_VGIC's debug interface is our own.
+        composition.unpublish; // don't independently publish the v7_vgic as a debug target;
+        composition.import;
+    }
+    
+    connection
+    {
+        self.configuration => v7_vgic.configuration;
+        self.irqs          => v7_vgic.spi;
+        self.reset_signal  => v7_vgic.reset_signal;
+        self.cfgsdisable   => v7_vgic.cfgsdisable;
+        v7_vgic.irq_out    => self.irqcpu; 
+        v7_vgic.fiq_out    => self.fiqcpu;
+        v7_vgic.virq_out   => self.virqcpu; 
+        v7_vgic.vfiq_out   => self.vfiqcpu;
+
+        self.legacyirq     => v7_vgic.irq_in; // internally connected to PPI with interrupt id 31
+                
+        self.cntpnsirq[0]  => v7_vgic.ppi_core0[14];      // PPI interrupt id 30
+        self.cntpnsirq[1]  => v7_vgic.ppi_core1[14];      // PPI interrupt id 30
+        self.cntpnsirq[2]  => v7_vgic.ppi_core2[14];      // PPI interrupt id 30
+        self.cntpnsirq[3]  => v7_vgic.ppi_core3[14];      // PPI interrupt id 30
+        self.cntpnsirq[4]  => v7_vgic.ppi_core4[14];      // PPI interrupt id 30
+        self.cntpnsirq[5]  => v7_vgic.ppi_core5[14];      // PPI interrupt id 30
+        self.cntpnsirq[6]  => v7_vgic.ppi_core6[14];      // PPI interrupt id 30
+        self.cntpnsirq[7]  => v7_vgic.ppi_core7[14];      // PPI interrupt id 30
+        
+        self.cntpsirq[0]  => v7_vgic.ppi_core0[13];       // PPI interrupt id 29
+        self.cntpsirq[1]  => v7_vgic.ppi_core1[13];       // PPI interrupt id 29
+        self.cntpsirq[2]  => v7_vgic.ppi_core2[13];       // PPI interrupt id 29
+        self.cntpsirq[3]  => v7_vgic.ppi_core3[13];       // PPI interrupt id 29
+        self.cntpsirq[4]  => v7_vgic.ppi_core4[13];       // PPI interrupt id 29
+        self.cntpsirq[5]  => v7_vgic.ppi_core5[13];       // PPI interrupt id 29
+        self.cntpsirq[6]  => v7_vgic.ppi_core6[13];       // PPI interrupt id 29
+        self.cntpsirq[7]  => v7_vgic.ppi_core7[13];       // PPI interrupt id 29
+        
+        self.legacyfiq     => v7_vgic.fiq_in; // internally connected to PPI with interrupt id 28
+        
+        self.cntvirq[0]  => v7_vgic.ppi_core0[11];       // PPI interrupt id 27
+        self.cntvirq[1]  => v7_vgic.ppi_core1[11];       // PPI interrupt id 27
+        self.cntvirq[2]  => v7_vgic.ppi_core2[11];       // PPI interrupt id 27
+        self.cntvirq[3]  => v7_vgic.ppi_core3[11];       // PPI interrupt id 27
+        self.cntvirq[4]  => v7_vgic.ppi_core4[11];       // PPI interrupt id 27
+        self.cntvirq[5]  => v7_vgic.ppi_core5[11];       // PPI interrupt id 27
+        self.cntvirq[6]  => v7_vgic.ppi_core6[11];       // PPI interrupt id 27
+        self.cntvirq[7]  => v7_vgic.ppi_core7[11];       // PPI interrupt id 27
+        
+        self.cnthpirq[0]  => v7_vgic.ppi_core0[10];      // PPI interrupt id 26
+        self.cnthpirq[1]  => v7_vgic.ppi_core1[10];      // PPI interrupt id 26
+        self.cnthpirq[2]  => v7_vgic.ppi_core2[10];      // PPI interrupt id 26
+        self.cnthpirq[3]  => v7_vgic.ppi_core3[10];      // PPI interrupt id 26
+        self.cnthpirq[4]  => v7_vgic.ppi_core4[10];      // PPI interrupt id 26
+        self.cnthpirq[5]  => v7_vgic.ppi_core5[10];      // PPI interrupt id 26
+        self.cnthpirq[6]  => v7_vgic.ppi_core6[10];      // PPI interrupt id 26
+        self.cnthpirq[7]  => v7_vgic.ppi_core7[10];      // PPI interrupt id 26
+
+        self.pvbus_s       => v7_vgic.pvbus_s;
+    }
+
+    includes
+    {
+#include <iostream>
+#include <cstdlib>
+#include <sstream>
+    }
+
+    behaviour set_mapping(
+        unsigned    interface_number_,
+        unsigned    cluster_id_,
+        unsigned    core_id_in_cluster_,
+        unsigned    ppi_port_number_
+        )
+    {
+        if (interface_number_ >= number_of_interfaces)
+        {
+            return;
+        }
+        
+        assert( interface_number_   <  8 );
+        assert( cluster_id_         < 16 );
+        assert( core_id_in_cluster_ <  4 );
+        assert( ppi_port_number_    <  8 );
+
+        unsigned const master_id = (cluster_id_ & 0xF) << 2 | (core_id_in_cluster_ & 0x3);
+
+        if (masterid_to_interface.find(master_id) != masterid_to_interface.end())
+        {
+            std::ostringstream os;
+            os << "*** ERROR: GIC_400 instance " << getHierarchicalName()
+               << " : "
+               << "The parameters for interface " << interface_number_
+               << " has CLUSTERID " << cluster_id_
+               << " and core number " << core_id_in_cluster_
+               << " but interface " << masterid_to_interface[master_id]
+               << " is declared identically!"
+               << std::endl;
+            message( os.str().c_str(), MSG_FATAL_ERROR );
+        }
+
+        masterid_to_interface[master_id] = interface_number_;
+
+        configuration.setMasterIdToCoreNumberMapping(
+            master_id,
+            (0xf << 2) | 0x3, // master_id_mask
+            interface_number_,
+            0, // we are not doing anything with PPI renumbering
+            ppi_port_number_
+            );
+    }
+}

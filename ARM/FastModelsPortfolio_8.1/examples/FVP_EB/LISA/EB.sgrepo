@@ -1,0 +1,182 @@
+component "RemapDecoder"
+{
+        path = "../../Common/LISA/RemapDecoder.lisa";
+}
+component "IntelStrataFlashJ3"
+{
+        path = "../../Common/LISA/IntelStrataFlashJ3.lisa";
+}
+
+component "FVP_EB_ARM926"
+{
+        path = "FVP_EB_ARM926.lisa";
+}
+component "FVP_EB_ARM1136"
+{
+        path = "FVP_EB_ARM1136.lisa";
+}
+component "FVP_EB_ARM1176"
+{
+        path = "FVP_EB_ARM1176.lisa";
+}
+component "FVP_EB_Cortex-R4"
+{
+        path = "FVP_EB_Cortex_R4.lisa";
+}
+component "FVP_EB_Cortex-A8"
+{
+        path = "FVP_EB_Cortex_A8.lisa";
+}
+component "FVP_EB_Cortex-A9"
+{
+        path = "FVP_EB_Cortex_A9.lisa";
+}
+component "FVP_EB_Cortex-A9_MPx1"
+{
+        path = "FVP_EB_Cortex_A9_MPx1.lisa";
+}
+component "FVP_EB_CortexA9-MP_x2"
+{
+        path = "FVP_EB_Cortex_A9_MPx2.lisa";
+}
+component "FVP_EB_Cortex-A9_MPx4"
+{
+        path = "FVP_EB_Cortex_A9_MPx4.lisa";
+}
+component "FVP_EB_Cortex-A5"
+{
+        path = "FVP_EB_Cortex_A5.lisa";
+}
+component "FVP_EB_Cortex-A5_MPx1"
+{
+        path = "FVP_EB_Cortex_A5_MPx1.lisa";
+}
+component "FVP_EB_Cortex-A5_MPx2"
+{
+        path = "FVP_EB_Cortex_A5_MPx2.lisa";
+}
+component "FVP_EB_Cortex-A5_MPx4"
+{
+        path = "FVP_EB_Cortex_A5_MPx4.lisa";
+}
+component "EB926CoreTile"
+{
+        path = "EB926CoreTile.lisa";
+}
+component "EB1136CoreTile"
+{
+        path = "EB1136CoreTile.lisa";
+}
+component "EB1176CoreTile"
+{
+        path = "EB1176CoreTile.lisa";
+}
+component "EBCortexR4CoreTile"
+{
+        path = "EBCortexR4CoreTile.lisa";
+}
+component "EBCortexA8CoreTile"
+{
+        path = "EBCortexA8CoreTile.lisa";
+}
+component "EBCortexA9UPCoreTile"
+{
+        path = "EBCortexA9UPCoreTile.lisa";
+}
+component "EBCortexA9MPx1CoreTile"
+{
+        path = "EBCortexA9MPx1CoreTile.lisa";
+}
+component "EBCortexA9MPx2CoreTile"
+{
+        path = "EBCortexA9MPx2CoreTile.lisa";
+}
+component "EBCortexA9MPx4CoreTile"
+{
+        path = "EBCortexA9MPx4CoreTile.lisa";
+}
+component "EBCortexA5CoreTile"
+{
+        path = "EBCortexA5CoreTile.lisa";
+}
+component "EBCortexA5MPx1CoreTile"
+{
+        path = "EBCortexA5MPx1CoreTile.lisa";
+}
+component "EBCortexA5MPx2CoreTile"
+{
+        path = "EBCortexA5MPx2CoreTile.lisa";
+}
+component "EBCortexA5MPx4CoreTile"
+{
+        path = "EBCortexA5MPx4CoreTile.lisa";
+}
+component "EmulationBaseboard"
+{
+        path = "EmulationBaseboard.lisa";
+}
+component "EBMemoryCoreTile"
+{
+        path = "EBMemoryCoreTile.lisa";
+}
+component "EBConnector"
+{
+        path = "EBConnector.lisa";
+}
+component "EBSocket"
+{
+        path = "EBConnector.lisa";
+}
+component "EBInterruptForwarder"
+{
+        path = "EBInterruptForwarder.lisa";
+}
+component "EBInterruptReceiver"
+{
+        path = "EBInterruptReceiver.lisa";
+}
+component "EBRemapper"
+{
+        path = "EBRemapper.lisa";
+}
+component "EBVisualisation"
+{
+        path = "EBVisualisation.lisa";
+}
+component "EB_SysRegs"
+{
+        path = "EB_SysRegs.lisa";
+}
+component "EB_IntMapper"
+{
+        path = "EB_IntMapper.lisa";
+}
+component "EB_USB"
+{
+        path = "EB_USB.lisa";
+}
+component "FVP_GIC"
+{
+        path = "FVP_GIC.lisa";
+}
+component "TSC2200"
+{
+        path = "TSC2200.lisa";
+}
+component "EBCortexA9_SysRegs"
+{
+        path = "EBCortexA9_SysRegs.lisa";
+}
+
+files
+{
+    path = "$(PVLIB_HOME)/etc/sglib.sgrepo";
+    path = "$(PVLIB_HOME)/VFS2/etc/vfs2.sgrepo";
+    path = "../../Common/LISA/LCDLayoutInfoProtocol.lisa";
+    path = "../../Common/LISA/UIClass/UIClass.cpp";
+    path = "EBSysRegsProtocol.lisa";
+    path = "GIC/GIC.cpp";
+    path = "GIC/";
+    path = "../../Common/LISA/";
+    path = ".";
+}

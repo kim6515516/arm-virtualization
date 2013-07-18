@@ -1,0 +1,81 @@
+/* -*- c++ -*- */
+/* vim: syntax=cpp
+ */
+/*!
+ *  \file   CounterInterface2SystemC.lisa
+ *  \brief  
+ *  \date   Copyright ARM Limited 2012 All Rights Reserved.
+ *  
+ *  
+ */
+
+component CounterInterface2SystemC
+{
+    properties {
+        version = "8.1.37";
+        component_type = "System";
+        dso_safe = 0;
+        description = "CounterInterface to SystemC Converter";
+    }
+    
+    behaviour init()
+    {
+        composition.init();
+    }
+
+
+    // Interface to MemoryMappedCounterModel
+    slave port<CounterInterface> cntvalueb
+    {
+        slave behaviour signalUpdate()
+        {
+            amba_pv_signalUpdate_m.set_state(0,0);
+        }
+
+        slave behaviour setEnabled(bool en)
+        {
+            amba_pv_setEnabled_m.set_state(0,en?1:0);
+        }
+
+        slave behaviour eventUpdate()
+        {
+            amba_pv_eventUpdate_m.set_state(0,0);
+        }
+    }
+    
+    slave port<AMBAPVValueState64>  amba_pv_getCounterValue_s
+    {
+        behavior set_state(int /*export_id*/,
+                           const uint64_t & /*value*/) {
+        }
+
+        behavior get_state(int /*export_id*/,
+                           tlm::tlm_tag<uint64_t> * /*t*/): uint64_t {
+            return cntvalueb.getCounterValue();;
+        }
+    }
+
+    slave port<AMBAPVValue64>       amba_pv_requestSignalUpdate_s
+    {
+        behavior set_state(int /*export_id*/,
+                           const uint64_t & value) {
+            cntvalueb.requestSignalUpdate(value);
+        }
+    }
+
+    master port<AMBAPVValue>        amba_pv_signalUpdate_m;
+    master port<AMBAPVValue>        amba_pv_setEnabled_m;
+
+    slave port<AMBAPVValue64>       amba_pv_requestEventUpdate_s
+    {
+        behavior set_state(int /*export_id*/,
+                           const uint64_t & value) {
+            cntvalueb.requestEventUpdate(value);
+        }
+    }
+
+    master port<AMBAPVValue>        amba_pv_eventUpdate_m;
+}
+
+
+/* eof CounterInterface2SystemC.lisa */

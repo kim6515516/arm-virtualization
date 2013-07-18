@@ -1,0 +1,118 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component RAMDevice
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "RAM device, can be dynamic or static ram.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    composition
+    {
+        bus_slave : PVBusSlave(size = size);
+    }
+
+    connection
+    {
+        self.pvbus => bus_slave.pvbus_s;
+    }
+    
+    resources
+    {
+        // Controls how much RAM will be modelled, defaulting to 4GB.
+        PARAMETER { description("Memory Size"), default(0x100000000), type(uint64_t) }  size;
+        PARAMETER { description("Global monitor ignores non-exclusive stores"),
+                    default(false), type(bool), publish(false) }  global_monitor_ignores_non_ex_store;
+
+        MEMORY { virtual(true), read_function(debug_read), write_function(debug_write) } ram_contents[0x10000000000];
+    }
+
+    slave port<PVBus> pvbus;
+    
+    behaviour init()
+    {
+        composition.init();
+            
+        // Preinit RAM to a pattern which ought to generate an SVC in ARM or Thumb
+        bus_slave.control.setFillPattern(0xdfdfdfcf,0xcfdfdfdf);
+        bus_slave.control.setAccess(0, size, pv::ACCESSTYPE_RW, pv::ACCESSMODE_MEMORY);
+
+        if (global_monitor_ignores_non_ex_store)
+        {
+           pv::slave_config_t  slave_config;
+
+           slave_config.ignoreNonExclusiveStoresToGlobalMonitor();
+
+           bus_slave.control.configure(&slave_config);
+        }
+    }
+
+    // -- CADI Debug interface to memory --
+
+    behaviour debug_read(uint32_t space_id,
+                         uint32_t block_id,
+                         uint64_t offset,
+                         uint32_t size_in_maus,
+                         uint64_t *data,
+                         bool side_effects,
+                         sg::MemoryAccessContext *mac)
+        : AccessFuncResult
+    {
+        pv::bus_addr_t start_address = offset % size;
+        uint8_t *      ptr = (uint8_t *)data;
+        uint32_t       size_in_bytes = size_in_maus * mac->GetMauInBytes();
+
+        while (size_in_bytes > 0) {
+            pv::bus_addr_t block_limit;
+            uint8_t const *storage = bus_slave.control.getReadStorage(start_address,
+                                                                      &block_limit);
+            uint32_t       transfer_bytes = block_limit - start_address;
+            if (transfer_bytes > size_in_bytes) transfer_bytes = size_in_bytes;
+            if (transfer_bytes == 0) break;
+
+            memcpy(ptr, storage, transfer_bytes);
+
+            size_in_bytes -= transfer_bytes;
+            start_address  = (start_address + transfer_bytes) % size;
+            ptr += transfer_bytes;
+        }
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour debug_write(uint32_t space_id,
+                          uint32_t block_id,
+                          uint64_t offset,
+                          uint32_t size_in_maus,
+                          const uint64_t *data,
+                          bool side_effects,
+                          sg::MemoryAccessContext *mac)
+        : AccessFuncResult
+    {
+        pv::bus_addr_t start_address = offset % size;
+        uint8_t const *ptr = (uint8_t *)data;
+        uint32_t       size_in_bytes = size_in_maus * mac->GetMauInBytes();
+
+        while (size_in_bytes > 0) {
+            pv::bus_addr_t block_limit;
+            uint8_t *      storage = bus_slave.control.getWriteStorage(start_address,
+                                                                       &block_limit);
+            uint32_t       transfer_bytes = block_limit - start_address;
+            if (transfer_bytes > size_in_bytes) transfer_bytes = size_in_bytes;
+            if (transfer_bytes == 0) break;
+
+            memcpy(storage, ptr, transfer_bytes);
+
+            size_in_bytes -= transfer_bytes;
+            start_address  = (start_address + transfer_bytes) % size;
+            ptr += transfer_bytes;
+        }
+        return ACCESS_FUNC_OK;
+    }
+}
+

@@ -1,0 +1,21 @@
+/*!
+ * \file  VirtualEthernetProtocol.lisa
+ * \brief LISA Implementation of the Virtual Ethernet Protocol.
+ * \date  Copyright 2009 ARM Limited. All rights reserved.
+ *
+ */
+
+protocol VirtualEthernet {
+    properties {
+        version = "8.1.37";
+        description = "Virtual Ethernet Protocol";
+        documentation_file = "none";
+    }
+
+    includes {
+        #include "components/VirtualEthernet/Protocol/EthernetFrame.h"
+    }
+    
+    slave behaviour sendToSlave(EthernetFrame* frame);
+    master behaviour sendToMaster(EthernetFrame* frame);
+}

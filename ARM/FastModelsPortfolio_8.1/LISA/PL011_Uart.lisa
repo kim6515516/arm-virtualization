@@ -1,0 +1,1106 @@
+/*
+ * Copyright 2004-2013 ARM Limited. All rights reserved.
+ */
+
+// LISA Implementation of PL011
+
+component PL011_Uart
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell UART(PL011)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+#include "hostconf/zinttypes.h"
+#include "components/PL011-Uart-FIFO.h"
+#include <stdio.h>
+#include "sg/SGComponentTrace.h"
+
+        #define TRACE_UART_INT   if (!0) ; else printf
+        #define TRACE_UART_CLOCK if (!0) ; else printf
+    }
+
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+        clk_divider : ClockDivider;
+        timer : ClockTimer;
+    }
+
+    // Memory-mapped register interface.
+    slave port<PVBus> pvbus;
+
+    // Serial input/output and control signals.
+    master port<SerialData> serial_out;
+
+    // Reference clock used as base for serial clock.
+    slave port<ClockSignal> clk_in_ref;
+
+    // Interrupt signal
+    master port<Signal> intr;
+
+    // Handle event notifications from the timer.
+    internal slave port<TimerCallback> timer_callback_handler
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            ++ ticks;
+            return handleByteClockSignal();
+        }
+    }
+
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behaviour read(pv::ReadTransaction tx)
+                    : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32((uint32_t)registerRead(tx.getAddress() & ~3));
+        }
+        behaviour write(pv::WriteTransaction tx)
+                    : pv::Tx_Result
+        {
+            registerWrite(tx.getAddress(),
+                          tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+
+    connection
+    {
+        self.clk_in_ref => clk_divider.clk_in;
+        clk_divider.clk_out => timer.clk_in;
+
+        timer.timer_callback => self.timer_callback_handler;
+
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+    }
+
+    resources
+    {
+        PARAMETER { description("Clock rate for PL011."), type(uint32_t), default(14745600) } clock_rate;
+        PARAMETER { description("Baud rate."), type(uint32_t), default(38400) } baud_rate;
+        PARAMETER { description("Enable uart when the system starts up. (clock_rate and baud_rate are only valid when this option is enabled.)"), type(bool), default("false") } uart_enable;
+        PARAMETER { description("Ignore the clock rate and transmit/receive serial data immediately"), type(bool), default("true") } untimed_fifos;
+        PARAMETER { description("Output file to hold data written by the UART (use '-' to send all output to stdout)"), type(string), default("") } out_file;
+        PARAMETER { description("Input file for data to be read by the UART" ), type(string), default("") } in_file;
+        PARAMETER { description("Unbuffered output" ), type(bool), default("false") } unbuffered_output ;
+        PARAMETER { description("Input file escape sequence" ), type(string), default("##") } in_file_escape_sequence;
+        PARAMETER { description("Shutdown simulation when a EOT (ASCII 4) char is transmitted (useful for regression tests when semihosting is not available)" ), type(bool), default(false) } shutdown_on_eot;
+        PARAMETER { description("Shutdown simulation when a string is transmitted" ), type(string), runtime(true), default("") } shutdown_tag;
+
+        enum DataFlags
+        {
+            UartData_NODATA = (1<<12),
+            UartData_OE = (1<<11),
+            UartData_BE = (1<<10),
+            UartData_PE = (1<<9),
+            UartData_FE = (1<<8)
+        };
+
+        enum Signals
+        {
+            // UART Input signals
+            SIG_RI = 1<<0,
+            SIG_CTS = 1<<1,
+            SIG_DSR = 1<<2,
+            SIG_DCD = 1<<3,
+            // UART Output signals
+            SIG_DTR = 1<<4,
+            SIG_RTS = 1<<5,
+            SIG_Out1 = 1<<6,
+            SIG_Out2 = 1<<7,
+
+            SIG_OutMask = (SIG_DTR | SIG_RTS | SIG_Out1 | SIG_Out2),
+            SIG_InMask = (SIG_RI | SIG_CTS | SIG_DSR | SIG_DCD)
+        };
+
+        enum Interrupts
+        {
+            ORINT  = (1<<10),
+            CTSINT = (1<<1),
+            RTINT  = (1<<6),
+            TXINT  = (1<<5),
+            RXINT  = (1<<4)
+        };
+
+        enum FRBits
+        {
+            // flags register bits
+            UARTFR_RI   = (1<<8),
+            UARTFR_TXFE = (1<<7),
+            UARTFR_RXFE = (1<<4),
+            UARTFR_RXFF = (1<<6),
+            UARTFR_TXFF = (1<<5),
+            UARTFR_BUSY = (1<<3),
+            UARTFR_DCD  = (1<<2),
+            UARTFR_DSR  = (1<<1),
+            UARTFR_CTS  = (1<<0)
+        };
+
+        enum DRBits
+        {
+            // bits in the fifo/data register, these are shifted when read from rsr
+            OVERRUN_ERR = (1<<11),
+            BREAK_ERR   = (1<<10),
+            PARITY_ERR  = (1<<9),
+            FRAMING_ERR = (1<<8)
+        };
+
+        enum CRBits
+        {
+            // bits in the Control register
+            UARTCR_CTSEn  = (1<<15),
+            UARTCR_RTSEn  = (1<<14),
+            UARTCR_RTS    = (1<<11),
+            UARTCR_RXE    = (1<<9),
+            UARTCR_TXE    = (1<<8),
+            UARTCR_UARTEN = (1<<0)
+        };
+
+        // fifo TX/RX trigger points. Last three are reserved
+        uint32_t fifoTide[8];
+        char fifo_string[80];
+
+        bool irq_signal;
+
+        uint8_t  lcr_h;
+        uint32_t irq;
+        uint32_t irq_mask;
+        uint16_t fr;
+        uint16_t ibrd;
+        uint8_t  fbrd;
+        uint16_t ifls;
+        uint16_t cr;
+        uint16_t rsr;
+
+        REGISTER { description("Data read or written"),               read_function(debug_read), write_function(debug_write), reg_number(0x000) } UARTDR;
+        REGISTER { description("Receive status(RO)/Error clear(WO)"), read_function(debug_read), write_function(debug_write), reg_number(0x004) } UARTRSR;
+        REGISTER { description("Flag(RO)"),                           read_function(debug_read), write_function(debug_write), reg_number(0x018) } UARTFR;
+        REGISTER { description("Integer baud rate divisor"),          read_function(debug_read), write_function(debug_write), reg_number(0x024) } UARTIBRD;
+        REGISTER { description("Fractional baud rate divisor"),       read_function(debug_read), write_function(debug_write), reg_number(0x028) } UARTFBRD;
+        REGISTER { description("Line control, high byte"),            read_function(debug_read), write_function(debug_write), reg_number(0x02C) } UARTLCR_H;
+        REGISTER { description("Control"),                            read_function(debug_read), write_function(debug_write), reg_number(0x030) } UARTCR;
+        REGISTER { description("Interrupt FIFO level select"),        read_function(debug_read), write_function(debug_write), reg_number(0x034) } UARTIFLS;
+        REGISTER { description("Interrupt mask set/clear"),           read_function(debug_read), write_function(debug_write), reg_number(0x038) } UARTIMSC;
+        REGISTER { description("Raw interrupt status(RO)"),           read_function(debug_read), write_function(debug_write), reg_number(0x03C) } UARTRIS;
+        REGISTER { description("Masked interrupt status(RO)"),        read_function(debug_read), write_function(debug_write), reg_number(0x040) } UARTMIS;
+        REGISTER { description("Interrupt clear(WO)"),                read_function(debug_read), write_function(debug_write), reg_number(0x044) } UARTICR;
+
+        REGISTER { bitwidth(8) } UARTPeriphID[4];
+        REGISTER { bitwidth(8) } UARTCellID[4];
+
+        uint8_t  word_len;
+        uint8_t  stop_bits;
+
+        uint32_t rx_intlevel;
+        uint32_t tx_intlevel;
+
+        uint8_t  fifo_enabled;
+        uint8_t  enabled;
+        uint8_t  tx_enabled;
+        uint8_t  rx_enabled;
+        uint16_t overrun;
+        uint16_t fifo_overrun;
+
+        bool  rts;
+
+        FIFO<uint32_t> in;
+        FIFO<uint32_t> out;
+
+        uint32_t last_dr;
+        FILE *iFile;
+        FILE *oFile;
+
+        enum { INFILE_IDLE, INFILE_NEWLINE, INFILE_WAIT_PROMPT } infile_status;
+        char     prompt[500];
+        uint8_t  compare_index;
+        uint8_t  delay_cnt;
+
+        uint64_t ticks;
+        sg::EventSource3<uint64_t /*ticks*/, uint8_t /*character*/, bool /*fifo_overflow*/> character_out;
+        sg::EventSource3<uint64_t /*ticks*/, uint8_t /*character*/, bool /*fifo_overflow*/> character_in;
+        sg::EventSource2<uint64_t /*ticks*/, char const*                                  > line_buffered_out;
+
+        std::string line_buffer;
+    }
+
+    // Number of baud-ticks per byte of data.
+    behavior byte_ticks() : uint32_t
+    {
+        return word_len + stop_bits + 1;
+    }
+
+
+    behavior log_hex2(char *dest, uint32_t val)
+    {
+        char s[3];
+        sprintf(s, "%2.2x", (val & 0xff));
+        dest[0] = s[0];
+        dest[1] = s[1];
+    }
+
+    behavior log_fifos()
+    {
+        size_t i;
+        for (i = 0; i < 79; ++i) fifo_string[i] = ' ';
+        fifo_string[i] = 0;
+        fifo_string[40] = '|';
+        for (i = 0; i < in.size(); ++i) {
+            log_hex2(&fifo_string[5+2*(15-i)],
+                     in[i]);
+        }
+        for (i = 0; i < out.size(); ++i) {
+            log_hex2(&fifo_string[44+2*(15-i)],
+                     out[i]);
+        }
+    }
+
+    behavior update_clock()
+    {
+        if (ibrd > 0) // PL011 trm 3.3.6
+        {
+            uint32_t bauddiv = ((uint32_t)ibrd << 6) + (fbrd & 0x2f);
+
+            clk_divider.rate.set(64, bauddiv * 16);
+
+            TRACE_UART_CLOCK("PL011: clock rate is %"PRIu64"\n", (uint64_t)clk_divider.clk_out.rateInHz());
+
+            if (enabled) {
+                timer.timer_control.set(byte_ticks());
+            }
+        } else {
+            timer.timer_control.cancel();
+        }
+    }
+
+
+    behavior update_fr() : uint16_t
+    {
+        return fr;
+    }
+
+    behavior set_rts(bool rts_enabled)
+    {
+        uint8_t signals = serial_out.signalsGet();
+
+        rts = rts_enabled;
+        signals = (signals & ~SIG_RTS) | (rts ? SIG_RTS : 0);
+
+        serial_out.signalsSet(signals);
+    }
+
+    behavior update_interrupts()
+    {
+        TRACE_UART_INT("PL011::interrupts now raw:0x%x masked:0x%x\n", irq, irq & irq_mask);
+
+        bool signal = ((irq & irq_mask) != 0);
+        if (signal != irq_signal) {
+            intr.setValue((signal) ? sg::Signal::Set : sg::Signal::Clear);
+            irq_signal = signal;
+        }
+    }
+
+
+    behavior disconnect()
+    {
+        timer.timer_control.cancel();
+        composition.disconnect();
+    }
+
+    behavior init()
+    {
+        iFile = NULL;
+        oFile = NULL;
+
+        infile_status = INFILE_NEWLINE;
+
+        composition.init();
+
+        character_in.setName("pl011_character_in");
+        character_in.setDescription("A character was received.");
+        character_in.AddField("tick", "The count of ticks from simulation start that the UART has received.", MTI::EventFieldType::MTI_UNSIGNED_INT, 8);
+        character_in.AddField(
+            "char",
+            "The character received.",
+            MTI::EventFieldType::MTI_UNSIGNED_INT,
+            1
+            );
+        character_in.AddField(
+            "fifo_overflow",
+            "If true, then the character was lost as the fifo was full.",
+            MTI::EventFieldType::MTI_BOOL,
+            1
+            );
+        cadi__->RegisterTraceSource(&character_in);
+
+        character_out.setName("pl011_character_out");
+        character_out.setDescription(
+            "A character was written to the UART to output."
+            );
+        character_out.AddField(
+            "tick",
+            "The count of ticks from simulation start that the UART has received.",
+            MTI::EventFieldType::MTI_UNSIGNED_INT,
+            8
+            );
+        character_out.AddField(
+            "char",
+            "The output character.",
+            MTI::EventFieldType::MTI_UNSIGNED_INT,
+            1
+            );
+        character_out.AddField(
+            "fifo_overflow",
+            "If true, then the character was lost as the fifo was full.",
+            MTI::EventFieldType::MTI_BOOL,
+            1
+            );
+        cadi__->RegisterTraceSource(&character_out);
+
+        line_buffered_out.setName("pl011_line_buffered_out");
+        line_buffered_out.setDescription(
+            "The buffered output of character_out.  The buffer is flushed when any control character is received.  The control characters do not form part of the buffer.  The buffer's size is limited to 255 characters and truncation is indicated by an appended '...'  "
+            );
+        line_buffered_out.AddField(
+            "tick",
+            "The count of ticks from simulation start that the UART has received at the point at which it receives the control character that flushes the buffer.",
+            MTI::EventFieldType::MTI_UNSIGNED_INT,
+            8
+            );
+        line_buffered_out.AddField(
+            "buffer",
+            "The line buffer.",
+            MTI::EventFieldType::MTI_STRING,
+            0,
+            260
+            );
+        cadi__->RegisterTraceSource(&line_buffered_out);
+
+        if (shutdown_on_eot)
+        {
+            shutdown_tag = "\04";
+        }
+    }
+
+    behavior terminate()
+    {
+        if (oFile)
+        {
+            // close output file, but only if it is not stdout
+            if (oFile != stdout)
+                fclose(oFile);
+            oFile = NULL;
+        }
+
+        if (iFile)
+        {
+            fclose(iFile);
+            iFile = NULL;
+        }
+
+        composition.terminate();
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        fifoTide[0]=2;
+        fifoTide[1]=4;
+        fifoTide[2]=8;
+        fifoTide[3]=12;
+        fifoTide[4]=14;
+        fifoTide[5]=14;
+        fifoTide[6]=14;
+        fifoTide[7]=14;
+
+
+        int temp = 16 * baud_rate;
+        int divider = clock_rate / temp;
+        int remainder = clock_rate % temp;
+        temp = (8 * remainder) / baud_rate;
+        int fraction = (temp >> 1) + (temp & 1);
+
+        irq       = 0;
+        irq_mask  = 0;
+        lcr_h     = 0;
+        fr        = UARTFR_TXFE | UARTFR_RXFE | UARTFR_CTS;   // assume CTS
+        if (uart_enable)
+        {
+            ibrd      = divider;
+            fbrd      = fraction;
+            cr        = UARTCR_RXE | UARTCR_TXE | UARTCR_UARTEN;
+        } else {
+            ibrd      = 0;
+            fbrd      = 0;
+            cr        = UARTCR_RXE | UARTCR_TXE;
+        }
+
+        ifls      = 0x12; // 2_010010
+
+        rsr       = 0;
+        word_len  = 8;
+        stop_bits = 1;
+
+        rx_intlevel = fifoTide[2]; // half full
+        tx_intlevel = fifoTide[2]; // half full
+
+
+        fifo_enabled = 0;
+        in.set_capacity(1);
+        out.set_capacity(1);
+
+        overrun = 0;
+        fifo_overrun = 0;
+
+
+        enabled = (cr & UARTCR_UARTEN) ? 1 : 0;
+        tx_enabled = (cr & UARTCR_TXE) ? 1 : 0;
+        rx_enabled = (cr & UARTCR_RXE) ? 1 : 0;
+
+        rts = 1; // RTSEn is false and the fifo has room
+
+        irq_signal = false;
+
+        update_interrupts();
+        update_clock();
+
+        if (out_file != "")
+        {
+            if (out_file == "-") // as a special case if the output filename is '-' send all output to stdout
+                oFile = stdout;
+            else
+                oFile = fopen(out_file.c_str(), "wb"); // send all output to file
+
+            if (NULL == oFile)
+            {
+                message(MSG_ERROR, "%s: could not open output file <%s> for writing\n", getInstanceName().c_str(), out_file.c_str());
+            }
+        }
+
+        if (in_file != "")
+        {
+            iFile = fopen(in_file.c_str(), "rb");
+
+            if (NULL == iFile)
+            {
+                message(MSG_ERROR, "%s: could not open input file <%s> for reading\n", getInstanceName().c_str(), in_file.c_str());
+            }
+        }
+    }
+
+
+    behavior registerRead(pv::bus_addr_t device_addr) : uint32_t
+    {
+        switch (device_addr) {
+        case 0x00: return getUARTDR();
+        case 0x04: return getUARTRSR();
+        case 0x08: return 0; // undefined: implemented as legacy PL010 UARTCR.
+        case 0x0c: return 0; // undefined: implemented as legacy PL010 UARTCR.
+        case 0x10: return 0; // undefined: implemented as legacy PL010 UARTCR.
+        case 0x14: return 0; // undefined: implemented as legacy PL010 UARTCR.
+        case 0x18: return getUARTFR();
+        case 0x20: return 0; // UARTILPR: unimplemented.
+        case 0x24: return getUARTIBRD();
+        case 0x28: return getUARTFBRD();
+        case 0x2c: return getUARTLCR_H();
+        case 0x30: return getUARTCR();
+        case 0x34: return getUARTIFLS();
+        case 0x38: return getUARTIMSC();
+        case 0x3C: return getUARTRIS();
+        case 0x40: return getUARTMIS();
+        case 0x44: return 0; // UARTICR: write-only
+        case 0x48: return 0; // UARTDMACR: unimplemented.
+
+        // UART PeripID = 0x00141011;
+        case 0xFE0: return 0x11;
+        case 0xFE4: return 0x10;
+        case 0xFE8: return 0x24;
+        case 0xFEC: return 0x00;
+
+        // UART PCellID = 0xb105f00d;
+        case 0xFF0: return 0x0d;
+        case 0xFF4: return 0xf0;
+        case 0xFF8: return 0x05;
+        case 0xFFC: return 0xb1;
+
+        default: return 0; // Undefined register.
+        }
+    }
+
+    behavior registerWrite(pv::bus_addr_t device_addr, uint32_t data)
+    {
+        switch (device_addr) {
+        case 0x00: putUARTDR(data); return;
+        case 0x04: putUARTECR(data); return;
+        case 0x08: return; // undefined
+        case 0x0c: return; // undefined
+        case 0x10: return; // undefined
+        case 0x14: return; // undefined
+        case 0x18: return; // UARTFR - read only
+        case 0x20: return; // UARTILPR - unimplemented
+        case 0x24: putUARTIBRD(data); return;
+        case 0x28: putUARTFBRD(data); return;
+        case 0x2c: putUARTLCR_H(data); return;
+        case 0x30: putUARTCR(data); return;
+        case 0x34: putUARTIFLS(data); return;
+        case 0x38: putUARTIMSC(data); return;
+        case 0x3C: return; // UARTRIS - read only
+        case 0x40: return; // UARTMIS - read only
+        case 0x44: putUARTICR(data); return;
+        case 0x48: return; // UARTDMACR - unimplemented
+        default: return;
+        }
+    }
+
+    behavior debugRead(pv::bus_addr_t addr) : uint32_t
+    {
+        if (addr == 0x00) {
+            if (!in.empty()) {
+                return (uint16_t)in.front();
+            } else {
+                return 0;
+            }
+        }
+        return registerRead(addr);
+    }
+
+    behavior getUARTDR() : uint32_t
+    {
+        uint32_t data;
+        if (in.empty()) {
+            data = 0;
+        } else {
+            data = rsr = (uint16_t)in.front();
+            in.pop_front();
+            fr &=~ UARTFR_RXFF;
+
+            if (in.empty())
+            {
+                fr |= UARTFR_RXFE;
+
+                // cleared when the FIFO becomes empty
+                irq &= ~RTINT;
+                update_interrupts();
+            }
+
+            if (!fifo_enabled || in.size() < rx_intlevel)
+            {
+                // cleared when the FIFO level is below the threshold
+                irq &= ~RXINT;
+                update_interrupts();
+
+                // hardware flow control
+                if (cr & UARTCR_RTSEn) {
+                    set_rts(true);
+                }
+            }
+        }
+        last_dr = data;
+
+        if (untimed_fifos) {
+            handleByteClockSignal();
+        }
+
+        return data;
+    }
+
+    behavior getUARTRSR() : uint32_t
+    {
+        // rsr contains status of last byte read from the fifo, not the next
+        // overrun status comes from the overrun flag, not the fifo version
+        return ((rsr & ~OVERRUN_ERR) | overrun) >> 8;
+    }
+
+    behavior getUARTFR()    : uint32_t { return (uint32_t)update_fr();  }
+    behavior getUARTIBRD()  : uint32_t { return ibrd;  }
+    behavior getUARTFBRD()  : uint32_t { return fbrd;  }
+    behavior getUARTLCR_H() : uint32_t { return lcr_h; }
+    behavior getUARTCR()    : uint32_t { return cr | (rts ? UARTCR_RTS : 0); }
+    behavior getUARTIFLS()  : uint32_t { return ifls;  }
+    behavior getUARTIMSC()  : uint32_t { return irq_mask; }
+    behavior getUARTRIS()   : uint32_t { return irq; }
+    behavior getUARTMIS()   : uint32_t { return irq & irq_mask; }
+
+
+    behavior putUARTDR(uint32_t data)
+    {
+        last_dr = data;
+
+        if (!out.full())
+        {
+            out.push_back(data);
+            fr &=~ UARTFR_TXFE;
+            fr |= UARTFR_BUSY;
+
+            if (!fifo_enabled || out.size() > tx_intlevel)
+            {
+                irq &=~ TXINT;
+                update_interrupts();
+            }
+
+            if (out.full())
+            {
+                fr |= UARTFR_TXFF;
+            }
+
+            character_out_event(data, false);
+        } else {
+            // output buffer is full;
+            character_out_event(data, true);
+        }
+        if (untimed_fifos) {
+            handleByteClockSignal();
+        }
+    }
+
+    behavior putUARTECR(uint32_t /*data*/)
+    {
+        // data is ignored, all bits are cleared
+        rsr     = 0;
+
+        // also clears the overrun flag
+        overrun = 0;
+    }
+
+    behavior putUARTIBRD(uint32_t data)
+    {
+        ibrd = (uint16_t)data;
+    }
+    behavior putUARTFBRD(uint32_t data)
+    {
+        fbrd = (uint8_t)data;
+    }
+    behavior putUARTLCR_H(uint32_t data)
+    {
+        lcr_h = (uint8_t)(data);
+        word_len = ((lcr_h >> 5) & 3) + 5;
+        stop_bits = ((lcr_h >> 3) & 1) + 1;
+
+        update_clock();
+
+        uint8_t new_enabled = (lcr_h >> 4) & 1;
+        if (new_enabled && !fifo_enabled)
+        {
+            // Not specified, but according to the VHDL, the FIFOs should
+            // be flushed when turned on.
+            flush();
+
+            in.set_capacity(16);
+            out.set_capacity(16);
+        }
+        else if (!new_enabled && fifo_enabled)
+        {
+            // This is UNDEFINED when there is data in the fifo:
+            // we will flush out buffer data, to be safe.
+            flush();
+
+            in.set_capacity(1);
+            out.set_capacity(1);
+        }
+
+        fifo_enabled = new_enabled;
+    }
+
+    behavior putUARTCR(uint32_t data)
+    {
+        cr = (uint16_t)data;
+
+        rx_enabled = (cr & UARTCR_RXE) != 0;
+        tx_enabled = (cr & UARTCR_TXE) != 0;
+
+        if (!enabled && (cr & UARTCR_UARTEN))
+        {
+            // enabling uart, turn on the timer
+            timer.timer_control.set(byte_ticks());
+        }
+        else if (enabled && !(cr & UARTCR_UARTEN))
+        {
+            // should let one more char in
+            timer.timer_control.cancel();
+        }
+        enabled = (cr & UARTCR_UARTEN) != 0;
+
+        // software flow control
+        if ((cr & UARTCR_RTSEn) == 0) {
+            set_rts(1);
+        }
+        else
+        {
+            set_rts(0);
+        }
+    }
+
+    behavior putUARTIFLS(uint32_t data)
+    {
+        ifls = (uint16_t)(data);
+
+        rx_intlevel = fifoTide[(ifls >> 3) & 7];
+        tx_intlevel = fifoTide[(ifls >> 0) & 7];
+
+        // only detected when the uart level changes
+    }
+
+    behavior putUARTIMSC(uint32_t data)
+    {
+        // if transmit interrupt is enabled, caller is expecting interrupt to say 'ready to transmit'
+        irq_mask = data;
+
+        update_interrupts();
+    }
+
+    behavior putUARTICR(uint32_t data)
+    {
+        irq &=~ data;
+        update_interrupts();
+    }
+
+
+    behavior flush()
+    {
+        in.clear();
+        out.clear();
+
+        fr &=~ (UARTFR_TXFF | UARTFR_RXFF | UARTFR_BUSY); // can't be full now
+        fr |= UARTFR_TXFE | UARTFR_RXFE;
+
+        set_rts(true);
+
+        irq &= ~(RTINT | RXINT);
+        update_interrupts();
+    }
+
+    behaviour character_out_event( uint8_t character_, bool fifo_overflow )
+    {
+        character_out.fire( ticks, character_, fifo_overflow );
+
+        std::size_t const sz = line_buffer.size();
+
+        unsigned const max_size = 256;
+
+        if (character_ < 32 && character_ != uint8_t('\t'))
+        {
+            //
+            // Control character
+            //
+            if ( ! line_buffer.empty() )
+            {
+                // A non-tab control character is a trigger to make the line buffer be
+                // dumped.
+                line_buffered_out.fire( ticks, line_buffer.c_str() );
+                line_buffer.clear();
+            }
+        }
+        else
+        {
+            if (sz < max_size)
+            {
+                // We have an upper limit on the number of characters.
+                line_buffer += (char)character_;
+            }
+            else if (sz == max_size)
+            {
+                line_buffer.append( "..." );
+            }
+        }
+    }
+
+
+    // Every byte tick, transmit or send data as required.
+    // This implements flow control on behalf of the terminal
+    //  using RTS/CTS signals (DSR/DTR are currently ignored).
+    behavior handleByteClockSignal() : uint32_t
+    {
+        if (!enabled)
+            return 0;
+
+        // this might need to force at least slow polling
+
+        uint8_t signal_value = serial_out.signalsGet();
+        fr = fr & ~(UARTFR_DCD | UARTFR_DSR);
+        fr |= (signal_value & SIG_DSR) ? UARTFR_DSR : 0;
+        fr |= (signal_value & SIG_DCD) ? UARTFR_DCD : 0;
+
+
+        if (rx_enabled && rts)
+        {
+            uint16_t data;
+
+            if (fifo_enabled
+                    && !in.full()
+                    && iFile
+                    && !feof(iFile)
+               )
+            {
+                data = computeInFile();
+            }
+            else
+            {
+                data = serial_out.dataReceive();  // default: UartData_NODATA
+            }
+
+
+            if (0 == (data & UartData_NODATA))
+            {
+                if (!in.full())
+                {
+                    character_in.fire( ticks, data, /*fifo_overflow*/ false );
+
+                    // if last byte was dropped, signal an overrun in this fifo entry.
+                    in.push_back((uint32_t)data | fifo_overrun);
+
+                    // fifo received successfully
+                    fifo_overrun = 0;
+
+                    fr &=~ UARTFR_RXFE;
+
+                    if (!fifo_enabled || in.size() == rx_intlevel)
+                    {
+                        irq |= RXINT;
+                        update_interrupts();
+
+                        // hardware flow control
+                        if (cr & UARTCR_RTSEn) {
+                            set_rts(false);
+                        }
+                    }
+
+                    if (in.full()) {
+                        fr |= UARTFR_RXFF;
+                    }
+                }
+                else
+                {
+                    character_in.fire( ticks, data, /*fifo_overflow*/ true );
+                    // there are two overrun bits. One is the status but read from
+                    // RCR, the other is latched into the fifo and cleared on the
+                    // next successful read
+                    // the overrun is signalled immediately but only if the overrun flag is clear.
+                    fifo_overrun = OVERRUN_ERR;
+                    if (overrun == 0)
+                    {
+                        overrun = OVERRUN_ERR;
+
+                        // overrun interrupt is only generated on the rising edge
+                        // of an overrun
+                        irq |= ORINT;
+                        update_interrupts();
+                    }
+                }
+
+                if (untimed_fifos) {
+                    // Force RTINT to be set as soon as any data is received, to minimise latency
+                    irq |= RTINT;
+                }
+
+            }
+            else
+            {
+                // this (inaccurately) simulates the read timeout interrupt which
+                // should occur 32 bits after the last read if there is data in the
+                // fifo and there is no more data coming in. We should count down
+                // three(ish) characters
+                if (!(fr & UARTFR_RXFE))
+                {
+                    irq |= RTINT;
+                    update_interrupts();
+                }
+            }
+        }
+        if (tx_enabled)
+        {
+            if (!out.empty())
+            {
+                uint8_t data = (uint8_t)out.front();
+
+                bool ok = false;
+                if (signal_value & SIG_CTS) {
+                    serial_out.dataTransmit(data);
+                    if (oFile)
+                    {
+                        if (data == 0)
+                            fwrite("<NUL>", 5, 1, oFile);
+                        else
+                            fwrite(&data, sizeof(data), 1, oFile);
+                    }
+
+                    // act on unbuffered_output parameter
+                    if(unbuffered_output)
+                    {
+                        fflush(oFile);
+                    }
+
+                    shutdownTest(data);
+
+                    checkPrompt(data);
+                    ok = true;
+                }
+
+                // for now we always implement CTS as this isn't
+                // simulated by the host Terminal (yet)
+                if (ok /* || ((cr & CTSEn) == 0) */)
+                {
+                    out.pop_front();
+
+                    fr &=~ UARTFR_TXFF;
+                    if ((fr & UARTFR_CTS) == 0)
+                    {
+                        fr |= UARTFR_CTS;
+                        irq |= CTSINT;
+
+                        update_interrupts();
+                    }
+
+                    if (out.empty())
+                    {
+                        fr |= UARTFR_TXFE;
+                        fr &= ~UARTFR_BUSY;
+                    }
+
+                    if (!fifo_enabled || out.size() == tx_intlevel)
+                    {
+                        irq |= TXINT;
+                        update_interrupts();
+                    }
+                }
+                else
+                {
+                    if (fr & UARTFR_CTS)
+                    {
+                        fr &= ~UARTFR_CTS;
+                        irq |= CTSINT;
+                        update_interrupts();
+                    }
+                }
+            }
+        }
+
+        return byte_ticks();
+    }
+
+    behaviour computeInFile() : uint16_t
+    {
+        uint16_t data = UartData_NODATA;
+
+        switch (infile_status)
+        {
+            case INFILE_NEWLINE:
+            {
+                long fpos = ftell (iFile);
+                char line[500];
+                if (fscanf (iFile, "%500[^\n\r]\r", line) > 0)
+                {
+                    if(fscanf (iFile, "\n") > 0)
+                    {
+                        if (strncmp (line, in_file_escape_sequence.c_str(), in_file_escape_sequence.size()) == 0)
+                        {
+                            char * ptr = line + in_file_escape_sequence.size();
+                            if (sscanf (ptr, " WaitForPrompt %[^\n]", prompt) == 1)
+                            {
+                                compare_index = 0;
+                                infile_status = INFILE_WAIT_PROMPT;
+                                break;
+                            }
+                        }
+                    }
+                }
+                fseek (iFile, fpos, SEEK_SET);
+                infile_status = INFILE_IDLE;
+            }
+
+            case INFILE_IDLE:
+            {
+                uint8_t u8;
+                if (fread(&u8, sizeof(u8), 1, iFile) == 1)
+                {
+                    if (u8 == '\n')
+                        infile_status = INFILE_NEWLINE;
+                    data = (uint16_t)u8;
+                    data &= ~UartData_NODATA;
+                    fr = UARTFR_DCD | UARTFR_DSR | UARTFR_CTS;
+                }
+            }
+            break;
+
+            case INFILE_WAIT_PROMPT:
+            break;
+        }
+        return data;
+    }
+
+    behaviour shutdownTest(uint8_t ch)
+    {
+        static unsigned i = 0;
+
+        if (shutdown_tag[0] != '\0')
+        {
+            if (ch == shutdown_tag[i])
+            {
+                if (shutdown_tag[++i] == '\0')
+                {
+                    simShutdown();
+                }
+            }
+            else
+            {
+                i = 0;
+            }
+        }
+    }
+
+    behaviour checkPrompt(uint8_t u8)
+    {
+       if (infile_status == INFILE_WAIT_PROMPT)
+        {
+            if (u8 == prompt[compare_index])
+            {
+                ++ compare_index;
+                if (compare_index == strlen(prompt))
+                    infile_status = INFILE_NEWLINE;
+            }
+            else
+                compare_index = 0;
+        }
+    }
+
+
+    // debugger register access support
+
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        if(reg_id == 0x000)
+        {
+            *datap = last_dr;
+
+        } else {
+            *datap = registerRead(reg_id);
+        }
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+
+        return ACCESS_FUNC_OK;
+    }
+}

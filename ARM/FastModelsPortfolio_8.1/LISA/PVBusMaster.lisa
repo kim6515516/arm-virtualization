@@ -1,0 +1,70 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ */
+
+// The PVBusMaster subcomponent allows a device to generate PVBus transactions.
+// It does this by providing a control port that allows a component to
+// instantiate pv::TransactionGenerator objects.  These objects can be used 
+// to generate bus transactions.
+//
+// See PVTransactionMasterProtocol.lisa for details.
+//
+// A bus mastering component should connect the pvbus_m port to its own
+// bus port.
+//
+// Example:
+//
+// component DmaTransfer
+// {
+//    master port<PVBus> pvbus_m;
+//    master port<PVBusSlaveControl> busmaster_control;
+//    composition {
+//        busmaster : PVBusMaster;
+//    }
+//    resources {
+//        stream_in  : pv::TransactionGenerator;
+//        stream_out : pv::TransactionGenerator;
+//        read_addr  : pv::bus_addr_t;
+//        read_end   : pv::bus_addr_t;
+//        write_addr : pv::bus_addr_t;
+//    }
+//    connection {
+//        busmaster.pvbus_m => self.pvbus_m;
+//        self.busmaster_control => busmaster.control;
+//    }
+//    behaviour init() {
+//        stream_in = busmaster_control.createTransactionGenerator();
+//        stream_out = busmaster_control.createTransactionGenerator();
+//    }
+//    behaviour transfer(pv::bus_addr_t start,
+//                       pv::bus_addr_t end,
+//                       pv::bus_addr_t destination)
+//    {
+//        uint32_t data;
+//        bool ok = true;
+//        while (ok && start < end) {
+//            ok = stream_in->read32(start, &data);
+//            if (ok) {
+//                ok = stream_out->write32(destination, &data);
+//            }
+//            start += 4;
+//            destination += 4;
+//        }
+//    }
+
+extern component PVBusMaster
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "The PVBusMaster subcomponent allows a device to generate PVBus transactions.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    // Connection to bus.
+    master port<PVBus> pvbus_m;
+
+    // Control port used to instantiate a pv::TransactionGenerator.
+    slave  port<PVTransactionMaster> control;
+}

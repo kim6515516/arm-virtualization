@@ -1,0 +1,71 @@
+/*
+ * Copyright 2006-2008 ARM Limited. All rights reserved.
+ */
+
+// Simple bus protocol that allows a LISA component to handle bus read/write transactions
+// via a PVBusSlave sub-component
+//
+// Examples of usage:
+//   component SimpleSlave
+//   {
+//       composition
+//       {
+//           bus_slave : PVBusSlave(size = 0x1000);
+//       }
+//       connection
+//       {
+//           self.pvbus_s => bus_slave.pvbus_s;
+//           bus_slave.device => self.device;
+//       }
+//
+//       slave port <PVBus> pvbus_s;
+//
+//       internal slave port<PVDevice> device
+//       {
+//           behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+//           {
+//               switch(tx.getAddress() & ~3)
+//               {
+//               case 0:  return tx.setReturnData32(0x12345678);
+//               default: return tx.generateAbort();
+//               }
+//           }
+//           behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+//           {
+//               uint32_t data = tx.getData32();
+//               tx.writeComplete();
+//           }
+//           behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+//           {
+//               return device.read(tx);
+//           }
+//           behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+//           {
+//               return device.write(tx);
+//           }
+//       }
+//   }
+
+
+protocol PVDevice
+{
+    includes
+    {
+#include "pv/PVBus.h"
+    }
+
+    properties
+    {
+        version = "8.1.37";
+        description = "PVDevice Protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    // Device access behaviours for the PVBus protocol.
+    slave  behavior read(pv::ReadTransaction tx) : pv::Tx_Result;
+    slave  behavior write(pv::WriteTransaction tx) : pv::Tx_Result;
+
+    // debug accesses functions
+    slave  behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result;
+    slave  behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result;
+}

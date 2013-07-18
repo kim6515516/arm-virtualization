@@ -1,0 +1,573 @@
+/*
+ * AMBAPVACE2PVBus.lisa - AMBA-PV ACE to PVBus protocol converter.
+ *
+ * Copyright 2007-2011 ARM Limited.
+ * All rights reserved.
+ */
+
+/* This version of the AMBAPV to PVBus bridge enables the ACP port to treat a
+ * transaction as coherent.
+ *
+ * WARNING!     This version makes use of a private and undocumented API that
+ *              is not intended to be supported and will definitely change
+ *              in future releases. */
+
+component AMBAPVACE2PVBus
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "AMBA-PV ACE to PVBus protocol converter.";
+        loadfile_extension = "";
+        has_cadi = 1;
+        executes_software = 0;
+        is_single_stepped = 0;
+        dso_safe = 0;
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #include <pv/PVBusMaster.h>
+        #include <deque>
+
+        /* WARNING! API not intended to be supported and will definitively
+         * change in future releases. */
+        #include <pv/PVMemoryAttributes.h>
+        #include <pv/PVBus.h>
+
+        #include "components/VirtualDVMNode.h"
+    }
+
+    composition
+    {
+        bus_master : PVBusMaster();
+    }
+
+    resources
+    {
+        // Transaction generator queue
+        std::deque<pv::RandomContextTransactionGenerator*> tx_gen_q;
+        // Transaction generator queue for DMI accesses
+        std::deque<pv::TransactionGenerator*> dmi_tx_gen_q;
+
+        VirtualDVMNode<true>*  dvm_node;
+        
+        // Proxy to forward invalidateDirectMemPtr() callbacks from TransactionGenerator to this component
+        class InvalidateDirectMemPtrProxy: public pv::TransactionGenerator::CallbackInvalidateDirectMemPtr
+        {
+        public:
+            InvalidateDirectMemPtrProxy(Component__AMBAPVACE2PVBus *parent_): parent(parent_) {}
+            virtual ~InvalidateDirectMemPtrProxy() {}
+            virtual void invalidateDirectMemPtr(pv::bus_addr_range_t range)
+            {
+                parent->invalidateDirectMemPtr(range);
+            }
+        private:
+            Component__AMBAPVACE2PVBus *parent;
+        };
+        InvalidateDirectMemPtrProxy *invalidateDirectMemPtrProxy;
+    }
+
+    // Master PVBus port out into SystemGenerator world
+    master port<PVBus> pvbus_m
+    {
+        behavior aceSnoopRequest(ACE::SnoopRequest* snoop_request)
+        {
+            amba_pv::amba_pv_extension    ex;
+            amba_pv::amba_pv_transaction  trans;
+            sc_core::sc_time              t = sc_core::SC_ZERO_TIME;
+
+            ex.set_non_secure(snoop_request->is_non_secure());
+            ex.set_snoop(amba_pv::amba_pv_snoop_t(snoop_request->get_ace_AxSNOOP()));
+            // Note: ACE does not transport a domain field for snoop accesses. It is transported here transparently to allow linting within Fast Models.  
+            // AMBA-PV ACE masters should ignore the domain value (except for linting) and slaves which do not have
+            // domain information available should set this to amba_pv::AMBA_PV_SYSTEM which should prevent all linting.
+            ex.set_domain(amba_pv::amba_pv_domain_t(snoop_request->get_adomain()));
+
+            trans.set_read();
+            trans.set_address(snoop_request->get_address_begin());
+            trans.set_data_ptr(snoop_request->get_storage());
+            trans.set_data_length(snoop_request->size());
+            trans.set_streaming_width(snoop_request->size());
+
+            trans.set_extension(&ex);
+            try
+            {
+                amba_pv_ace_s.b_snoop(0, trans, t);
+            }
+            catch(...)
+            {
+                trans.clear_extension(&ex);
+                throw;
+            }
+            trans.clear_extension(&ex);
+
+            ACE::ace_crresp_t  snoop_response(ex.is_pass_dirty(),
+                                              !ex.is_shared(),
+                                              ex.is_snoop_was_unique(),
+                                              ex.is_snoop_data_transfer());
+
+            if (ex.is_snoop_error())
+               snoop_response.setError();
+
+            snoop_request->set_crresp(snoop_response);
+        }
+
+        behavior debugACESnoopRequest(ACE::SnoopRequest* snoop_request)
+        {
+            amba_pv::amba_pv_extension    ex;
+            amba_pv::amba_pv_transaction  trans;
+            sc_core::sc_time              t = sc_core::SC_ZERO_TIME;
+            unsigned int                  ret = 0;
+
+            ex.set_non_secure(snoop_request->is_non_secure());
+            ex.set_snoop(amba_pv::amba_pv_snoop_t(snoop_request->get_ace_AxSNOOP()));
+
+            if (snoop_request->is_for_a_cache_maintenance_operation())
+            {
+               trans.set_command(tlm::TLM_IGNORE_COMMAND);
+            }
+            else
+            {
+               trans.set_read();
+            }
+            trans.set_address(snoop_request->get_address_begin());
+            trans.set_data_ptr(snoop_request->get_storage());
+            trans.set_data_length(snoop_request->size());
+            trans.set_streaming_width(snoop_request->size());
+
+            trans.set_extension(&ex);
+            try
+            {
+                ret = amba_pv_ace_s.snoop_dbg(0, trans);
+            }
+            catch(...)
+            {
+                trans.clear_extension(&ex);
+                throw;
+            }
+            trans.clear_extension(&ex);
+
+            ACE::ace_crresp_t  snoop_response(ex.is_pass_dirty(),
+                                              !ex.is_shared(),
+                                              ex.is_snoop_was_unique(),
+                                              ex.is_snoop_data_transfer());
+
+            if (ret != trans.get_data_length())
+               snoop_response.setError();
+
+            if (ex.is_snoop_error())
+               snoop_response.setError();
+
+            snoop_request->set_crresp(snoop_response);
+        }
+    }
+    
+    // Connection in from AMBAPVACE master
+    slave port<AMBAPVACE> amba_pv_ace_s
+    {
+        // Blocking transport
+        behavior b_transport(int socket_id,
+                             amba_pv::amba_pv_transaction & trans,
+                             sc_core::sc_time & t)
+        {
+            // No DMI allowed
+            trans.set_dmi_allowed(false);
+
+            // Retrieve AMBA-PV extension
+            amba_pv::amba_pv_extension* ex = 0;
+
+            trans.get_extension(ex);
+            if (ex == 0)
+            {
+                trans.set_response_status(tlm::TLM_GENERIC_ERROR_RESPONSE);
+                return;
+            }
+
+            // Filter DVM messages into the DVM network
+            if (ex->get_snoop() == amba_pv::AMBA_PV_DVM_MESSAGE)
+            {
+                if (dvm_node->insertDVMMessage(DVM::id_t(1),
+                                               ex->get_dvm_transaction(),
+                                               ex->get_dvm_additional_address()) == DVM::ok)
+                    ex->set_okay();
+                else
+                    ex->set_slverr();
+            }
+            else
+            {
+                // ensure no byte enable!
+                if (trans.get_byte_enable_ptr() != 0)
+                {
+                    ex->set_slverr();
+                    trans.set_response_status(tlm::TLM_BYTE_ENABLE_ERROR_RESPONSE);
+                    return;
+                }
+
+                // Ensure as many bytes in the transaction as required!
+                if (trans.get_data_length() < (ex->get_size() * ex->get_length()))
+                {
+                    ex->set_slverr();
+                    trans.set_response_status(tlm::TLM_BURST_ERROR_RESPONSE);
+                    return;
+                }
+
+                translate_transaction(trans, ex, false);
+            }
+
+            // Convert AMBA-PV response into TLM status
+            trans.set_response_status(amba_pv::amba_pv_resp_to_tlm(ex->get_resp()));
+        }
+
+        // Blocking debug transport
+        behavior transport_dbg(int socket_id,
+                               amba_pv::amba_pv_transaction & trans) : unsigned int
+        {
+            // Retrieve AMBA-PV extension
+            amba_pv::amba_pv_extension* ex = 0;
+
+            trans.get_extension(ex);
+            if (ex == 0)
+                return 0;
+
+            unsigned num_bytes = 0;
+
+            if (trans.is_read() || trans.is_write())
+            {
+                // ensure no byte enable!
+                if (trans.get_byte_enable_ptr() != 0)
+                    return 0;
+
+                num_bytes = translate_transaction(trans, ex, true);
+            }
+
+            return num_bytes;
+        }
+
+        // Request a DMI access
+        behaviour get_direct_mem_ptr(int socket_id,
+                                     amba_pv::amba_pv_transaction & trans,
+                                     tlm::tlm_dmi & dmi_data) : bool
+        {
+            pv::MemoryAttributes        attr;
+            pv::TransactionAttributes   tx_attr;
+            pv::ACERequest              ace_request;
+            
+            // Retrieve AMBA-PV extension
+            amba_pv::amba_pv_extension* ex = 0;
+            trans.get_extension(ex);
+            if (ex == 0)
+            {
+                dmi_data.allow_read_write();
+                dmi_data.set_start_address(0x0);
+                dmi_data.set_end_address(sc_dt::uint64(-1));
+                return false;                
+            }
+            
+            // Get AxID
+            attr.setMasterID(ex->get_id());
+
+            // Get AxCACHE
+            attr.setInnerBufferable(ex->is_bufferable());
+            attr.setInnerCacheable(ex->is_modifiable());
+            attr.setInnerReadAllocatable(ex->is_read_allocate());
+            attr.setInnerWriteAllocatable(ex->is_write_allocate());
+            
+            attr.setOuterBufferable(ex->is_bufferable());
+            attr.setOuterCacheable(ex->is_modifiable());
+            attr.setOuterReadAllocatable(ex->is_read_allocate());
+            attr.setOuterWriteAllocatable(ex->is_write_allocate());
+
+            // Get AxPROT
+            attr.setPrivileged(ex->is_privileged());
+            attr.setInstruction(ex->is_instruction());
+            attr.setNormalWorld(ex->is_non_secure());
+
+            // Get AxUSER
+            attr.setUserFlags(ex->get_user());
+            
+            // Get AxLOCK
+            tx_attr.setExclusive(ex->is_exclusive());
+
+            // Get AxSNOOP, AxDOMAIN and AxBAR
+            unsigned snoop  = unsigned(ex->get_snoop());
+            unsigned bar    = unsigned(ex->get_bar());
+            unsigned domain = unsigned(ex->get_domain());            
+            if (trans.is_write() && (snoop == amba_pv::AMBA_PV_WRITE_UNIQUE))
+            {
+                // AMBA_PV_WRITE_UNIQUE needs to be translated into a transaction the cache model understands
+                ace_request.set_ace_operation(ACE::PseudoWriteOnce);
+            }
+            else
+            {
+                ace_request.set_ace_operation(trans.is_write() ? ACE::ace_operation_from_AWSNOOP(snoop, domain, bar)
+                                                               : ACE::ace_operation_from_ARSNOOP(snoop, domain, bar) );
+            }
+            ace_request.set_abar((bar & (1<<1)) ? ACE::abar_ignore_barriers : ACE::abar_respect_barriers);            
+            attr.setShareability(ACE::adomain_t(domain));
+            tx_attr = attr;
+
+            // use a new TransactionGenerator for every recursive transaction
+            // (this is unlikely yet not completely impossible for DMI)
+            pv::TransactionGenerator* dmi_tx_gen = obtain_dmi_tx_generator();
+            dmi_tx_gen->setCallbackInvalidateDirectMemPtr(invalidateDirectMemPtrProxy);
+
+            // issue DMI request using the TransactionGenerator
+            pv::DirectMemPtrData inner_dmi_data;
+            bool ret = dmi_tx_gen->getDirectMemPtr(!trans.is_write(), &tx_attr, &ace_request, pv::bus_addr_t(trans.get_address()), &inner_dmi_data);
+            
+            // release transaction generator once the inner transactioncompleted
+            release_dmi_tx_generator(dmi_tx_gen);
+            
+            // convert the results
+            dmi_data.set_granted_access((tlm::tlm_dmi::dmi_access_e)inner_dmi_data.granted_access);
+            dmi_data.set_dmi_ptr((unsigned char *)inner_dmi_data.dmi_ptr);
+            dmi_data.set_start_address((sc_dt::uint64)inner_dmi_data.range.begin);
+            dmi_data.set_end_address((sc_dt::uint64)inner_dmi_data.range.end_incl);
+            return ret;
+        }
+    }
+
+    // callback from PVBusMaster/TransactionGenerator 
+    behavior invalidateDirectMemPtr(pv::bus_addr_range_t range)
+    {
+        amba_pv_ace_s.invalidate_direct_mem_ptr(0, (sc_dt::uint64)range.begin, (sc_dt::uint64)range.end_incl);
+    }
+
+    internal slave port<DVMMessage> upstream_dvm
+    {
+        // Send an upstream DVM message via TLM
+        behavior send(DVM::Message* message_) : DVM::error_response_t
+        {
+            uint64_t                      transaction;
+            uint64_t                      additional_address;
+            amba_pv::amba_pv_extension    ex;
+            amba_pv::amba_pv_transaction  trans;
+            sc_core::sc_time              t = sc_core::SC_ZERO_TIME;
+
+            ex.set_modifiable();
+            ex.set_snoop(amba_pv::AMBA_PV_DVM_MESSAGE);
+            ex.set_domain(amba_pv::AMBA_PV_OUTER_SHAREABLE);
+
+            transaction = message_->encodeAxADDR(additional_address);
+            ex.set_dvm_transaction(transaction);
+
+             // Only set the additional address if indicated by the transaction AxADDR[0]
+            if (transaction & (1<<0))
+            {
+                ex.set_dvm_additional_address(additional_address);
+            }
+
+            trans.set_extension(&ex);
+            try
+            {
+                amba_pv_ace_s.b_snoop(0, trans, t);
+            }
+            catch(...)
+            {
+                trans.clear_extension(&ex);
+                throw;
+            }
+            trans.clear_extension(&ex);
+
+            if (!ex.is_okay())
+                return DVM::error;
+
+            return DVM::ok;
+        }
+    }
+
+    // Obtain a transaction generator from the free pool
+    behaviour obtain_tx_generator() : pv::RandomContextTransactionGenerator*
+    {
+        pv::RandomContextTransactionGenerator*  tx_gen;
+
+        if (!tx_gen_q.empty())
+        {
+            tx_gen = tx_gen_q.front();
+            tx_gen_q.pop_front();
+        }
+        else
+        {
+            tx_gen = bus_master.control.createRandomContextTransactionGenerator();
+        }
+
+        return tx_gen;
+    }
+
+    // Put transaction generator back in the free pool
+    behaviour release_tx_generator(pv::RandomContextTransactionGenerator* tx_gen)
+    {
+        tx_gen_q.push_back(tx_gen);
+    }
+
+    // Obtain a DMI transaction generator from the free pool
+    behaviour obtain_dmi_tx_generator() : pv::TransactionGenerator*
+    {
+        pv::TransactionGenerator*  dmi_tx_gen;
+
+        if (!dmi_tx_gen_q.empty())
+        {
+            dmi_tx_gen = dmi_tx_gen_q.front();
+            dmi_tx_gen_q.pop_front();
+        }
+        else
+        {
+            dmi_tx_gen = bus_master.control.createTransactionGenerator();
+        }
+
+        return dmi_tx_gen;
+    }
+
+    // Put DMI transaction generator back in the free pool
+    behaviour release_dmi_tx_generator(pv::TransactionGenerator* dmi_tx_gen)
+    {
+        dmi_tx_gen_q.push_back(dmi_tx_gen);
+    }
+
+    // Translate TLM transaction into a PVBus2 transaction
+    behaviour translate_transaction(amba_pv::amba_pv_transaction& trans,
+                                    amba_pv::amba_pv_extension*   ex,
+                                    bool                          debug) : unsigned int
+    {
+        unsigned int                num_bytes = 0;
+        pv::Tx_Result               result;
+        pv::MemoryAttributes        attr;
+        pv::TransactionAttributes   tx_attr;
+        pv::ACERequest              ace_request;
+
+        // Get AxID
+        attr.setMasterID(ex->get_id());
+
+        // Get AxCACHE
+        attr.setInnerBufferable(ex->is_bufferable());
+        attr.setInnerCacheable(ex->is_modifiable());
+        attr.setInnerReadAllocatable(ex->is_read_allocate());
+        attr.setInnerWriteAllocatable(ex->is_write_allocate());
+
+        attr.setOuterBufferable(ex->is_bufferable());
+        attr.setOuterCacheable(ex->is_modifiable());
+        attr.setOuterReadAllocatable(ex->is_read_allocate());
+        attr.setOuterWriteAllocatable(ex->is_write_allocate());
+
+        // Get AxPROT
+        attr.setPrivileged(ex->is_privileged());
+        attr.setInstruction(ex->is_instruction());
+        attr.setNormalWorld(ex->is_non_secure());
+
+        // Get AxUSER
+        attr.setUserFlags(ex->get_user());
+
+        // Get AxLOCK
+        tx_attr.setExclusive(ex->is_exclusive());
+
+        // Get AxSNOOP, AxDOMAIN and AxBAR
+        unsigned snoop  = unsigned(ex->get_snoop());
+        unsigned bar    = unsigned(ex->get_bar());
+        unsigned domain = unsigned(ex->get_domain());
+
+        if (trans.is_write() && (snoop == amba_pv::AMBA_PV_WRITE_UNIQUE))
+        {
+           // AMBA_PV_WRITE_UNIQUE needs to be translated into a transaction the cache model understands
+           ace_request.set_ace_operation(ACE::PseudoWriteOnce);
+        }
+        else
+        {
+           ace_request.set_ace_operation(trans.is_write() ? ACE::ace_operation_from_AWSNOOP(snoop, domain, bar)
+                                                          : ACE::ace_operation_from_ARSNOOP(snoop, domain, bar) );
+        }
+
+        ace_request.set_abar((bar & (1<<1)) ? ACE::abar_ignore_barriers : ACE::abar_respect_barriers);
+
+        attr.setShareability(ACE::adomain_t(domain));
+
+        tx_attr = attr;
+
+        tx_attr.setDebug(debug);
+
+        // Issue a PVBus transaction
+        pv::RandomContextTransactionGenerator* gen = obtain_tx_generator();
+        if (gen)
+        {
+            pv::RandomContextTransactionGenerator::buffer_t  buffer(pv::byteWidthToAccessWidth(ex->get_size()),
+                                                                    trans.get_data_ptr(),
+                                                                    ex->get_length());
+            if (trans.is_write())
+                result = gen->write( &tx_attr, &ace_request, pv::bus_addr_t(trans.get_address()), &buffer);
+            else
+                result = gen->read( &tx_attr, &ace_request, pv::bus_addr_t(trans.get_address()), &buffer);
+            trans.set_dmi_allowed(gen->getPrefetchHint());
+
+            release_tx_generator(gen);
+        }
+
+        // Convert transaction result to AMBA-PV response xRESP[3:0]
+        if (result.isOK())
+        {
+            if (ex->is_exclusive())
+                ex->set_exokay();
+            else
+                ex->set_okay();
+
+            if (!trans.is_write())
+            {
+                ex->set_pass_dirty(ace_request.is_rresp_pass_dirty());
+                ex->set_shared(!ace_request.is_rresp_unique());
+            }
+            num_bytes = trans.get_data_length();
+        }
+        else if (result.isExclusiveAbort())
+        {
+            ex->set_okay();
+        }
+        else
+        {
+            ex->set_slverr();
+        }
+
+        return num_bytes;
+    }
+ 
+    behavior init
+    {
+        composition.init();
+
+        dvm_node = new VirtualDVMNode<true>(upstream_dvm.getAbstractInterface(),
+                                            getHierarchicalName());
+        dvm_node->initDownstreamPort( pvbus_m, DVM::id_t(1) );
+        
+        // Create proxy which receives all DMI invalidation requests.
+        invalidateDirectMemPtrProxy = new InvalidateDirectMemPtrProxy(this);
+    }
+
+    behavior reset( int level_ )
+    {
+        composition.reset(level_);
+
+        // During reset() we build the DVM groups.
+        dvm_node->reset();
+
+        // Expose the ports.  This will make a transaction
+        // to them to ask them about themselves.
+        dvm_node->resetDownstreamPort(pvbus_m, 1<<0);
+    }
+
+    // Deconstruct component
+    behavior terminate
+    {
+        composition.terminate();
+        
+        // clear callbacks into this component (channels will be destryed after this terminate())
+        for (std::deque<pv::TransactionGenerator*>::iterator i = dmi_tx_gen_q.begin(); i != dmi_tx_gen_q.end(); i++)
+            (*i)->setCallbackInvalidateDirectMemPtr(0);
+            
+        delete invalidateDirectMemPtrProxy;
+    }
+
+    connection
+    {
+        bus_master.pvbus_m => self.pvbus_m;
+    }
+}

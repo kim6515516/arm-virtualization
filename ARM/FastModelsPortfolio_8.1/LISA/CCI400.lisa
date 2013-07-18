@@ -1,0 +1,283 @@
+/*
+ * Copyright 2011 ARM Limited. All rights reserved.
+ */
+
+//
+// Cache Coherent Interconnect
+//
+
+component CCI400
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Cache Coherent Interconnect for AXI4 ACE";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    debug
+    {
+        composition.import;
+        composition.unpublish;
+    }
+
+    composition
+    {
+    cciregisters : CCIRegisters(
+        "revision"=revision_string,
+        "log_enabled"=log_enabled
+        );
+    cciinterconnect : CCIInterconnect(
+        "cache_line_length_in_bytes"=64,
+        "cache_state_modelled"=cache_state_modelled,
+        "broadcastcachemain"=broadcastcachemain_parameter,
+        "acchannelen"=acchannelen_parameter,
+        "barrierterminate"=barrierterminate_parameter,
+        "bufferableoverride"=bufferableoverride_parameter,
+        "force_on_from_start"=force_on_from_start
+        );
+    pvbusmapper  : PVBusMapper();
+    }
+
+    includes
+    {
+        // This function returns false if there is something connected
+        // to upstream that doesn't implement ACE functionality.
+        template <typename P>
+        bool validate_upstream_port_for_ace(P &upstream) {
+            // Check whether an upstream connections is not ACE-enabled.
+            if (upstream.discoverUpstreamParentDVMNodes.implemented() ||
+                upstream.busMapChanging.implemented() ||
+                upstream.busMapChanged.implemented())
+            {
+                // Something is connected: confirm that it implements ACE.
+                return (upstream.aceSnoopRequest.implemented());
+            }
+            // No upstream connection
+            return true;
+        }
+    }
+
+    resources
+    {
+        PARAMETER {
+            name("cache_state_modelled"),
+                description("Model the cache state."),
+                type(bool),
+        default(true)
+                } cache_state_modelled;
+
+        PARAMETER {
+            name("broadcastcachemain"),
+                description("For each downstream port a bit determines if broadcast cache maintenance operations are forwarded down that port."),
+                type(uint32_t),
+                min(0), max(7),
+        default(0)
+                } broadcastcachemain_parameter;
+
+        PARAMETER {
+            name("acchannelen"),
+                description("For each upstream port, determine if it is enabled or not w.r.t. snoop requests."),
+                type(uint32_t),
+                min(0), max(31),
+        default(31)
+                } acchannelen_parameter;
+
+        PARAMETER {
+            name("barrierterminate"),
+                description("For each downstream port, determine if barriers will be terminated at that port."),
+                type(uint32_t),
+                min(0), max(7),
+        default(7)
+                } barrierterminate_parameter;
+
+        PARAMETER {
+            name("bufferableoverride"),
+                description("For each downstream port, determine if all transactions will be forced to non-bufferable."),
+                type(uint32_t),
+                min(0), max(7),
+        default(0)
+                } bufferableoverride_parameter;
+
+        PARAMETER {
+            name("force_on_from_start"),
+                description("The CCI will normally start up with snooping disabled, however, using this then we allow the model to start up as enabled without having to program it.  This is only setup at simulation reset and not at signal reset."),
+                type(bool),
+        default(false)
+                } force_on_from_start;
+
+        // Control the amount of log information using this parameter
+        PARAMETER {
+            name("log_enabled"),
+                description("Enable log messages from the CCI register file.  Log level 0 means do not print anything, 1 means print only access violations, 2 means also print writes, 3 means print reads as well."),
+                type(int),
+                runtime(false),
+        default(true)
+                } log_enabled;
+
+        PARAMETER {
+            name("periphbase"),
+            description("Value for PERIPHBASE. Only bits [39:16] are used. This value may be overriden by an input on the periphbase port"),
+            type(uint64_t),
+            default(0x2C000000)
+                } periphbase_param;
+
+        PARAMETER {
+            name("revision"),
+            description("Revision of the CCI400"),
+            type(string),
+            default("r0p0")
+                } revision_string;
+
+        uint64_t periphbase_value;
+        uint64_t register_base;
+    }
+
+    slave port<PVBus> pvbus_s_ace_4;
+    slave port<PVBus> pvbus_s_ace_3;
+    slave port<PVBus> pvbus_s_ace_lite_plus_dvm_2;
+    slave port<PVBus> pvbus_s_ace_lite_plus_dvm_1;
+    slave port<PVBus> pvbus_s_ace_lite_plus_dvm_0;
+
+    //
+    // The CCI can perform some linting operations if you tell it about the
+    // resets of the systems attached to ports 3 and 4.
+    //
+    slave port<Signal> lint_ace_3_reset_state;
+    slave port<Signal> lint_ace_4_reset_state;
+
+    //
+    // CCI is meant to have three downstream ports, however, we only model one.
+    //
+    master port<PVBus> pvbus_m;
+
+    // Reset signal
+    slave port<Signal>              reset_in;
+
+    // This port sets the base address of the private peripheral region
+    slave port<Value_64>  periphbase
+    {
+        behaviour setValue(uint64_t value)
+        {
+           periphbase_value = value;
+        }
+    }
+
+    /// A three bit signal saying whether to broadcast cache maintenance down
+    /// each of the downstream masters.  As we only have a single downstream
+    /// port then setting any of the bits will make it work.
+    slave port<Value>               broadcastcachemain;
+
+    /// A three bit signal saying whether to terminate barriers at the
+    /// downstream ports.
+    slave port<Value>               barrierterminate;
+
+    /// A three bit signal saying whether to force all transactions out of this
+    /// port to be non-bufferable (AWCACHE[0] is forced to 0).
+    slave port<Value>               bufferableoverride;
+
+    /// A signal saying that the imprecise error register is non-zero
+    master port<Signal>             errorirq;
+
+    /// A signal saying which of the channels are enabled.
+    slave port<Value>               acchannelen;
+
+    /// When the event counters overflow then they will raise a signal to
+    /// interrupt the core.
+    master port<Signal>             evntcntoverflow[5];
+
+    internal slave port<PVBusMapperControl>  mapper_control
+    {
+        behaviour remap(pv::RemapRequest& req) : unsigned
+        {
+            // Divert transactions in the 64K covered by the regsieter file
+            return ((req.getPageBase() & ~0xFFFFull) == register_base) ? 1 : 0;
+        }
+    }
+
+    internal slave port<Signal> mapper_reset
+    {
+        behaviour setValue(sg::Signal::State state)
+        {
+            if (state == sg::Signal::Set)
+            {
+                samplePeriphbase();
+            }
+        }
+    }
+
+    behaviour samplePeriphbase()
+    {
+        // Mask PERIPHBASE to [39:15] and offset by 0x90000
+        register_base = (periphbase_value & 0xFFFFFF8000ull) + 0x90000;
+
+        // Revoke any previous decodes
+        mapper_control.allBusMapChanging();
+    }
+
+    behavior init
+    {
+        composition.init();
+
+        // Initialise PERIPHBASE with default value
+        periphbase_value = periphbase_param;
+    }
+
+    behavior fatal_non_ace_connection(std::string portName) {
+        message(std::string("Connection error: a non-ACE bus master is connected to ") + portName,
+                MSG_FATAL_ERROR);
+    }
+
+    behavior reset( int level_ )
+    {
+        composition.reset( level_ );
+
+        // Check that we haven't been wired incorrectly to non-ACE masters.
+        if (!validate_upstream_port_for_ace(pvbus_s_ace_3)) {
+            fatal_non_ace_connection(pvbus_s_ace_3.getHierarchicalName());
+        }
+
+        if (!validate_upstream_port_for_ace(pvbus_s_ace_4)) {
+            fatal_non_ace_connection(pvbus_s_ace_4.getHierarchicalName());
+        }
+
+        samplePeriphbase();
+    }
+
+    connection
+    {
+        self.pvbus_s_ace_4 => cciinterconnect.upstream[4];
+        self.pvbus_s_ace_3 => cciinterconnect.upstream[3];
+        self.pvbus_s_ace_lite_plus_dvm_2 => cciinterconnect.upstream[2];
+        self.pvbus_s_ace_lite_plus_dvm_1 => cciinterconnect.upstream[1];
+        self.pvbus_s_ace_lite_plus_dvm_0 => cciinterconnect.upstream[0];
+        cciinterconnect.downstream[0] => pvbusmapper.pvbus_s;
+        pvbusmapper.control => self.mapper_control;
+        pvbusmapper.pvbus_m[0] => self.pvbus_m;
+        pvbusmapper.pvbus_m[1] => cciregisters.pvbus_s;
+
+        self.lint_ace_3_reset_state => cciinterconnect.reset_state_of_upstream_port_3;
+        self.lint_ace_4_reset_state => cciinterconnect.reset_state_of_upstream_port_4;
+
+        // connect the cciregisters to the cciinterconnect so that it can
+        // control snoop enables, etc.
+        cciregisters.cciinterconnect_control => cciinterconnect.control;
+
+        self.reset_in => cciinterconnect.reset_in;
+        self.broadcastcachemain => cciinterconnect.broadcastcachemain;
+        self.barrierterminate => cciinterconnect.barrierterminate;
+        self.bufferableoverride => cciinterconnect.bufferableoverride;
+        cciinterconnect.errorirq => self.errorirq;
+        self.acchannelen => cciinterconnect.acchannelen;
+
+        self.reset_in => cciregisters.reset_in;
+        self.reset_in => self.mapper_reset;
+
+        // When the CCI register block supports evntcntoverflow
+        // cciregisters.evntcntoverflow => self.evntcntoverflow
+
+        cciinterconnect.event_bus => cciregisters.event_bus_s;
+
+    }
+
+}

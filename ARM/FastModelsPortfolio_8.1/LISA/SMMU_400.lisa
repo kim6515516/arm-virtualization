@@ -1,0 +1,1288 @@
+//
+// MMU_400_BASE
+//
+// Copyright 2011 ARM Limited. All rights reserved.
+//
+// A SMMU that implements the architectural properties of an SMMU with
+// particular specialization for the MMU_400.
+//
+// NOTE that the MMU-400 has to supply a 'StreamID' and potentially an
+// 'SSD_Index' to the underlying class.
+///
+//
+
+protocol MMU_400_BASE_IDENTIFY
+{
+    includes {
+namespace pv
+{
+    class TransactionAttributes;
+}
+    }
+
+    ///
+    /// The way that the MMU-400 is configured to generate the StreamID and
+    /// SSD_Index are complicated and have to be done by implementing this
+    /// function.  This knowledge is specific to the SoC and to the devices
+    /// generating the transactions and so it isn't easily parameterisable.
+    ///
+    slave behaviour identify(
+        const pv::TransactionAttributes*  attributes_,
+        bool                              is_read_,
+        unsigned*                         stream_id_,
+        unsigned*                         ssd_or_ssd_index_
+        ) : void;
+}
+
+/// This protocol is for probing the internals of the MMU_400.  It has no
+/// correspondence in hardware.  It is only intended for testing and
+/// informational purposes.
+protocol MMU_400_Internals
+{
+    includes {
+        namespace MMU_400
+        {
+            class mmu_400_if;
+        }
+    }
+    
+    slave behaviour getMMU_400() : MMU_400::mmu_400_if*;
+}
+
+component MMU_400_BASE
+{
+    properties {
+        executes_software = 0;
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "MMU-400 base component";
+    }
+
+    includes {
+        #include "components/MMU_400.h"
+        #include "components/SMMU.h"
+        #include "sg/SGComponentTraceHelper.h"
+        #include <sstream>
+    }
+
+    // ----------------------------------------------------------------------
+    // Top level ports.
+    // ----------------------------------------------------------------------
+
+    /// This port is the upstream port of the device, addresses on the port are
+    /// in the VA/IPA
+    slave port<PVBus>       pvbus_s;
+
+    /// This downstream port is where the translated accesses from pvbus_s 
+    /// emerge.
+    ///
+    /// <201207231707>
+    ///
+    /// If page walks are configured to come out of this port, then they will
+    /// come out with the following master_id and user_flags.
+    ///
+    ///        master_id : 0xFFFFffff
+    ///
+    /// The user flags :
+    ///        
+    ///        user_flags[7:0]   stage 1 context_id (or 0xFF if stage2 only)
+    ///        user_flags[15:8]  stage 2 context_id (or 0xFF if stage 1 with stage 2 bypass)
+    ///        user_flags[18:16] stage 1 level
+    ///        user_flags[21:19] stage 2 level
+    ///        user_flags[23:22] stage 1 descriptor encoding (0=v7s, 1=v7l, 2=v8l, 3=none)
+    ///        user_flags[25:24] stage 2 descriptor encoding (0=v7s, 1=v7l, 2=v8l, 3=none)
+    ///        user_flags[31,30] adomain of the transaction
+    ///
+    /// NOTE that if the walk is being done for a stage 1 page walk descriptor
+    /// fetch then the stage 1 level field will indicate that level.  If the
+    /// walk is being done for a stage 2 descriptor fetch, then the stage 2
+    /// level field will show that level.
+    ///
+    /// If the context-id for a stage is not valid (0xFF) then the 'level'
+    /// information is 0x7.
+    ///
+    /// </201207231707>
+    master port<PVBus>      pvbus_m;
+
+    /// This downstream port is where page table walk accesses come from.
+    ///
+    /// This is only used if configured to use a separate page table walk port.
+    ///
+    /// The MMU-400 will only obey DVM messages if configured to use this port.
+    ///
+    /// The master_id and user flags are the same as specified at <201207231707/>.
+    master port<PVBus>      pvbus_ptw_m;
+
+    /// If the device has been configured with APB3 control ports then these are
+    /// used to address the register file with secure or non-secure accesses.
+    ///
+    /// If this is the case then the apb4_control port should not be used.
+    port<PVBus>             apb3_control_s;
+    port<PVBus>             apb3_control_ns;
+
+    /// If the device has been configured with APB4 control ports then this port
+    /// is used -- it carries the security world with the transaction itself.
+    ///
+    /// If this is the case then the apb3_control_s and apb3_control_ns should
+    /// not be used.
+    port<PVBus>             apb4_control;
+
+    /// Secure Configuration Access Fault Interrupt
+    ///
+    /// In the SMMU Architecture this is called SMMU_gCfgIrpt
+    master port<Signal>     cfg_flt_irpt_s;
+
+    /// Non-secure Configuration Access Fault Interrupt
+    ///
+    /// In the SMMU Architecture this is called SMMU_NSgCfgIrpt
+    master port<Signal>     cfg_flt_irpt_ns;
+
+    /// Global secure Fault Interrupt
+    ///
+    /// In the SMMU Architecture this is called SMMU_gIrpt
+    master port<Signal>     glbl_flt_irpt_s;
+
+    /// Global non-secure Fault Interrupt
+    ///
+    /// In the SMMU Architecture this is called SMMU_NSgIrpt
+    master port<Signal>     glbl_flt_irpt_ns;
+
+    /// Non-secure context bank fault
+    ///
+    /// NOTE that there is only one context bank fault, despite there being
+    /// potentially 8 contexts.  As we are HW stage 2 only then we can't have
+    /// any banks configured as secure (well if we do then we generate a global
+    /// fault)
+    master port<Signal>     cxt_irpt_ns;
+
+
+    /// "Non-secure combined interrupt"
+    ///
+    /// (cfg_flt_irpt_ns | glbl_flt_irpt_ns | cxt_irpt_ns)?
+    master port<Signal>     comb_irpt_ns;
+
+    /// "Secure combined interrupt"
+    ///
+    /// (cfg_flt_irpt_s | glbl_flt_irpt_s)?
+    master port<Signal>     comb_irpt_s;
+
+    /// The SoC supports coherent page walks, this is meant to be sampled at
+    /// reset.  However, in practice the model has to prevent the race condition
+    /// between cfg_cttw being asserted at the same 'cycle' as negedge reset.
+    /// Thus we actually only sample the signal on the first transaction to the
+    /// SMMU or the first transition on this signal after reset.  Thus in the
+    /// model, we require that cfg_cttw be held for at least this period of
+    /// time.
+    slave port<Signal>      cfg_cttw_in { behaviour setValue(sg::Signal::State t_) {
+            smmu->set_cfg_cttw(t_ == sg::Signal::Set );
+        }
+    }
+
+    /// The reset pin
+    slave port<Signal>      reset_in { behaviour setValue(sg::Signal::State t_) {
+            smmu->set_reset(t_ == sg::Signal::Set );
+        }
+    }
+
+    ///
+    /// This port is a special model port that is used to take a transaction and
+    /// map it to an SSD/SSD_Index and StreamID.
+    ///
+    master port<MMU_400_BASE_IDENTIFY> identify;
+
+    slave port<MMU_400_Internals>      priv_internals
+    {
+        behaviour getMMU_400() : MMU_400::mmu_400_if*
+        {
+            return smmu;
+        }
+    }
+    
+    // ----------------------------------------------------------------------
+    /// Components used to implement device.
+    // ----------------------------------------------------------------------
+    composition {
+        /// The basis of remapping the translated stream
+    mapper               : PVBusMapper(
+        "handling_of_dvm_messages_from_upstream"="terminate",
+        "handling_of_dvm_messages_from_downstream"=(ptw_has_separate_port ? "terminate" : "handle"),
+        "handling_of_upstream_snoop_requests"="terminate"
+        );
+
+        /// In order to receive DVM messages on pvbus_ptw_m then we
+        /// need to attach a PVBusMapper to it.
+    ptw_dvm_receiver     : PVBusMapper(
+        "handling_of_dvm_messages_from_upstream"="terminate",
+        "handling_of_dvm_messages_from_downstream"="handle",
+        "handling_of_upstream_snoop_requests"="terminate"
+        );
+
+        /// The register file ports
+    apb3_control_s_slv   : PVBusSlave();
+    apb3_control_ns_slv  : PVBusSlave();
+    apb4_control_slv     : PVBusSlave();
+
+        /// A PVBusMaster that we use to get a transaction generator to perform
+        /// page walks on if configured to use the separate port.
+    ptw_master           : PVBusMaster();
+
+        /// If pvbus_ptw_m is not configured to be used then this will be the
+        /// transaction generator configured to be used instead.
+    pvbus_master         : PVBusMaster();
+    }
+    
+    // ----------------------------------------------------------------------
+    /// Deal with handing of translation requests to the SMMU
+    // ----------------------------------------------------------------------
+    
+    internal slave port<PVBusMapperControl>  mapper_control
+    {
+        slave behavior remap( pv::RemapRequest& req_ ) : unsigned
+        {
+            unsigned stream_id;
+            unsigned ssd_index_or_ssd_state;
+            identify.identify( req_.getModifiableTransactionAttributes(),
+                               req_.isRead(),
+                               &stream_id,
+                               &ssd_index_or_ssd_state );
+            unsigned unpredictableness = 0;
+            unsigned const ret = smmu->remap( req_, /*tbu_number_*/0, stream_id, ssd_index_or_ssd_state, &unpredictableness );
+
+            if (dump_unpredictablity_in_user_flags)
+                req_.getModifiableTransactionAttributes()->setUserFlags( unpredictableness );
+            
+            return ret;
+        }
+
+        slave behaviour handleUpstreamDVMMessageFromDownstream(
+            unsigned             /*downstream_port_index_*/,
+            void*                /*arc_within_port_*/,
+            DVM::Message*        message_
+            ) : DVM::error_response_t
+        {
+            return smmu->handleUpstreamDVMMessageFromDownstream(message_, false);
+        }
+    }    
+
+    // ----------------------------------------------------------------------
+    /// Connect the register file requests to the model
+    // ----------------------------------------------------------------------
+    internal slave port<PVDevice> apb3_control_s_slv_port
+    {
+        slave  behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb3_control_s_read(tx);
+        }
+        slave  behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb3_control_s_write(tx);
+        }
+        slave  behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb3_control_s_debug_read(tx);
+        }
+        slave  behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb3_control_s_debug_write(tx);
+        }
+    }
+
+    internal slave port<PVDevice> apb3_control_ns_slv_port
+    {
+        slave  behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb3_control_ns_read(tx);
+        }
+        slave  behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb3_control_ns_write(tx);
+        }
+        slave  behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb3_control_ns_debug_read(tx);
+        }
+        
+        slave  behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb3_control_ns_debug_write(tx);
+        }
+    }
+    
+    internal slave port<PVDevice> apb4_control_slv_port
+    {
+        slave  behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb4_control_read(tx);
+        }
+        slave  behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb4_control_write(tx);
+        }
+        slave  behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb4_control_debug_read(tx);
+        }
+        slave  behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return smmu->apb4_control_debug_write(tx);
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    /// Deal with getting a transaction generator so we can produce table
+    /// walk requests
+    // ----------------------------------------------------------------------
+    internal master port<PVTransactionMaster> ptw_master_control;
+    internal master port<PVTransactionMaster> pvbus_master_control;
+
+    // ----------------------------------------------------------------------
+    /// Deal with receiving DVM messages on the ptw port
+    // ----------------------------------------------------------------------
+    internal slave port<PVBusMapperControl>  ptw_dvm_receiver_control
+    {
+        // This will be called if we do page walking through the pvbus_ptw_m
+        // port as we sit between the PVBusMaster that is generating the
+        // transaction and pvbus_ptw_m.  We are here only for the DVM message
+        // handling and nothing else.
+        slave behavior remap( pv::RemapRequest& ) : unsigned { return 0; }
+
+        slave behaviour handleUpstreamDVMMessageFromDownstream(
+            unsigned             /*downstream_port_index_*/,
+            void*                /*arc_within_port_*/,
+            DVM::Message*        message_
+            ) : DVM::error_response_t
+        {
+            return smmu->handleUpstreamDVMMessageFromDownstream(message_, true);
+        }
+    }    
+
+    // ----------------------------------------------------------------------
+    /// Connect everything up!
+    // ----------------------------------------------------------------------
+    connection {
+
+        //
+        // The translated stream
+        //
+        self.pvbus_s      => mapper.pvbus_s;
+        mapper.pvbus_m[0] => self.pvbus_m;
+        mapper.control    => self.mapper_control;
+
+        //
+        // The register ports
+        //
+        self.apb3_control_s               => apb3_control_s_slv.pvbus_s;
+        self.apb3_control_ns              => apb3_control_ns_slv.pvbus_s;
+        self.apb4_control                 => apb4_control_slv.pvbus_s;
+
+        apb3_control_s_slv.device         => self.apb3_control_s_slv_port;
+        apb3_control_ns_slv.device        => self.apb3_control_ns_slv_port;
+        apb4_control_slv.device           => self.apb4_control_slv_port;
+
+        // Connect our control port to the ptw_master so that we can ask it
+        // for a transaction generator to do page walks on.  And then connect
+        // up the PVBusMaster to the outside world via a PVBusMapper that we
+        // use to capture DVM messages sent to the PTW port.
+        self.ptw_master_control     => ptw_master.control;
+        ptw_master.pvbus_m          => ptw_dvm_receiver.pvbus_s;
+        ptw_dvm_receiver.pvbus_m[0] => self.pvbus_ptw_m;
+        ptw_dvm_receiver.control    => self.ptw_dvm_receiver_control;
+
+        self.pvbus_master_control   => pvbus_master.control;
+        pvbus_master.pvbus_m        => self.pvbus_m;
+    }
+
+    // ----------------------------------------------------------------------
+    /// Resource section
+    // ----------------------------------------------------------------------
+    resources {
+
+        PARAMETER { type(bool), default(true), description( "Is pvbus_m (the downstream port that translated transaction exit) ACE-Lite" ) } pvbus_m_is_ace_lite;
+        PARAMETER { type(unsigned), default(64), min(0), max(64), description( "TLB Depth (0 means 'infinite')" ) } tlb_depth;
+        PARAMETER { type(unsigned), default(8), min(1), max(8), description( "Number of context banks" ) } number_of_contexts;
+        PARAMETER { type(unsigned), default(16), min(2), max(32), description( "Number of stream match registers." ) } number_of_smrs;
+        PARAMETER { type(bool), default(true), description( "Page Table Walks use pvbus_ptw_m" ) } ptw_has_separate_port;
+        PARAMETER { type(bool), default(true), description( "Is pvbus_ptw_m (the downstream port that is used for walks if ptw_has_separate_port is true) ACE-Lite" ) } pvbus_ptw_m_is_ace_lite;
+        PARAMETER { type(bool), default(true), description( "Use SSD Determination Table" ) } use_ssd_determination_table;
+        PARAMETER { type(unsigned), default(6), min(0), max(15), description( "StreamID bit width" ) } stream_id_width;
+// Fixed at 15 always
+//        PARAMETER { type(unsigned), default(15), min(0), max(15), description( "SSD Index bit width" ) } ssd_index_width;
+        PARAMETER { type(string), default(""), description( "Programmable SSD Indexes that are by default secure (e.g. 0, 6, 35-84)." ) } programmable_secure_by_default_ssd_indices;
+        PARAMETER { type(string), default(""), description( "Programmable SSD Indexes that are by default non-secure (e.g. 0, 6, 35-84)." ) } programmable_non_secure_by_default_ssd_indices;
+        PARAMETER { type(string), default(""), description( "Non-programmable SSD Indexes that are always secure (e.g. 0, 6, 35-64)." ) } always_secure_ssd_indices;
+        
+        PARAMETER { type(bool), default(true), description( "Perform coherent page table walks" ) } cfg_cttw;
+        
+        PARAMETER { type(uint32_t), default(0x12345678), description( "Seed for SMMU" ) } seed;
+
+        PARAMETER { type(uint32_t), default(10), min(0), max(100), description( "Percentage of times that a poll of TLBSTATUS will commit the TLBI commands" ) } percent_tlbstatus_commits;
+
+        PARAMETER { type(bool), default(false), description( "Override the user flags to encode unpredictable information (validation only)" ) } dump_unpredictablity_in_user_flags;
+
+        MMU_400::mmu_400_if*  smmu;
+        bool                  first_reset;
+        
+        class mmu_400_pin_wiggle_thunk_t : public SMMU::smmu_output_pin_wiggle_thunk_t
+        {
+            setValue_if* comb_irpt[2];
+
+            bool         cfg_flt_irpt[2];
+            bool         glbl_flt_irpt[2];
+            bool         ctx_irpt_ns;
+            bool         comb_irpt_asserted[2];
+
+            typedef SMMU::smmu_output_pin_wiggle_thunk_t base_type;
+
+            DEFINE_SIMPLE_TRACE_SOURCE(
+                comb_irpt_trace,
+                "comb_irpt",
+                "Combined interrupt signal.  This is the OR of all of the non-secure interrupt signals.",
+                ( bool, bool ),
+                ( "is_non_secure",
+                  "Is the comb_irpt_ns signal or the comb_irpt_s signal",
+
+                  "asserted",
+                  "The signal is asserted.")
+                );
+            
+            DEFINE_SIMPLE_TRACE_SOURCE(
+                cfg_flt_irpt_trace,
+                "cfg_flt_irpt",
+                "Configuration Fault Interrupt.",
+                ( bool, bool ),
+                ( "is_non_secure",
+                  "cfg_flt_irpt_ns or cfg_flt_irpt_s",
+
+                  "asserted",
+                  "The signal is asserted.")
+                );
+            
+            DEFINE_SIMPLE_TRACE_SOURCE(
+                glbl_flt_irpt_trace,
+                "glbl_flt_irpt",
+                "Global Fault Interrupt.",
+                ( bool, bool ),
+                ( "is_non_secure",
+                  "glbl_flt_irpt_ns or glbl_flt_irpt_s",
+
+                  "asserted",
+                  "The signal is asserted.")
+                );
+            
+            DEFINE_SIMPLE_TRACE_SOURCE(
+                ctx_irpt_ns_trace,
+                "ctx_irpt_ns",
+                "Context Interrupt, this can only ever be non-secure.",
+                ( bool ),
+                ( "asserted",
+                  "The signal is asserted.")
+                );
+        public:
+            
+            mmu_400_pin_wiggle_thunk_t()
+            {
+                cfg_flt_irpt[0]       = false;
+                cfg_flt_irpt[1]       = false;
+                glbl_flt_irpt[0]      = false;
+                glbl_flt_irpt[1]      = false;
+                ctx_irpt_ns           = false;
+                comb_irpt_asserted[0] = false;
+                comb_irpt_asserted[1] = false;
+
+                comb_irpt[0] = 0;
+                comb_irpt[1] = 0;
+            }
+
+            ~mmu_400_pin_wiggle_thunk_t()
+            {
+                delete comb_irpt[0];
+                delete comb_irpt[1];
+            }
+
+            void register_trace_sources( sg::ComponentTrace* t_ )
+            {
+                register_objects_with_component_trace(*t_)
+                    << comb_irpt_trace
+                    << cfg_flt_irpt_trace
+                    << glbl_flt_irpt_trace
+                    << ctx_irpt_ns_trace
+                    ;
+            }
+            
+            template<typename PORT, typename VALUE>
+            void register_comb_irpt(bool is_non_secure_, PORT& p_, VALUE asserted_, VALUE deasserted_)
+            {
+                unsigned const index(is_non_secure_);
+                assert( comb_irpt[index] == 0 );
+                comb_irpt[index] = new setValue_array_port_if<PORT,VALUE>(&p_, 1, asserted_, deasserted_);
+            }
+
+            // Drive the comb_irpt_changed signals.
+            void first_reset()
+            {
+                // All other pins will get driven automagically for us.
+                comb_irpt[0]->setValue( /* port index */ 0, false ); // NOTE that we have only a single port
+                comb_irpt[1]->setValue( /* port index */ 0, false ); // NOTE that we have only a single port
+            }
+            
+        private:
+        
+            void do_comb_irpt(unsigned index_)
+            {
+                // Index 0 is secure
+                // Index 1 is non-secure
+                
+                // The comb_irpt_ns/s are an OR of all the corresponding worlds.
+                assert( index_ < 2 );
+                
+                bool const asserted
+                    =  cfg_flt_irpt[index_]
+                    || glbl_flt_irpt[index_]
+                    || (index_ == 1 && ctx_irpt_ns);
+
+                if (asserted != comb_irpt_asserted[index_])
+                {
+                    comb_irpt_asserted[index_] = asserted;
+                    comb_irpt[index_]->setValue( 0, asserted );
+                    comb_irpt_trace( index_ != 0, asserted );
+                }
+            }
+
+            ///
+            /// \name From smmu_output_pin_wiggle_if
+            ///
+            //@{
+        
+            virtual void set_context_interrupt_pin( unsigned pin_number_, bool asserted_ )
+            {
+                assert( pin_number_ == 0 );
+                ctx_irpt_ns = asserted_;
+                ctx_irpt_ns_trace( asserted_ );
+                do_comb_irpt(/*index_*/1);
+                base_type::set_context_interrupt_pin(pin_number_, asserted_);
+            }
+
+            virtual void set_SMMU_gCfgIrpt( bool is_non_secure_, bool asserted_ )
+            {
+                unsigned const index(is_non_secure_);
+                cfg_flt_irpt[index] = asserted_;
+                cfg_flt_irpt_trace( is_non_secure_, asserted_ );
+                do_comb_irpt(index);
+                base_type::set_SMMU_gCfgIrpt(is_non_secure_, asserted_);
+            }
+        
+            virtual void set_SMMU_gIrpt( bool is_non_secure_, bool asserted_ )
+            {
+                unsigned const index(is_non_secure_);
+                glbl_flt_irpt[index] = asserted_;
+                glbl_flt_irpt_trace( is_non_secure_, asserted_ );
+                do_comb_irpt(index);
+                base_type::set_SMMU_gIrpt(is_non_secure_, asserted_);
+            }
+
+            //@}
+        };
+
+        mmu_400_pin_wiggle_thunk_t pin_wiggler;
+    }
+
+    behaviour init()
+    {
+        composition.init();
+
+        first_reset = true;
+
+        pin_wiggler.register_SMMU_gCfgIrpt( /*is_non_secure_*/false,
+                                            cfg_flt_irpt_s, sg::Signal::Set, sg::Signal::Clear );
+        pin_wiggler.register_SMMU_gCfgIrpt( /*is_non_secure_*/true,
+                                            cfg_flt_irpt_ns, sg::Signal::Set, sg::Signal::Clear );
+
+        pin_wiggler.register_SMMU_gIrpt( /*is_non_secure_*/false,
+                                         glbl_flt_irpt_s, sg::Signal::Set, sg::Signal::Clear );
+        pin_wiggler.register_SMMU_gIrpt( /*is_non_secure_*/true,
+                                         glbl_flt_irpt_ns, sg::Signal::Set, sg::Signal::Clear );
+
+        pin_wiggler.register_context_interrupt_pins( &cxt_irpt_ns, /*p_len_*/1,
+                                                     sg::Signal::Set, sg::Signal::Clear );
+
+        pin_wiggler.register_comb_irpt( /*is_non_secure_*/false,
+                                        comb_irpt_s, sg::Signal::Set, sg::Signal::Clear );
+        pin_wiggler.register_comb_irpt( /*is_non_secure_*/true,
+                                        comb_irpt_ns, sg::Signal::Set, sg::Signal::Clear );
+
+        pin_wiggler.register_trace_sources( cadi__ );
+
+        smmu = MMU_400::makeMMU400(this, getHierarchicalName());
+        if (smmu == 0)
+            message("Failed to instantiate MMU-400",MSG_FATAL_ERROR);
+
+        smmu->configure(
+            (pvbus_m_is_ace_lite
+             ? MMU_400::mmu_400_if::ace_lite_downstream
+             : MMU_400::mmu_400_if::axi3_or_axi4_downstream),
+
+            tlb_depth,
+            number_of_contexts,
+            number_of_smrs,
+            ptw_has_separate_port,
+            (pvbus_ptw_m_is_ace_lite
+             ? MMU_400::mmu_400_if::ace_lite_downstream
+             : MMU_400::mmu_400_if::axi3_or_axi4_downstream),
+
+            use_ssd_determination_table,
+
+            stream_id_width,
+            15, // ssd_index_width,  FIXED at 15 always
+
+            programmable_secure_by_default_ssd_indices,
+            programmable_non_secure_by_default_ssd_indices,
+            always_secure_ssd_indices,
+
+            cfg_cttw,
+
+            // Create two transaction generators for doing page walks on, the
+            // configuration will determine which one will be used.
+            ptw_master_control.createRandomContextTransactionGenerator(),
+            pvbus_master_control.createRandomContextTransactionGenerator(),
+
+            &pin_wiggler,
+
+            seed,
+
+            percent_tlbstatus_commits
+            );
+
+        smmu->init_trace_sources( cadi__ );
+
+    }
+
+    behaviour reset(int power_on_)
+    {
+        composition.reset(power_on_);
+
+        if (first_reset)
+        {
+            first_reset = false;
+            
+            // Drive the comb_irpt_ns/s signals, but not until everyone has run
+            // their init() sections so that they have had time to construct
+            // themselves.  In particular the testbench is not constructed in
+            // time to catch these signals and so we delay this communication to
+            // now.
+            pin_wiggler.first_reset();
+        }
+        smmu->reset();
+    }
+
+    behaviour terminate()
+    {
+        composition.terminate();
+        delete smmu;
+    }
+}
+
+///
+/// This provides a basic MMU-400 that is configurable.  It does not allow
+/// arbitrary configuration with respect to how StreamIDs and SSD_Indexes are
+/// derived from the transaction attributes.
+///
+/// It has two different modes which are selected by the parameter
+/// "use_label_mapping".
+///
+/// use_label_mapping == true
+/// -------------------------
+///
+/// If use_label_mapping is true then it is assumed that your upstream
+/// devices are 'labeled' in the top 16 bits of the MasterID of the
+/// transaction.  Note that the model doesn't have a concept of AXI-ID, but a
+/// transaction can have a MasterID set on it.
+///
+/// It is assumed that you will label your upstream components 0..N and that the
+/// parameters on this component can be used to map those integers to StreamID
+/// and SSD_Index.
+///
+/// use_label_mapping == false
+/// --------------------------
+///
+/// If use_label_mapping is false then it is assumed that the stream id is
+/// encoded in the top 16 bits of the master_id and the bottom 16 encode either
+/// the SSD_Index (if use_ssd_determination_table) or the SSD state directly (0
+/// as secure or non-0 as non-secure).
+///
+/// Typically in HW, then a device will emit many AXI IDs determined by what it
+/// is actually doing.  In the model, then MasterIDs are usually not very
+/// diverse and a device will only emit a single MasterID.
+///
+component MMU_400
+{
+    composition
+    {
+    mmu : MMU_400_BASE(
+        //
+        // Synthesis parameters
+        //
+        "pvbus_m_is_ace_lite"=pvbus_m_is_ace_lite,
+        "tlb_depth"=tlb_depth,
+        "number_of_contexts"=number_of_contexts,
+        "number_of_smrs"=number_of_smrs,
+        "ptw_has_separate_port"=ptw_has_separate_port,
+        "pvbus_ptw_m_is_ace_lite"=pvbus_ptw_m_is_ace_lite,
+        "use_ssd_determination_table"=use_ssd_determination_table,
+        "stream_id_width"=stream_id_width,
+//        "ssd_index_width"=ssd_index_width, // fixed at 15 always
+        "programmable_secure_by_default_ssd_indices"=programmable_secure_by_default_ssd_indices,
+        "programmable_non_secure_by_default_ssd_indices"=programmable_non_secure_by_default_ssd_indices,
+        "always_secure_ssd_indices"=always_secure_ssd_indices,
+
+        //
+        // Configuration tie-offs
+        //
+        "cfg_cttw"=cfg_cttw,
+
+
+        "percent_tlbstatus_commits"=percent_tlbstatus_commits,
+        "dump_unpredictablity_in_user_flags"=dump_unpredictablity_in_user_flags
+        );
+    }
+
+    slave  port<PVBus>             pvbus_s;
+    master port<PVBus>             pvbus_m;
+    master port<PVBus>             pvbus_ptw_m;
+    master port<Signal>            cfg_flt_irpt_s;
+    master port<Signal>            cfg_flt_irpt_ns;
+    master port<Signal>            glbl_flt_irpt_s;
+    master port<Signal>            glbl_flt_irpt_ns;
+    master port<Signal>            cxt_irpt_ns;
+    master port<Signal>            comb_irpt_ns;
+    master port<Signal>            comb_irpt_s;
+    slave  port<Signal>            reset_in;
+    slave  port<Signal>            cfg_cttw_in;
+    slave port<MMU_400_Internals>  priv_internals;
+
+    ///
+    /// NOTE that a system should either use the APBv4 ports or the APBv4 port
+    /// but not both!  The HW either has one or the other but not both.  In the
+    /// model, we export both and choose based on the first access to either
+    /// which was configured.
+    ///
+    /// These are _slave_ ports.
+    ///
+    //@{
+    slave port<PVBus>       apb3_control_s;
+    slave port<PVBus>       apb3_control_ns;
+    slave port<PVBus>       apb4_control;
+    //@}
+
+    internal slave port<MMU_400_BASE_IDENTIFY> identify
+    {
+        ///
+        /// The way that the MMU-400 is configured to generate the StreamID and
+        /// SSD_Index are complicated and have to be done by implementing this
+        /// function.  This knowledge is specific to the SoC and to the devices
+        /// generating the transactions.
+        ///
+        /// If you want to write your own wrapper then copy this component and
+        /// modify it appropriately.
+        ///
+        slave behaviour identify(
+            const pv::TransactionAttributes*  attributes_,
+            bool                              is_read_,
+            unsigned*                         stream_id_,
+            unsigned*                         ssd_or_ssd_index_
+            ) : void
+        {
+            if (use_label_mapping)
+            {
+                // In our example, we assume that we label each device upstream of
+                // the SMMU with a number in the top 16 bits of the master id.  We
+                // then map that to a StreamID and an SSD_Index
+                
+                unsigned const index = attributes_->getMasterID() >> 16;
+                
+                if (index < map.size())
+                {
+                    r_t const& r = map[index];
+                    *stream_id_        = r.get_stream_id(is_read_);
+                    
+                    unsigned const ssd_or_ssd_index = r.get_ssd_or_ssd_index(is_read_);
+                    *ssd_or_ssd_index_
+                        = use_ssd_determination_table
+                        ? ssd_or_ssd_index
+                        : (ssd_or_ssd_index == 0
+                           ? SMMU::ssd_secure()
+                           : SMMU::ssd_non_secure());
+                    return;
+                }
+
+                ostringstream lerr;
+                lerr << getHierarchicalName()
+                     << " received a transaction with attributes " << *attributes_ << "\n"
+                     << "It has a MasterID of " << attributes_->getMasterID()
+                     << " whose 'label' (top 16 bits) is " << index << ".\n"
+                     << "This is out-of-range of any that we have been told how to map to a StreamID\n"
+                     << "and SSD/SSD_Index.";
+                 message(lerr.str(),MSG_FATAL_ERROR);
+            }
+            else
+            {
+                //
+                // In this mode then the upstream system itself has managed to
+                // put the stream id and the SSD_Index or SSD state directly
+                // into the master id.
+                //
+                uint32_t const mi = attributes_->getMasterID();
+                *stream_id_         =  mi >> 16;
+                *ssd_or_ssd_index_  = use_ssd_determination_table
+                    ? mi & 0xFFFF
+                    : ((mi & 0xFFFF) == 0
+                       ? SMMU::ssd_secure()
+                       : SMMU::ssd_non_secure());
+                return;
+            }
+        }
+    }
+
+    connection
+    {
+        self.pvbus_s             => mmu.pvbus_s;
+        mmu.pvbus_m              => self.pvbus_m;
+        mmu.pvbus_ptw_m          => self.pvbus_ptw_m;
+        self.apb3_control_s      => mmu.apb3_control_s;
+        self.apb3_control_ns     => mmu.apb3_control_ns;
+        self.apb4_control        => mmu.apb4_control;
+        mmu.identify             => self.identify;
+        mmu.cfg_flt_irpt_s       => self.cfg_flt_irpt_s;
+        mmu.cfg_flt_irpt_ns      => self.cfg_flt_irpt_ns;
+        mmu.glbl_flt_irpt_s      => self.glbl_flt_irpt_s;
+        mmu.glbl_flt_irpt_ns     => self.glbl_flt_irpt_ns;
+        mmu.cxt_irpt_ns          => self.cxt_irpt_ns;
+        mmu.comb_irpt_ns         => self.comb_irpt_ns;
+        mmu.comb_irpt_s          => self.comb_irpt_s;
+        self.reset_in            => mmu.reset_in;
+        self.cfg_cttw_in         => mmu.cfg_cttw_in;
+        self.priv_internals      => mmu.priv_internals;
+    }
+    
+    includes
+    {
+#include <vector>
+    }
+
+    resources
+    {
+        PARAMETER { type(bool), default(true), description( "Is pvbus_m (the downstream port that translated transaction exit) ACE-Lite" ) } pvbus_m_is_ace_lite;
+        PARAMETER { type(unsigned), default(64), min(0), max(64), description( "TLB Depth (0 means 'infinite')" ) } tlb_depth;
+        PARAMETER { type(unsigned), default(8), min(1), max(8), description( "Number of context banks" ) } number_of_contexts;
+        PARAMETER { type(unsigned), default(32), min(2), max(32), description( "Number of stream match registers." ) } number_of_smrs;
+        PARAMETER { type(bool), default(true), description( "Page Table Walks use pvbus_ptw_m" ) } ptw_has_separate_port;
+        PARAMETER { type(bool), default(true), description( "Is pvbus_ptw_m (the downstream port that is used for walks if ptw_has_separate_port is true) ACE-Lite" ) } pvbus_ptw_m_is_ace_lite;
+        PARAMETER { type(bool), default(true), description( "Use SSD Determination Table" ) } use_ssd_determination_table;
+        PARAMETER { type(unsigned), default(6), min(0), max(15), description( "StreamID bit width" ) } stream_id_width;
+// Fixed at 15 always        
+//        PARAMETER { type(unsigned), default(4), min(0), max(15), description( "SSD Index bit width" ) } ssd_index_width;
+        PARAMETER { type(string), default(""), description( "Programmable SSD Indexes that are by default secure (e.g. 0, 6, 35-84)." ) } programmable_secure_by_default_ssd_indices;
+        PARAMETER { type(string), default(""), description( "Programmable SSD Indexes that are by default non-secure (e.g. 0, 6, 35-84)." ) } programmable_non_secure_by_default_ssd_indices;
+        PARAMETER { type(string), default(""), description( "Non-programmable SSD Indexes that are always secure (e.g. 0, 6, 35-64)." ) } always_secure_ssd_indices;
+
+        PARAMETER { type(bool), default(true), description( "Perform coherent page table walks" ) } cfg_cttw;
+        
+        PARAMETER { type(uint32_t), default(10), min(0), max(100), description( "Percentage of times that a poll of TLBSTATUS will commit the TLBI commands" ) } percent_tlbstatus_commits;
+        
+        PARAMETER { type(bool), default(false), description( "Override the user flags to encode unpredictable information (validation only)" ) } dump_unpredictablity_in_user_flags;
+
+        // ----------------------------------------------------------------------
+        ///
+        ///     What follows is solely used by the 'identify' function and
+        ///     the way that we have chosen to implement it.  If you are
+        ///     going to copy this component to write your own 'identify'
+        ///     component then your probably don't want the rest of this.
+        ///
+        // ----------------------------------------------------------------------
+
+        // ----------------------------------------------------------------------
+        ///
+        ///  Table of parameters mapping a 'label' of a transaction to a stream
+        ///  id and an SSD_Index (or SSD).
+        ///
+        /// If the MMU-400 is using an SSD Determination Table
+        /// (use_ssd_determination_table) then this is the index of the entry in
+        /// the table and so has to be < 2^ssd_index_width.
+        ///
+        /// If ! use_ssd_determination_table then this will be the SSD directly
+        /// which is:
+        ///     0 -- secure
+        ///     1 -- non-secure
+        ///
+        // ----------------------------------------------------------------------
+        PARAMETER { type(bool),     default(true), description("Use label mapping") } use_label_mapping;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label0: Read Stream ID")         } label0_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label0: Read SDD or SSD_Index")  } label0_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label0: Write Stream ID")        } label0_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label0: Write SDD or SSD_Index") } label0_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label1: Read Stream ID")         } label1_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label1: Read SDD or SSD_Index")  } label1_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label1: Write Stream ID")        } label1_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label1: Write SDD or SSD_Index") } label1_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label2: Read Stream ID")         } label2_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label2: Read SDD or SSD_Index")  } label2_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label2: Write Stream ID")        } label2_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label2: Write SDD or SSD_Index") } label2_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label3: Read Stream ID")         } label3_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label3: Read SDD or SSD_Index")  } label3_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label3: Write Stream ID")        } label3_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label3: Write SDD or SSD_Index") } label3_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label4: Read Stream ID")         } label4_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label4: Read SDD or SSD_Index")  } label4_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label4: Write Stream ID")        } label4_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label4: Write SDD or SSD_Index") } label4_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label5: Read Stream ID")         } label5_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label5: Read SDD or SSD_Index")  } label5_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label5: Write Stream ID")        } label5_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label5: Write SDD or SSD_Index") } label5_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label6: Read Stream ID")         } label6_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label6: Read SDD or SSD_Index")  } label6_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label6: Write Stream ID")        } label6_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label6: Write SDD or SSD_Index") } label6_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label7: Read Stream ID")         } label7_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label7: Read SDD or SSD_Index")  } label7_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label7: Write Stream ID")        } label7_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label7: Write SDD or SSD_Index") } label7_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label8: Read Stream ID")         } label8_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label8: Read SDD or SSD_Index")  } label8_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label8: Write Stream ID")        } label8_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label8: Write SDD or SSD_Index") } label8_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label9: Read Stream ID")         } label9_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label9: Read SDD or SSD_Index")  } label9_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label9: Write Stream ID")        } label9_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label9: Write SDD or SSD_Index") } label9_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label10: Read Stream ID")         } label10_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label10: Read SDD or SSD_Index")  } label10_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label10: Write Stream ID")        } label10_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label10: Write SDD or SSD_Index") } label10_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label11: Read Stream ID")         } label11_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label11: Read SDD or SSD_Index")  } label11_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label11: Write Stream ID")        } label11_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label11: Write SDD or SSD_Index") } label11_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label12: Read Stream ID")         } label12_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label12: Read SDD or SSD_Index")  } label12_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label12: Write Stream ID")        } label12_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label12: Write SDD or SSD_Index") } label12_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label13: Read Stream ID")         } label13_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label13: Read SDD or SSD_Index")  } label13_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label13: Write Stream ID")        } label13_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label13: Write SDD or SSD_Index") } label13_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label14: Read Stream ID")         } label14_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label14: Read SDD or SSD_Index")  } label14_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label14: Write Stream ID")        } label14_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label14: Write SDD or SSD_Index") } label14_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label15: Read Stream ID")         } label15_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label15: Read SDD or SSD_Index")  } label15_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label15: Write Stream ID")        } label15_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label15: Write SDD or SSD_Index") } label15_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label16: Read Stream ID")         } label16_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label16: Read SDD or SSD_Index")  } label16_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label16: Write Stream ID")        } label16_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label16: Write SDD or SSD_Index") } label16_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label17: Read Stream ID")         } label17_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label17: Read SDD or SSD_Index")  } label17_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label17: Write Stream ID")        } label17_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label17: Write SDD or SSD_Index") } label17_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label18: Read Stream ID")         } label18_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label18: Read SDD or SSD_Index")  } label18_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label18: Write Stream ID")        } label18_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label18: Write SDD or SSD_Index") } label18_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label19: Read Stream ID")         } label19_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label19: Read SDD or SSD_Index")  } label19_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label19: Write Stream ID")        } label19_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label19: Write SDD or SSD_Index") } label19_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label20: Read Stream ID")         } label20_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label20: Read SDD or SSD_Index")  } label20_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label20: Write Stream ID")        } label20_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label20: Write SDD or SSD_Index") } label20_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label21: Read Stream ID")         } label21_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label21: Read SDD or SSD_Index")  } label21_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label21: Write Stream ID")        } label21_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label21: Write SDD or SSD_Index") } label21_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label22: Read Stream ID")         } label22_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label22: Read SDD or SSD_Index")  } label22_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label22: Write Stream ID")        } label22_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label22: Write SDD or SSD_Index") } label22_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label23: Read Stream ID")         } label23_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label23: Read SDD or SSD_Index")  } label23_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label23: Write Stream ID")        } label23_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label23: Write SDD or SSD_Index") } label23_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label24: Read Stream ID")         } label24_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label24: Read SDD or SSD_Index")  } label24_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label24: Write Stream ID")        } label24_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label24: Write SDD or SSD_Index") } label24_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label25: Read Stream ID")         } label25_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label25: Read SDD or SSD_Index")  } label25_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label25: Write Stream ID")        } label25_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label25: Write SDD or SSD_Index") } label25_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label26: Read Stream ID")         } label26_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label26: Read SDD or SSD_Index")  } label26_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label26: Write Stream ID")        } label26_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label26: Write SDD or SSD_Index") } label26_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label27: Read Stream ID")         } label27_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label27: Read SDD or SSD_Index")  } label27_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label27: Write Stream ID")        } label27_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label27: Write SDD or SSD_Index") } label27_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label28: Read Stream ID")         } label28_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label28: Read SDD or SSD_Index")  } label28_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label28: Write Stream ID")        } label28_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label28: Write SDD or SSD_Index") } label28_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label29: Read Stream ID")         } label29_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label29: Read SDD or SSD_Index")  } label29_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label29: Write Stream ID")        } label29_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label29: Write SDD or SSD_Index") } label29_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label30: Read Stream ID")         } label30_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label30: Read SDD or SSD_Index")  } label30_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label30: Write Stream ID")        } label30_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label30: Write SDD or SSD_Index") } label30_write_ssd;
+
+
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label31: Read Stream ID")         } label31_read_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label31: Read SDD or SSD_Index")  } label31_read_ssd;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label31: Write Stream ID")        } label31_write_stream_id;
+        PARAMETER { type(unsigned), default(0), min(0), max(65535), description("Label31: Write SDD or SSD_Index") } label31_write_ssd;
+
+        //
+        // A record that describes how to map a single 'label' to a stream_id
+        // and/or ssd_or_ssd_index
+        //
+        struct r_t
+        {
+            // Index 0 is write, index 1 is read
+            unsigned stream_id[2];
+            unsigned ssd_or_ssd_index[2];
+
+            unsigned get_stream_id(bool is_read_) const
+            {
+                return stream_id[unsigned(is_read_)];
+            }
+            
+            unsigned get_ssd_or_ssd_index(bool is_read_) const
+            {
+                return ssd_or_ssd_index[unsigned(is_read_)];
+            }
+            
+            r_t( unsigned read_stream_id_,
+                 unsigned read_ssd_or_ssd_index_,
+                 unsigned write_stream_id_,
+                 unsigned write_ssd_or_ssd_index_ )
+            {
+                stream_id[0]        = write_stream_id_;
+                stream_id[1]        = read_stream_id_;
+                ssd_or_ssd_index[0] = write_ssd_or_ssd_index_;
+                ssd_or_ssd_index[1] = read_ssd_or_ssd_index_;
+            }
+        };
+
+        
+        std::vector< r_t > map;
+    }
+
+    behaviour init()
+    {
+        composition.init();
+        
+        map.push_back( r_t( label0_read_stream_id,  label0_read_ssd,
+                            label0_write_stream_id, label0_write_ssd ) );
+        map.push_back( r_t( label1_read_stream_id,  label1_read_ssd,
+                            label1_write_stream_id, label1_write_ssd ) );
+        map.push_back( r_t( label2_read_stream_id,  label2_read_ssd,
+                            label2_write_stream_id, label2_write_ssd ) );
+        map.push_back( r_t( label3_read_stream_id,  label3_read_ssd,
+                            label3_write_stream_id, label3_write_ssd ) );
+        map.push_back( r_t( label4_read_stream_id,  label4_read_ssd,
+                            label4_write_stream_id, label4_write_ssd ) );
+        map.push_back( r_t( label5_read_stream_id,  label5_read_ssd,
+                            label5_write_stream_id, label5_write_ssd ) );
+        map.push_back( r_t( label6_read_stream_id,  label6_read_ssd,
+                            label6_write_stream_id, label6_write_ssd ) );
+        map.push_back( r_t( label7_read_stream_id,  label7_read_ssd,
+                            label7_write_stream_id, label7_write_ssd ) );
+        map.push_back( r_t( label8_read_stream_id,  label8_read_ssd,
+                            label8_write_stream_id, label8_write_ssd ) );
+        map.push_back( r_t( label9_read_stream_id,  label9_read_ssd,
+                            label9_write_stream_id, label9_write_ssd ) );
+        map.push_back( r_t( label10_read_stream_id,  label10_read_ssd,
+                            label10_write_stream_id, label10_write_ssd ) );
+        map.push_back( r_t( label11_read_stream_id,  label11_read_ssd,
+                            label11_write_stream_id, label11_write_ssd ) );
+        map.push_back( r_t( label12_read_stream_id,  label12_read_ssd,
+                            label12_write_stream_id, label12_write_ssd ) );
+        map.push_back( r_t( label13_read_stream_id,  label13_read_ssd,
+                            label13_write_stream_id, label13_write_ssd ) );
+        map.push_back( r_t( label14_read_stream_id,  label14_read_ssd,
+                            label14_write_stream_id, label14_write_ssd ) );
+        map.push_back( r_t( label15_read_stream_id,  label15_read_ssd,
+                            label15_write_stream_id, label15_write_ssd ) );
+        map.push_back( r_t( label16_read_stream_id,  label16_read_ssd,
+                            label16_write_stream_id, label16_write_ssd ) );
+        map.push_back( r_t( label17_read_stream_id,  label17_read_ssd,
+                            label17_write_stream_id, label17_write_ssd ) );
+        map.push_back( r_t( label18_read_stream_id,  label18_read_ssd,
+                            label18_write_stream_id, label18_write_ssd ) );
+        map.push_back( r_t( label19_read_stream_id,  label19_read_ssd,
+                            label19_write_stream_id, label19_write_ssd ) );
+        map.push_back( r_t( label20_read_stream_id,  label20_read_ssd,
+                            label20_write_stream_id, label20_write_ssd ) );
+        map.push_back( r_t( label21_read_stream_id,  label21_read_ssd,
+                            label21_write_stream_id, label21_write_ssd ) );
+        map.push_back( r_t( label22_read_stream_id,  label22_read_ssd,
+                            label22_write_stream_id, label22_write_ssd ) );
+        map.push_back( r_t( label23_read_stream_id,  label23_read_ssd,
+                            label23_write_stream_id, label23_write_ssd ) );
+        map.push_back( r_t( label24_read_stream_id,  label24_read_ssd,
+                            label24_write_stream_id, label24_write_ssd ) );
+        map.push_back( r_t( label25_read_stream_id,  label25_read_ssd,
+                            label25_write_stream_id, label25_write_ssd ) );
+        map.push_back( r_t( label26_read_stream_id,  label26_read_ssd,
+                            label26_write_stream_id, label26_write_ssd ) );
+        map.push_back( r_t( label27_read_stream_id,  label27_read_ssd,
+                            label27_write_stream_id, label27_write_ssd ) );
+        map.push_back( r_t( label28_read_stream_id,  label28_read_ssd,
+                            label28_write_stream_id, label28_write_ssd ) );
+        map.push_back( r_t( label29_read_stream_id,  label29_read_ssd,
+                            label29_write_stream_id, label29_write_ssd ) );
+        map.push_back( r_t( label30_read_stream_id,  label30_read_ssd,
+                            label30_write_stream_id, label30_write_ssd ) );
+        map.push_back( r_t( label31_read_stream_id,  label31_read_ssd,
+                            label31_write_stream_id, label31_write_ssd ) );
+
+
+        // Now check all the configuration information
+        std::ostringstream os;
+
+        unsigned const ssd_index_width = 15; // Fixed at 15 always
+
+        unsigned const number_of_ssd_indices = 1u << ssd_index_width;
+        unsigned const number_of_stream_ids  = 1u << stream_id_width;
+        for (unsigned i = 0; i != map.size(); ++ i)
+        {
+            r_t const&     r = map[i];
+            unsigned const read_ssd_index  = r.get_ssd_or_ssd_index(true);
+            unsigned const write_ssd_index = r.get_ssd_or_ssd_index(false);
+            unsigned const read_stream_id  = r.get_stream_id(true);
+            unsigned const write_stream_id = r.get_stream_id(false);
+            if (use_ssd_determination_table)
+            {
+                if (read_ssd_index >= number_of_ssd_indices)
+                {
+                    os << "Label" << i << ": read ssd_index is "
+                       << read_ssd_index
+                       << " which is out of range of [0,2^ssd_index_width) (" << number_of_ssd_indices << ")\n";
+                }
+                if (write_ssd_index >= number_of_ssd_indices)
+                {
+                    os << "Label" << i << ": write ssd_index is "
+                       << write_ssd_index
+                       << " which is out of range of [2^ssd_index_width) (" << number_of_ssd_indices << ")\n";
+                }
+            }
+            else
+            {
+                assert( ! use_ssd_determination_table );
+                // Only allowed values are 0 or 1
+                if (read_ssd_index > 1)
+                {
+                    os << "Label" << i << ": read SSD state is "
+                       << read_ssd_index
+                       << " which should be 0 (secure) or 1 (non-secure) as \n"
+                       << "use_ssd_determination_table == false and so this is the SSD itself.\n";
+                }
+                if (write_ssd_index > 1)
+                {
+                    os << "Label" << i << ": write SSD state is "
+                       << write_ssd_index
+                       << " which should be 0 (secure) or 1 (non-secure) as \n"
+                       << "use_ssd_determination_table == false and so this is the SSD itself.\n";
+                }
+            }
+            
+            if (read_stream_id >= number_of_stream_ids)
+            {
+                os << "Label" << i << ": read stream id is "
+                   << read_stream_id
+                   << " which is out of range of [0,2^stream_id_width) (" << number_of_stream_ids << ")\n";
+            }
+
+            if (write_stream_id >= number_of_stream_ids)
+            {
+                os << "Label" << i << ": write stream id is "
+                   << write_stream_id
+                   << " which is out of range of [0,2^stream_id_width) (" << number_of_stream_ids << ")\n";
+            }
+        }
+
+        if ( ! os.str().empty() )
+        {
+            ostringstream lerr;
+            lerr << getHierarchicalName()
+                  << " The parameters controlling the label to stream_id/ssd_index_or_ssd_state are incorrect:-\n"
+                  << os.str();
+            message(lerr.str(),MSG_FATAL_ERROR);
+        }
+    }
+}

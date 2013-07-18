@@ -1,0 +1,2420 @@
+/*
+ * Copyright 2006-2010 ARM Limited. All rights reserved.
+ */
+
+// The PrimeCell CLCD controller component.
+
+component PL11x_CLCD
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Internal component used by PL110 and PL111 CLCD controllers";
+        hidden = true;
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #include "pv/PVBusMaster.h"
+        #include "components/Visualisation.h"
+
+        #define PL11x_TRACE if(!0) ; else printf
+
+        // create a mask of with bits s (MSB) to e (LSB) inclusive set
+        #define pl11x_mask(s, e) (0xffffffff>>(31-(s)) & (0xffffffff << (e)))
+        #define pl11x_bit(b) (1<<(b))
+
+         // timing0
+         enum {
+            LCD_HBP_MASK  = pl11x_mask(31, 24),
+            LCD_HBP_SHIFT = 24,
+            LCD_HFP_MASK  = pl11x_mask(23, 16),
+            LCD_HFP_SHIFT = 16,
+            LCD_HSW_MASK  = pl11x_mask(15,8),
+            LCD_HSW_SHIFT = 8,
+            LCD_PPL_MASK  = pl11x_mask(7,2),
+            LCD_PPL_SHIFT = 2,
+            LCD_TIMING0_MASK = (LCD_HBP_MASK|LCD_HFP_MASK|LCD_HSW_MASK|LCD_PPL_MASK)
+         };
+        // timing1
+        enum {
+            LCD_VBP_MASK  = pl11x_mask(31,24),
+            LCD_VBP_SHIFT = 24,
+            LCD_VFP_MASK  = pl11x_mask(23,16),
+            LCD_VFP_SHIFT = 16,
+            LCD_VSW_MASK  = pl11x_mask(15,10),
+            LCD_VSW_SHIFT = 10,
+            LCD_LPP_MASK  = pl11x_mask(9,0),
+            LCD_LPP_SHIFT = 0,
+            LCD_TIMING1_MASK = (LCD_VBP_MASK|LCD_VFP_MASK|LCD_VSW_MASK|LCD_LPP_MASK)
+        };
+        // timing2
+        enum {
+            LCD_PCD_HI_MASK = pl11x_mask(31,27),
+            LCD_PCD_HI_SHIFT = 27,
+            LCD_BCD_MASK  = pl11x_bit(26),
+            LCD_BCD_SHIFT = 26,
+            LCD_CPL_MASK  = pl11x_mask(25,16),
+            LCD_CPL_SHIFT = 16,
+            LCD_IEO_MASK  = pl11x_bit(14),
+            LCD_IEO_SHIFT = 14,
+            LCD_IPC_MASK  = pl11x_bit(13),
+            LCD_IPC_SHIFT = 13,
+            LCD_IHS_MASK  = pl11x_bit(12),
+            LCD_IHS_SHIFT = 12,
+            LCD_IVS_MASK  = pl11x_bit(11),
+            LCD_IVS_SHIFT = 11,
+            LCD_ACB_MASK  = pl11x_mask(10,6),
+            LCD_ACB_SHIFT_6,
+            LCD_CLKSEL_MASK = pl11x_bit(5),
+            LCD_CLKSEL_SHIFT = 5,
+            LCD_PCD_LO_MASK = pl11x_mask(4,0),
+            LCD_PCD_LO_SHIFT = 0,
+            LCD_TIMING2_MASK = (LCD_PCD_HI_MASK|LCD_BCD_MASK|LCD_CPL_MASK|LCD_IEO_MASK| \
+                LCD_IPC_MASK|LCD_IHS_MASK|LCD_IVS_MASK|LCD_ACB_MASK| \
+                LCD_CLKSEL_MASK|LCD_PCD_LO_MASK)
+        };
+        // timing3
+        enum {
+            LCD_LEE_MASK = pl11x_bit(16),
+            LCD_LEE_SHIFT  = 16,
+            LCD_LED_MASK   = pl11x_mask(6,0),
+            LCD_LED_SHIFT  = 0,
+            LCD_TIMING3_MASK  = (LCD_LEE_MASK|LCD_LED_MASK)
+        };
+        // control
+        enum {
+             LCD_WATERMARK = pl11x_bit(16),
+             LCD_VCOMP_MASK = pl11x_mask(13,12),
+             LCD_VCOMP_SHIFT = 12,
+             LCD_POWER = pl11x_bit(11),
+             LCD_BEPO  = pl11x_bit(10),
+             LCD_BEBO  = pl11x_bit(9),
+             LCD_BGR   = pl11x_bit(8),
+             LCD_DUAL  = pl11x_bit(7),
+             LCD_MONO8 = pl11x_bit(6),
+             LCD_TFT   = pl11x_bit(5),
+             LCD_BW    = pl11x_bit(4),
+             LCD_BPP_MASK = pl11x_mask(3,1),
+             LCD_BPP_SHIFT = 1,
+             LCD_ENABLE = pl11x_bit(0)
+        };
+        // CM_CTRL bits (shifted down)
+        enum {
+             LCD_CM_N24BIT  = pl11x_bit(11),
+             LCD_CM_UDFLIP  = pl11x_bit(9),
+             LCD_CM_LRFLIP  = pl11x_bit(8),
+             LCD_CM_EN1     = pl11x_bit(7),
+             LCD_CM_EN0     = pl11x_bit(6),
+             LCD_CM_MUX_MASK = pl11x_mask(5,3),
+             LCD_CM_MUX_SHIFT = 3,
+             LCD_CM_DIMMER   = pl11x_bit(2),
+             LCD_CM_BRIGHTER = pl11x_bit(1),
+             LCD_CM_LIGHT    = pl11x_bit(0)
+        };
+        // Interrupt bits
+        enum {
+             INT_MBERROR = pl11x_bit(4),
+             INT_Vcomp   = pl11x_bit(3),
+             INT_LNBU    = pl11x_bit(2),
+             INT_FUF     = pl11x_bit(1),
+             LCD_INT_MASK = (INT_MBERROR|INT_Vcomp|INT_LNBU|INT_FUF)
+        };
+        // palette layout - r and b may be swapped by BGR
+        enum {
+             PAL_RBITS  =  5,
+             PAL_ROFF   =  0,
+             PAL_GBITS  =  5,
+             PAL_GOFF   =  5,
+             PAL_BBITS  =  5,
+             PAL_BOFF   = 10
+        };
+
+        enum {
+            CLCDCLK = 1536000
+        };
+
+        // ********************
+        // CONFIG_PL111 - Start
+        // ********************
+        // Cursor Control
+        enum {
+            CRSR_NUM_MASK = pl11x_mask(5,4),
+            CRSR_NUM_SHIFT = 4,
+            CRSR_ON = pl11x_bit(0)
+        };
+        // Cursor Configuration
+        enum {
+            CRSR_FRAME_SYNC = pl11x_bit(1),
+            CRSR_SIZE = pl11x_bit(0)
+        };
+        // Cursor Palette0/1
+        enum {
+            CRSR_PAL_BLUE_MASK = pl11x_mask(23,16),
+            CRSR_PAL_BLUE_SHIFT = 16,
+            CRSR_PAL_GREEN_MASK = pl11x_mask(15,8),
+            CRSR_PAL_GREEN_SHIFT = 8,
+            CRSR_PAL_RED_MASK = pl11x_mask(7,0),
+            CRSR_PAL_RED_SHIFT = 0
+        };
+        // Cursor XY Position
+        enum {
+            CRSR_Y_EXPAN_MASK = pl11x_mask(27,26),
+            CRSR_Y_EXPAN_SHIFT = 26,
+            CRSR_Y_MASK = pl11x_mask(25,16),
+            CRSR_Y_SHIFT = 16,
+            CRSR_X_EXPAN_MASK = pl11x_mask(11,10),
+            CRSR_X_EXPAN_SHIFT = 10,
+            CRSR_X_MASK = pl11x_mask(9,0),
+            CRSR_X_SHIFT = 0
+        };
+        // Cursor Clip Position
+        enum {
+            CRSR_CLIPY_MASK = pl11x_mask(13,8),
+            CRSR_CLIPY_SHIFT = 8,
+            CRSR_CLIPX_MASK = pl11x_mask(5,0),
+            CRSR_CLIPX_SHIFT = 0
+        };
+        // Cursor Interrupt Mask Set/Clear
+        enum {
+            CRSR_IM = pl11x_bit(0)
+        };
+        // Cursor Interrupt Clear
+        enum {
+            CRSR_IC = pl11x_bit(0)
+        };
+        // Cursor Raw Interrupt Status
+        enum {
+            CRSR_RIS = pl11x_bit(0)
+        };
+        // Cursor Masked Interrupt Status
+        enum {
+            CRSR_MIS = pl11x_bit(0)
+        };
+        // ******************
+        // CONFIG_PL111 - End
+        // ******************
+
+        // control register change bits
+        enum LCDRegisters
+        {
+            eLCDTiming0=0,
+            eLCDTiming1=1,
+            eLCDTiming2=2,
+            eLCDTiming3=3,
+            eLCDUpbase=4,
+            eLCDLpbase=5,
+            eLCDControl=7,
+            eLCDPalette=8
+        };
+
+        // ********************
+        // CONFIG_PL111 - Start
+        // ********************
+        enum  CursorRegisters
+        {
+            CrsrCtrl=9,
+            CrsrConfig=10,
+            CrsrPalette0=11,
+            CrsrPalette1=12,
+            CrsrXY=13,
+            CrsrClip=14,
+            CrsrIMSC=15,
+            CrsrICR=16,
+            CrsrRIS=17,
+            CrsrMIS=18,
+            CrsrIMG=19
+        };
+        // ******************
+        // CONFIG_PL111 - End
+        // ******************
+        // Gross pixel format. Other differences are handled in the palette
+        enum PL11X_PixelFormat
+        {
+            LB8, BB8, RGB16, BGR16, RGB24, BGR24
+        };
+
+        // serializer format (fifo bits -> channels)
+        enum PL11X_ChannelFormat
+        {
+            CF_INDEX, CF_1555, CF_565, CF_444, CF_888
+        };
+
+        // Used for producing pixel doubling variants of templated fns
+        enum Size
+        {
+            Single = 1, Double = 2
+        };
+
+        class PL11X_Blit_Line {
+            public:
+            PL11X_Blit_Line()
+            {
+                crsrWidth = 0;
+                crsrHeight = 0;
+            }
+
+
+            // Lookup tables for CLCD 1-16 bit data -> host framebuffer pixel format conversion
+            union {
+                // Map 1-8 bits of paletized source pixel data onto a number of pixels in a
+                // destination format. A 1/2/4/8 bpp source gives 8/4/2/1 pixels output respectively.
+                //
+                // Structuring it as a array-of-unions means each palette entry takes up exactly 32
+                // bytes no matter which dst format we use. This means if we need to fall back to
+                // blitting with memcpy we don't need to know the dst format to calculate the address
+                // of a run of pixels
+                union {
+                    uint8_t  dst8[8];
+                    uint16_t dst16[8];
+                    uint32_t dst32[8];
+                } clut_src8[256];
+
+                // Each of the RGB channels of a 16 bit source pixel is gamma converted by passing it
+                // through a lookup table. For now, precalculate the table for all 16 bits, and look
+                // up destination pixels in that, but might be more efficient (memory locality) to
+                // extract the channels and look them up.
+                union {
+                    uint8_t  dst8;
+                    uint16_t dst16;
+                    uint32_t dst32;
+                } clut_src16[65536];
+            };
+
+            uint8_t crsrImageEncoding[32*32*4]; // At 32*32 pixel cursor with at most 32bpp.
+
+            uint8_t crsrMergeLine[32+8];
+
+            // colour components for destination surface channels. Assumes max 32bpp destination format
+            uint32_t rcomp[256];
+            uint32_t gcomp[256];
+            uint32_t bcomp[256];
+
+            uint32_t crsrx;
+            uint32_t crsry;
+            uint32_t clipx;
+            uint32_t clipy;
+            uint32_t crsrWidth;
+            uint32_t crsrHeight;
+            uint32_t crsrnum;
+
+            uint32_t palette0;
+            uint32_t palette1;
+
+            uint32_t cx, cy, cw, ch;
+
+            PL11X_PixelFormat *pl11x_pixel_format;
+            PL11X_ChannelFormat *pl11x_channel_format;
+            VisPixelFormat const *f;
+            uint32_t *pixels_per_line;
+            uint32_t *pl11x_bpp; // Bits per pixel of the current framebuffer mode
+            bool bgr;           // swap b+r channels
+
+            void decodeCursorImage(uint32_t *crsrram)
+            {
+                // Merge cursor pixels with the pixels from frame
+                uint32_t paletteEncoding[4];
+                uint32_t m=0;
+                for (int i=0; i<256; i++){
+                    switch(crsrWidth)
+                    {
+                    case 32:
+                        paletteEncoding[0] = *crsrram++; i++;
+                        paletteEncoding[1] = *crsrram++;
+                        break;
+                    case 64:
+                        paletteEncoding[0] = *crsrram++; i++;
+                        paletteEncoding[1] = *crsrram++; i++;
+                        paletteEncoding[2] = *crsrram++; i++;
+                        paletteEncoding[3] = *crsrram++;
+                        break;
+                    }
+
+                    uint32_t palette = 0;
+                    int index = 7;
+
+                    for (int j=0; j<4 && palette<crsrWidth/16; j++)
+                    {
+                        crsrImageEncoding[m++] = (paletteEncoding[palette] & pl11x_mask(index-j*2, index-j*2-1)) >> (index-j*2-1);
+
+                        if (index == 31 && j == 3) // one palette has 32 bits
+                        {
+                            index = -1;
+                            palette++;
+                        }
+                        if(j == 3) // using LBBP hence the decoding sequency is bit 7-0, 15-8, 23-16, 31-24
+                        {
+                            j = -1;
+                            index += 8;
+                        }
+                    }
+                }
+            }
+
+            // merge the cursor pixel with the src pixel
+            // and send the merged pixel to the destination
+            // instead of the original src pixel.
+            // color   ANDmask  XORmask  Display
+            // color0     0      color0    color0
+            // color1     0      color1    color1
+            //  frame     1        0        Frame
+            //  frame     1        1        invert frame
+            template<class T> T mergePixel(T srcPixel, uint8_t encoding)
+            {
+                // using andmask and xormask
+                T t = (T)0x0;
+
+                switch(encoding)
+                {
+                case 0: // Color0
+                    t = (T)palette0;
+                    break;
+                case 1: // Color1
+                    t = (T)palette1;
+                    break;
+                case 2: //Transparent
+                    t = srcPixel;
+                    break;
+                case 3: // Inverted
+                    t = srcPixel ^ (T)0xFFFFFFFF;
+                    break;
+                }
+
+                return t;
+            }
+
+            template<Size S, class T, class U> int updatePointers(T** dst, const U** src, uint32_t len,
+                uint32_t offset, uint32_t line)
+            {
+                int crsr_pos = 0;
+
+                // Calculate what's the start merging point and the merging length.
+                if (offset == 0 && crsrx<len)
+                    crsr_pos = crsrx;
+                else if (offset == 0 && crsrx>=len)
+                    return 0;
+                else if (offset > 0 && crsrx>=offset)
+                    crsr_pos = crsrx;
+                else if (offset > 0 && crsrx<offset && (crsrx+cw)>=offset)
+                    crsr_pos = offset;
+                else if (offset > 0 && (crsrx+cw)<offset)
+                    return 0;
+                else if (offset > 0 && crsrx>=(len+offset))
+                    return 0;
+
+                (*dst) += (crsr_pos - offset) * S;
+
+                if (*pl11x_bpp==24)
+                    (*src) += (crsr_pos-offset)*4;
+                else
+                    (*src) += crsr_pos-offset;
+
+                uint32_t merge_len;
+
+                if((crsrx+cw)<(len+offset))
+                    merge_len = crsrx+cw-crsr_pos;
+                else
+                    merge_len = len+offset-crsr_pos;
+                // Ensure word alignment
+                uint8_t start_offset = crsr_pos%4;
+                uint8_t end_offset = (crsr_pos+merge_len)%4;
+                end_offset = (end_offset==0)?0:(4-end_offset);
+
+                if (*pl11x_bpp==24)
+                    (*src) -= start_offset *4;
+                else
+                    (*src) -= start_offset;
+
+                (*dst) -= start_offset * S;
+
+                if (crsrWidth == 32)
+                {
+                    switch(crsrnum)
+                    {
+                    case 1: crsr_pos += 0x400; break;
+                    case 2: crsr_pos += 0x800; break;
+                    case 3: crsr_pos += 0xC00; break;
+                    }
+                }
+
+                crsr_pos += (line-crsry+clipy)*crsrWidth-crsrx+clipx;
+
+                // Prepare cursor merge line
+                uint32_t i=0;
+                for(;i<start_offset; i++)
+                    crsrMergeLine[i] = 2; // Transparent
+                for(; i<merge_len+start_offset; i++)
+                    crsrMergeLine[i] = crsrImageEncoding[crsr_pos++];
+                for(; i<merge_len+start_offset+end_offset; i++)
+                    crsrMergeLine[i] = 2; // Transparent;
+                merge_len += start_offset + end_offset;
+
+                return merge_len;
+            }
+
+
+            template<Size S, class T, class U> void mergeCursor( T* dst, const U* src,
+                uint32_t len)
+                {
+                for (uint32_t i=0; i<len; i++)
+                {
+                    switch(*pl11x_pixel_format)
+                    {
+                    case LB8:
+                        *dst++ = mergePixel(*getCLUT8Pixels<T*>(*src++), crsrMergeLine[i]);
+                        if (S == Double) { *dst = *(dst-1); dst++; }
+                        break;
+                    case BB8:
+                        {
+                            T pixeldata0 = *getCLUT8Pixels<T*>(*src++);
+                            T pixeldata1 = *getCLUT8Pixels<T*>(*src++);
+                            T pixeldata2 = *getCLUT8Pixels<T*>(*src++);
+                            T pixeldata3 = *getCLUT8Pixels<T*>(*src++);
+
+                            *dst++ = mergePixel(pixeldata3, crsrMergeLine[i++]); if (S == Double) { *dst = *(dst-1); dst++; }
+                            *dst++ = mergePixel(pixeldata2, crsrMergeLine[i++]); if (S == Double) { *dst = *(dst-1); dst++; }
+                            *dst++ = mergePixel(pixeldata1, crsrMergeLine[i++]); if (S == Double) { *dst = *(dst-1); dst++; }
+                            *dst++ = mergePixel(pixeldata0, crsrMergeLine[i]);   if (S == Double) { *dst = *(dst-1); dst++; }
+                            // TODO: should this final i have a ++?
+                        }
+                        break;
+                    case RGB16:
+                    case BGR16:
+                        *dst++ = mergePixel( getCLUT16Pixel<T>(*src++), crsrMergeLine[i]);
+                        if (S == Double) { *dst = *(dst-1); dst++; }
+                        break;
+                    case RGB24:
+                        {
+                            uint32_t bmask = bcomp[*src++];
+                            uint32_t gmask = gcomp[*src++];
+                            uint32_t rmask = rcomp[*src++];
+                            src++; // Skip 4th byte lane
+                            T pixeldata = rmask|gmask|bmask;
+                            *dst++ = mergePixel(pixeldata, crsrMergeLine[i]);
+                            if (S == Double) { *dst = *(dst-1); dst++; }
+                        }
+                        break;
+                    case BGR24:
+                        {
+                            uint32_t rmask = bcomp[*src++];
+                            uint32_t gmask = gcomp[*src++];
+                            uint32_t bmask = rcomp[*src++];
+                            src++; // Skip 4th byte lane
+                            T pixeldata = rmask|gmask|bmask;
+                            *dst++ = mergePixel(pixeldata, crsrMergeLine[i]);
+                            if (S == Double) { *dst = *(dst-1); dst++; }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // templated fast version for known sizes
+            template<Size S, class T> T* blit_line_lb8(T* dst, const uint8_t* src, uint32_t src_bytes)
+            {
+                while (src_bytes > 0)
+                {
+                    for (int i=0; i<4; ++i)
+                    {
+                        T pixeldata = *getCLUT8Pixels<T*>(*src++);
+                        *dst++ = pixeldata; if (S == Double) { *dst++ = pixeldata; }
+                    }
+                    src_bytes -= 4;
+                }
+                return dst;
+            }
+
+            template<Size S, class T>  T* blit_line_bb8(T* dst, const uint8_t* src, uint32_t src_bytes)
+            {
+                while (src_bytes > 0)
+                {
+                    T pixeldata0 = *getCLUT8Pixels<T*>(*src++);
+                    T pixeldata1 = *getCLUT8Pixels<T*>(*src++);
+                    T pixeldata2 = *getCLUT8Pixels<T*>(*src++);
+                    T pixeldata3 = *getCLUT8Pixels<T*>(*src++);
+
+                    *dst++ = pixeldata3; if (S == Double) { *dst++ = pixeldata3; }
+                    *dst++ = pixeldata2; if (S == Double) { *dst++ = pixeldata2; }
+                    *dst++ = pixeldata1; if (S == Double) { *dst++ = pixeldata1; }
+                    *dst++ = pixeldata0; if (S == Double) { *dst++ = pixeldata0; }
+                    src_bytes -= 4;
+                }
+                return dst;
+            }
+
+            template<Size S, class T>  T* blit_line_rgb16(T* dst, const uint16_t* src16, uint32_t src_bytes)
+            {
+                while (src_bytes > 0)
+                {
+                    T pixeldata0 = getCLUT16Pixel<T>(*src16++);
+                    T pixeldata1 = getCLUT16Pixel<T>(*src16++);
+                    *dst++ = pixeldata0; if (S == Double) { *dst++ = pixeldata0; }
+                    *dst++ = pixeldata1; if (S == Double) { *dst++ = pixeldata1; }
+                    src_bytes -= 4;
+                }
+                return dst;
+            }
+
+            template<Size S, class T>  T* blit_line_rgb24(T* dst, const uint8_t* src, uint32_t src_bytes)
+            {
+                while (src_bytes > 0)
+                {
+                    uint32_t rmask = rcomp[*src++];
+                    uint32_t gmask = gcomp[*src++];
+                    uint32_t bmask = bcomp[*src++];
+                    src++; // Skip 4th byte lane
+                    T pixeldata = rmask|gmask|bmask;
+                    *dst++ = pixeldata; if (S == Double) { *dst++ = pixeldata; }
+                    src_bytes -= 4;
+                }
+                return dst;
+            }
+
+            template<Size S, class T>  T* blit_line_bgr24(T* dst, const uint8_t* src, uint32_t src_bytes)
+            {
+                while (src_bytes > 0)
+                {
+                    uint32_t rmask = bcomp[*src++];
+                    uint32_t gmask = gcomp[*src++];
+                    uint32_t bmask = rcomp[*src++];
+                    src++; // Skip 4th byte lane
+                    T pixeldata = rmask|gmask|bmask;
+                    *dst++ = pixeldata; if (S == Double) { *dst++ = pixeldata; }
+                    src_bytes -= 4;
+                }
+                return dst;
+            }
+
+            // In 1/2/4 bpp mode, 1 byte of PL11x data  maps onto >1 destination pixel.
+            // If pbytes * pixels_per_byte > 4, we need to copy these using memcpy.
+            template<Size S> uint8_t*  blit_line_lb8(uint8_t* dst, const uint8_t* src, uint32_t src_bytes, uint32_t dst_bytes)
+            {
+                while (src_bytes > 0)
+                {
+                    for (int i=0; i<4; ++i)
+                    {
+                        uint8_t *pixeldata = getCLUT8Pixels<uint8_t*>(*src++);
+                        memcpy(dst, pixeldata, dst_bytes); dst += dst_bytes; if (S == Double) { memcpy(dst, pixeldata, dst_bytes); dst += dst_bytes; }
+                    }
+                    src_bytes -= 4;
+                }
+                return dst;
+            }
+
+            // In 1/2/4 bpp mode, 1 byte of PL11x data  maps onto >1 destination pixel.
+            // If pbytes * pixels_per_byte > 4, we need to copy these using memcpy.
+            template<Size S> uint8_t*  blit_line_bb8(uint8_t* dst, const uint8_t* src, uint32_t src_bytes, uint32_t dst_bytes)
+            {
+                while (src_bytes > 0)
+                {
+                    uint8_t* pixeldata0 = getCLUT8Pixels<uint8_t*>(*src++);
+                    uint8_t* pixeldata1 = getCLUT8Pixels<uint8_t*>(*src++);
+                    uint8_t* pixeldata2 = getCLUT8Pixels<uint8_t*>(*src++);
+                    uint8_t* pixeldata3 = getCLUT8Pixels<uint8_t*>(*src++);
+
+                    memcpy(dst, pixeldata3, dst_bytes); dst += dst_bytes; if (S == Double) { memcpy(dst, pixeldata3, dst_bytes); dst += dst_bytes; }
+                    memcpy(dst, pixeldata2, dst_bytes); dst += dst_bytes; if (S == Double) { memcpy(dst, pixeldata2, dst_bytes); dst += dst_bytes; }
+                    memcpy(dst, pixeldata1, dst_bytes); dst += dst_bytes; if (S == Double) { memcpy(dst, pixeldata1, dst_bytes); dst += dst_bytes; }
+                    memcpy(dst, pixeldata0, dst_bytes); dst += dst_bytes; if (S == Double) { memcpy(dst, pixeldata0, dst_bytes); dst += dst_bytes; }
+
+                    src_bytes -= 4;
+                }
+                return dst;
+            }
+
+            template <Size S> uint32_t crsrUpdatePointers(uint8_t** dst, const uint8_t** src, uint32_t render_len, uint32_t offset, uint32_t line,
+                uint32_t dst_bytes)
+            {
+                switch(*pl11x_pixel_format)
+                {
+                case LB8:
+                case BB8:
+                    switch(dst_bytes)
+                    {
+                        case 1: return updatePointers<S>(            dst, src, render_len, offset, line); break;
+                        case 2: return updatePointers<S>((uint16_t**)dst, src, render_len, offset, line); break;
+                        case 4: return updatePointers<S>((uint32_t**)dst, src, render_len, offset, line); break;
+                    }
+                    break;
+                case RGB16:
+                case BGR16:
+                    switch(dst_bytes)
+                    {
+                        case 1: return updatePointers<S>(            dst, (const uint16_t**)src, render_len, offset, line); break;
+                        case 2: return updatePointers<S>((uint16_t**)dst, (const uint16_t**)src, render_len, offset, line); break;
+                        case 4: return updatePointers<S>((uint32_t**)dst, (const uint16_t**)src, render_len, offset, line); break;
+                    }
+                    break;
+                case RGB24:
+                case BGR24:
+                    switch(dst_bytes)
+                    {
+                        case 1: return updatePointers<S>(            dst, src, render_len, offset, line); break;
+                        case 2: return updatePointers<S>((uint16_t**)dst, src, render_len, offset, line); break;
+                        case 4: return updatePointers<S>((uint32_t**)dst, src, render_len, offset, line); break;
+                    }
+                    break;
+                }
+                return 0;
+            }
+
+            template<Size S> void blit_cursor_line(uint8_t* dst, const uint8_t* src, uint32_t src_bytes, uint32_t dst_bytes)
+            {
+                switch(*pl11x_pixel_format)
+                {
+                case LB8:
+                case BB8:
+                    switch(dst_bytes)
+                    {
+                        case 1: mergeCursor<S>((uint8_t*) dst, src, src_bytes); break;
+                        case 2: mergeCursor<S>((uint16_t*)dst, src, src_bytes); break;
+                        case 4: mergeCursor<S>((uint32_t*)dst, src, src_bytes); break;
+                    }
+                    break;
+                case RGB16:
+                case BGR16:
+                    switch(dst_bytes)
+                    {
+                        case 1: mergeCursor<S>((uint8_t*) dst, (uint16_t*)src, src_bytes); break;
+                        case 2: mergeCursor<S>((uint16_t*)dst, (uint16_t*)src, src_bytes); break;
+                        case 4: mergeCursor<S>((uint32_t*)dst, (uint16_t*)src, src_bytes); break;
+                    }
+                    break;
+                case RGB24:
+                case BGR24:
+                    switch(dst_bytes)
+                    {
+                        case 1: mergeCursor<S>((uint8_t*) dst, src, src_bytes); break;
+                        case 2: mergeCursor<S>((uint16_t*)dst, src, src_bytes); break;
+                        case 4: mergeCursor<S>((uint32_t*)dst, src, src_bytes); break;
+                    }
+                    break;
+                }
+            }
+
+            // returns the new dst ptr
+            template<Size S> uint8_t* blit_line(uint8_t* dst, const uint8_t* src, uint32_t src_bytes, uint32_t dst_bytes)
+            {
+                switch (*pl11x_pixel_format)
+                {
+                case LB8:
+                    if (src)
+                    {
+                        switch (dst_bytes)
+                        {
+                        case 1:  dst = (uint8_t*)blit_line_lb8<S>((uint8_t*) dst, src, src_bytes); break;
+                        case 2:  dst = (uint8_t*)blit_line_lb8<S>((uint16_t*)dst, src, src_bytes); break;
+                        case 4:  dst = (uint8_t*)blit_line_lb8<S>((uint32_t*)dst, src, src_bytes); break;
+                        default: dst =           blit_line_lb8<S>(           dst, src, src_bytes, dst_bytes); break;
+                        }
+                    } else {
+                        dst += dst_bytes * src_bytes;
+                    }
+                    break;
+                case BB8:
+                    if (src)
+                    {
+                        switch (dst_bytes)
+                        {
+                        case 1:  dst = (uint8_t*)blit_line_bb8<S>((uint8_t*) dst, src, src_bytes); break;
+                        case 2:  dst = (uint8_t*)blit_line_bb8<S>((uint16_t*)dst, src, src_bytes); break;
+                        case 4:  dst = (uint8_t*)blit_line_bb8<S>((uint32_t*)dst, src, src_bytes); break;
+                        default: dst =           blit_line_bb8<S>(           dst, src, src_bytes, dst_bytes); break;
+                        }
+                    } else {
+                        dst += dst_bytes * src_bytes;
+                    }
+                    break;
+                case RGB16:
+                case BGR16:
+                    if (src)
+                    {
+                        switch (dst_bytes)
+                        {
+                        case 1:  dst = (uint8_t*)blit_line_rgb16<S>( (uint8_t*)dst, (uint16_t*)src, src_bytes); break;
+                        case 2:  dst = (uint8_t*)blit_line_rgb16<S>((uint16_t*)dst, (uint16_t*)src, src_bytes); break;
+                        case 4:  dst = (uint8_t*)blit_line_rgb16<S>((uint32_t*)dst, (uint16_t*)src, src_bytes); break;
+                        default: assert(!"Unsupported output format");
+                        }
+                    } else {
+                        dst += dst_bytes * src_bytes/2;
+                    }
+                    break;
+                case RGB24:
+                    if (src)
+                    {
+                        switch (dst_bytes)
+                        {
+                        case 1:  dst = (uint8_t*)blit_line_rgb24<S>((uint8_t*) dst, src, src_bytes); break;
+                        case 2:  dst = (uint8_t*)blit_line_rgb24<S>((uint16_t*)dst, src, src_bytes); break;
+                        case 4:  dst = (uint8_t*)blit_line_rgb24<S>((uint32_t*)dst, src, src_bytes); break;
+                        default: assert(!"Unsupported output format");
+                        }
+                    } else {
+                        dst += dst_bytes * src_bytes/4;
+                    }
+                    break;
+                case BGR24:
+                    if (src)
+                    {
+                        switch (dst_bytes)
+                        {
+                        case 1:  dst = (uint8_t*)blit_line_bgr24<S>((uint8_t*) dst, src, src_bytes); break;
+                        case 2:  dst = (uint8_t*)blit_line_bgr24<S>((uint16_t*)dst, src, src_bytes); break;
+                        case 4:  dst = (uint8_t*)blit_line_bgr24<S>((uint32_t*)dst, src, src_bytes); break;
+                        default: assert(!"Unsupported output format");
+                        }
+                    } else {
+                        dst += dst_bytes * src_bytes/4;
+                    }
+                    break;
+                }
+                return dst;
+            }
+
+            template<typename T> T getCLUT8Pixels(const int i);
+            template<typename T> T getCLUT16Pixel(const int i);
+        };
+
+        // Specialised accessors to let us access the right destination pixel types in templated fns.
+
+        template<> inline uint8_t*  PL11X_Blit_Line::getCLUT8Pixels<uint8_t*>(const int i)  { return clut_src8[i].dst8; }
+        template<> inline uint16_t* PL11X_Blit_Line::getCLUT8Pixels<uint16_t*>(const int i) { return clut_src8[i].dst16; }
+        template<> inline uint32_t* PL11X_Blit_Line::getCLUT8Pixels<uint32_t*>(const int i) { return clut_src8[i].dst32; }
+
+        template<> inline uint8_t  PL11X_Blit_Line::getCLUT16Pixel<uint8_t>(const int i)  { return clut_src16[i].dst8; }
+        template<> inline uint16_t PL11X_Blit_Line::getCLUT16Pixel<uint16_t>(const int i) { return clut_src16[i].dst16; }
+        template<> inline uint32_t PL11X_Blit_Line::getCLUT16Pixel<uint32_t>(const int i) { return clut_src16[i].dst32; }
+}
+
+resources
+{
+        PARAMETER { description("Minimum LCD pixel width before display will be zoomed"), type(uint32_t), default(300) }  pixel_double_limit;
+        PARAMETER { description("Define PL11x behaviour. 0 for PL110, 1 for PL111"), type(uint32_t), default(0)} pl11x_behavior;
+
+
+        pv::StreamingTransactionGenerator* dma;  // memory accessor (dma)
+
+        bool fbuffer_changed;   // true if any changes were detected in the fbuffer
+        bool force_redraw;      // force redraw even if source data hasn't changed
+
+        // Packed control registers as written by the programmer
+        uint32_t timing0, timing1, timing2, timing3;
+        uint32_t upbase, lpbase;
+        uint32_t r_control;
+        uint32_t palette[128]; // messy representation, decode when it changes
+        uint32_t irq_raw;
+        uint32_t irq_mask;
+
+        uint32_t reg_changed;  // which of the above registers changed
+
+
+        // expanded, safe control registers - stable during a frame
+        // there are lots more registers but we don't use them all yet
+
+        uint32_t pixels_per_line;
+        uint32_t lines_per_panel;
+        uint32_t bytes_per_line;
+
+        uint32_t panel_clock_divisor;
+        bool   bypass_pcd;
+        uint32_t clocks_per_line;
+
+        uint32_t up_base; // upper panel base
+        uint32_t lp_base; // lower panel base
+
+        uint32_t vcomp;    // when to generate an interrupt (ignored)
+
+        // pixel colour layout
+
+        bool be_pixel_order;// little/big endian pixel order
+        bool be_byte_order; // little/big endian byte order (<16bpp only)
+        bool bgr;           // swap b+r channels
+
+        bool lcddual;       // dual panel stn style panel (ignored)
+        bool lcdmono8;      // monochrome stn/lcd panel (ignored)
+        bool lcdtft;        // colour tft panel (ignored)
+        bool lcdbw;         // greyscale panel (ignored)
+
+        uint32_t pl11x_bpp; // bpp code (0-7)
+
+        bool enabled;       // critical - determines if the event runs or not
+
+        uint32_t cm_control;  // core module control bits (>>8)
+        uint32_t mux;         // pixel multiplexer control (for pl110 only)
+
+        uint32_t lcd_event;    // timer event for handling video dma+interrupts
+        int32_t  event_period; // variable period between lcd events, depends on timing
+
+        uint32_t dst_bytes;    // In the current PL11x colour format, how many bytes of
+                               // destination pixels does a single CLUT entry hold?
+                               // In 8/16/24 bpp, each CLUT entry will hold 1 destination pixel.
+                               // In 4/2/1 bpp, each CLUT entry will hold 2/4/8 destination pixels
+
+        const VisRasterLayout * fdata;  // frame buffer data when locked
+
+        bool pixel_double;               // draw each source pixel as 2x2 dest pixels
+
+        PL11X_PixelFormat    pl11x_pixel_format;   // 8/16/24 bpp + channel order
+        PL11X_ChannelFormat  pl11x_channel_format; // bits per channel + offset
+
+        bool palette_changed;        // true if the palette changed
+        bool crsr_palette_changed;   // true if the cursor palette changed
+        bool colour_format_changed;  // true if any of the colour related registers changed
+
+
+        PL11X_Blit_Line blit;
+        // ********************
+        // CONFIG_PL111 - Start
+        // ********************
+        // Registers
+        uint32_t crsr_ram[256];     // CursorImage RAM size 256 x 32 bits
+        uint32_t crsr_ctrl;         // ClcdCrsrCtrl
+        uint32_t crsr_config;       // ClcdCrsrConfig;
+        uint32_t crsr_palette0;     // ClcdCrsrPalette0
+        uint32_t crsr_palette1;     // ClcdCrsrPalette1
+        uint32_t crsr_xy;           // ClcdCrsrXY
+        uint32_t crsr_clip;         // ClcdCrsrClip
+        uint32_t crsr_imsc;         // ClcdCrsrIMSC
+        uint32_t crsr_icr;          // ClcdCrsrICR
+        uint32_t crsr_ris;          // ClcdCrsrRIS
+        uint32_t crsr_mis;          // ClcdCrsrMIS
+
+        uint32_t old_crsrx;
+        uint32_t old_crsry;
+        uint32_t old_clipx;
+        uint32_t old_clipy;
+        uint32_t old_ch;
+        // ******************
+        // CONFIG_PL111 - End
+        // ******************
+    }
+
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            // Reads must be aligned and can't be >32 bits because we don't handle multi-register reads.
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32((uint32_t)registerRead(tx.getAddress() & ~3));
+        }
+
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            // Only allow aligned 32-bit writes. As tested with a debugger on a V2P-CA9, Physical PL111s
+            // have odd undefined behaviour for sub-register writes. They appear to combine the 8/16-bits
+            // of the current transaction with the last 32-bit value written to the device (irrespective
+            // of the address) and write the resulting 32-bit value to the register.
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(),tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+        busmaster : PVBusMaster();
+        timer : ClockTimer;
+    }
+
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        self.clk_in => timer.clk_in;
+        timer.timer_callback => self.timer_callback_handler;
+        busmaster.pvbus_m => self.pvbus_m;
+    }
+
+
+    // Externally visible ports:
+    slave port<PVBus>       pvbus;
+    slave port<ClockSignal> clk_in;
+
+    master port<Signal>     intr;
+    master port<LCD>        display;
+    slave port<Value>       control
+    {
+        behavior setValue(uint32_t control)
+        {
+            setCMControl(control);
+        }
+    }
+
+    // Handle event notifications from the timer.
+    internal slave port<TimerCallback> timer_callback_handler
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            return timer_callback();
+        }
+    }
+
+    // master port used to access framebuffer
+    master port<PVBus>      pvbus_m;
+
+    behavior init()
+    {
+        fdata = NULL;
+        pixel_double = false;
+        pv::TransactionMasterControl t_control;
+        t_control >> busmaster->findPort("control");
+        dma = t_control.createStreamingTransactionGenerator();
+        fbuffer_changed = true;
+        force_redraw = true;
+        crsr_palette_changed = true;
+        blit.pl11x_pixel_format = &pl11x_pixel_format;
+        blit.pl11x_channel_format = &pl11x_channel_format;
+        blit.pl11x_bpp = &pl11x_bpp;
+        blit.pixels_per_line = &pixels_per_line;
+        composition.init();
+
+        cm_control = 0;
+        mux = 0;
+    }
+
+    behavior terminate()
+    {
+        delete dma;
+        composition.terminate();
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        reg_changed = (1<<eLCDTiming0)
+        | (1<<eLCDTiming1)
+        | (1<<eLCDTiming2)
+        | (1<<eLCDTiming3)
+        | (1<<eLCDUpbase)
+        | (1<<eLCDLpbase)
+        | (1<<eLCDControl)
+        | (1<<eLCDPalette);
+
+        if (pl11x_behavior == 1)
+        {
+            reg_changed = (1 << CrsrCtrl)
+            | (1<<CrsrConfig)
+            | (1<<CrsrPalette0)
+            | (1<<CrsrPalette1)
+            | (1<<CrsrXY)
+            | (1<<CrsrClip)
+            | (1<<CrsrIMSC)
+            | (1<<CrsrICR)
+            | (1<<CrsrRIS)
+            | (1<<CrsrMIS)
+            | (1<<CrsrIMG);
+        }
+
+        timing0    = 0;
+        timing1    = 0;
+        timing2    = 0;
+        timing3    = 0;
+        r_control  = 0;
+        upbase     = 0;
+        lpbase     = 0;
+        irq_raw    = 0;
+        irq_mask   = 0;
+
+        pixels_per_line = 480;
+        lines_per_panel = 640;
+
+        panel_clock_divisor = 1;
+        bypass_pcd = true;
+        clocks_per_line = 640;
+
+        up_base = 0; // upper panel base
+        lp_base = 0; // lower panel base
+
+        vcomp = 0;    // when to generate an interrupt
+
+        // pixel colour layout
+
+        be_pixel_order = false;
+        be_byte_order = false;
+        bgr = false;
+
+        lcddual     = false;
+        lcdmono8    = false;
+        lcdtft      = false;
+        lcdbw       = false;
+
+        pl11x_bpp = 1;
+
+        enabled = false;
+
+        // *********************
+        // CONFIG_PL111 - Start
+        // *********************
+        crsr_ctrl = 0;
+        crsr_config = 0;
+        crsr_palette0 = 0;
+        crsr_palette1 = 0;
+        crsr_xy = 0;
+        crsr_clip = 0;
+        crsr_imsc = 0;
+        crsr_icr = 0;
+        crsr_ris = 0;
+        crsr_mis = 0;
+                old_crsrx = 0xFFFFFFFF;
+                old_crsry = 0xFFFFFFFF;
+        old_clipx = 0;
+        old_clipy = 0;
+        old_ch = 0;
+        // *******************
+        // CONFIG_PL111 - End
+        // *******************
+
+        update_registers();
+
+        lcd_event  = 0;
+        event_period = 0;
+        timer.timer_control.cancel();
+        dma->setRange(0, 0);
+    }
+
+    // interrupt status/mask changed
+    behavior update_interrupts()
+    {
+        if (irq_raw & irq_mask) {
+            if (intr.setValue.implemented())
+                intr.setValue(sg::Signal::Set);
+        } else {
+            if (intr.setValue.implemented())
+                intr.setValue(sg::Signal::Clear);
+        }
+    }
+
+    // convert the user programmed registers into useful registers
+    // and indicate that the base registers have been copied
+    behavior update_registers()
+    {
+        if (reg_changed) {
+            fbuffer_changed = true;
+        }
+        if (reg_changed & (1<<eLCDTiming0))
+        {
+            pixels_per_line = (((timing0 & LCD_PPL_MASK)>>LCD_PPL_SHIFT)+1) * 16;
+
+            // update layout
+            bytes_per_line = pl11x_bpp <= 16 ? (pixels_per_line * pl11x_bpp)/8
+            : pl11x_bpp == 24 ? pixels_per_line * 4
+            : 0;
+
+            PL11x_TRACE("LCD pixels per line = %d\n", pixels_per_line);
+        }
+
+        if (reg_changed & (1<<eLCDTiming1))
+        {
+            lines_per_panel = ((timing1 & LCD_LPP_MASK)>>LCD_LPP_SHIFT) + 1;
+
+            // update layout
+
+            PL11x_TRACE("LCD lines per panel = %d\n", lines_per_panel);
+        }
+
+        if (reg_changed & (1<<eLCDTiming2))
+        {
+            panel_clock_divisor = ((((timing2 & LCD_PCD_HI_MASK)>>LCD_PCD_HI_SHIFT)<<5)
+                |  ((timing2 & LCD_PCD_LO_MASK)>>LCD_PCD_LO_SHIFT)) + 2;
+
+            bypass_pcd      = (timing2 & LCD_BCD_MASK) != 0;
+            clocks_per_line = ((timing2 & LCD_CPL_MASK) >> LCD_CPL_SHIFT)+1;
+
+            // update timing
+
+            PL11x_TRACE("LCD panel_clock_divisor = %d %s\n", panel_clock_divisor, bypass_pcd ? "(bypassed)" : "");
+            PL11x_TRACE("LCD clocks_per_line = %d\n", clocks_per_line);
+
+
+            // calculate how many clock ticks per frame
+            event_period = (clocks_per_line*lines_per_panel);
+
+        }
+
+        if (reg_changed & (1<<eLCDTiming3))
+        {
+            // ignored for now
+        }
+
+        if (reg_changed & (1<<eLCDUpbase))
+        {
+            up_base = upbase;
+
+            PL11x_TRACE("LCD upper panel base = 0x%x\n", up_base);
+        }
+
+        if (reg_changed & (1<<eLCDLpbase))
+        {
+            lp_base = lpbase;
+
+            PL11x_TRACE("LCD lower panel base = 0x%x\n", lp_base);
+        }
+
+        if (reg_changed & (1<<eLCDControl))
+        {
+            uint32_t c = r_control;
+
+            vcomp = (c&LCD_VCOMP_MASK)>>LCD_VCOMP_SHIFT;
+
+
+            be_pixel_order = (c&LCD_BEPO) != 0;
+            be_byte_order  = (c&LCD_BEBO) != 0;
+            bgr            = (c&LCD_BGR)  != 0;
+            blit.bgr       = bgr;
+
+            lcddual  = (c&LCD_DUAL)  != 0;
+            lcdmono8 = (c&LCD_MONO8) != 0;
+            lcdtft   = (c&LCD_TFT)   != 0;
+            lcdbw    = (c&LCD_BW)    != 0;
+
+            static const uint32_t bpptable[8] = { 1, 2, 4, 8, 16, 24, 16, 16 }; // the last two are reserved on pl110
+            static const PL11X_ChannelFormat format[8] = { CF_INDEX, CF_INDEX, CF_INDEX, CF_INDEX,
+            CF_1555, CF_888, CF_565, CF_444 };
+            static const char* formatname[8] = { "indexed", "indexed", "indexed", "indexed",
+            "555", "888", "565", "444" };
+
+            uint32_t bppcode = (c&LCD_BPP_MASK)>>LCD_BPP_SHIFT;
+
+            // an 'addition' to the PL110 spec - the mux alters the pixel format in 16bpp modes
+            if (bppcode == 4)
+            {
+                if (mux == 2)
+                {
+                    bppcode = 6;
+                    bgr = false;
+                }
+                else if (mux == 3)
+                {
+                    bppcode = 6;
+                    bgr = true;
+                }
+            }
+            pl11x_bpp            = bpptable[bppcode];
+            pl11x_channel_format = format[bppcode];
+
+            bytes_per_line = pl11x_bpp <= 16 ? (pixels_per_line * pl11x_bpp)/8
+            : pl11x_bpp == 24 ? pixels_per_line * 4
+            : 0;
+
+            PL11x_TRACE("LCD pixel format: %s %s %s %d bpp (%s)\n",
+                be_pixel_order ? "BEPO" : "LEPO",
+                be_byte_order  ? "BEBO" : "LEBO",
+                bgr            ? "BGR"  : "RGB",
+                pl11x_bpp,
+                formatname[bppcode]);
+
+            // recalculate colour maps
+            colour_format_changed = true;
+        }
+
+        if (reg_changed & (1<<eLCDPalette))
+        {
+            palette_changed = true;
+        }
+
+        if (reg_changed & ((1<<eLCDUpbase)|(1<<eLCDTiming0)|(1<<eLCDTiming1)))
+        {
+            uint32_t fbuffer_bytes = (bytes_per_line * lines_per_panel);
+
+            dma->setRange(up_base, fbuffer_bytes);
+        }
+
+
+        // **********************
+        // CONFIG_PL111 - Start
+        // **********************
+
+        if (reg_changed & (1<<CrsrCtrl))
+        {
+            blit.crsrnum = (crsr_ctrl & CRSR_NUM_MASK) >> CRSR_NUM_SHIFT;
+        }
+
+        if (reg_changed & (1<<CrsrConfig))
+        {
+            blit.crsrWidth = blit.crsrHeight = (crsr_config & CRSR_SIZE)==0?32:64;
+            blit.cw = blit.crsrWidth - blit.clipx - 1;
+            blit.ch = blit.crsrHeight - blit.clipy - 1;
+        }
+        if (reg_changed & (1<<CrsrPalette0))
+        {
+            crsr_palette_changed = true;
+        }
+
+        if (reg_changed & (1<<CrsrPalette1))
+        {
+            crsr_palette_changed = true;
+        }
+
+        if (reg_changed & (1<<CrsrXY))
+        {
+            blit.crsrx = (crsr_xy & CRSR_X_MASK) >> CRSR_X_SHIFT;
+            blit.crsry = (crsr_xy & CRSR_Y_MASK) >> CRSR_Y_SHIFT;
+            blit.cx = blit.crsrx+blit.clipx;
+            blit.cy = blit.crsry+blit.clipy;
+        }
+
+        if (reg_changed & (1<<CrsrClip))
+        {
+            blit.clipx = (crsr_clip & CRSR_CLIPX_MASK) >> CRSR_CLIPX_SHIFT;
+            blit.clipy = (crsr_clip & CRSR_CLIPY_MASK) >> CRSR_CLIPY_SHIFT;
+            blit.cx = blit.crsrx+blit.clipx;
+            blit.cy = blit.crsry+blit.clipy;
+            blit.cw = blit.crsrWidth - blit.clipx - 1;
+            blit.ch = blit.crsrHeight - blit.clipy - 1;
+        }
+
+        if (reg_changed & (1<<CrsrIMSC))
+        {
+            // ignore for now
+        }
+
+        if (reg_changed & (1<<CrsrICR))
+        {
+            // ignore for now
+        }
+
+        if (reg_changed & (1<<CrsrRIS))
+        {
+            // ignore for now
+        }
+
+        if (reg_changed & (1<<CrsrMIS))
+        {
+            // ignore for now
+        }
+        if (reg_changed & (1<<CrsrIMG))
+        {
+            blit.decodeCursorImage(crsr_ram);
+        }
+        // *******************
+        // CONFIG_PL111 - End
+        // *******************
+
+        reg_changed = 0;
+
+        // say that base update occurred
+        irq_raw |= INT_LNBU;
+        update_interrupts();
+    }
+
+    // The palette or colour format changed, recalculate new palette entries
+    behavior update_palette()
+    {
+        VisPixelFormat const * f = &fdata->format;
+        PL11x_TRACE("update_palette pl11x_bpp=%d\n", pl11x_bpp);
+        PL11x_TRACE("output format\n");
+        PL11x_TRACE("    rbits: %d, gbits: %d, bbits: %d\n", f->rbits, f->gbits, f->bbits);
+        PL11x_TRACE("    roff: %d, boff:%d, goff: %d\n", f->roff, f->boff, f->goff);
+        PL11x_TRACE("    pbytes: %d\n", f->pbytes);
+
+        // 1, 2, 4, 8 bpp are paletized modes
+        if (pl11x_bpp <= 8)
+        {
+            pl11x_pixel_format = be_byte_order ? BB8 : LB8;
+
+            /* looks complicated but isn't. We build up a pixel line of destination format
+            pixels so we can read and translate the dma data one byte at a time. Any byte
+            of dma data can contain 1-8 pixels.
+            */
+
+            uint32_t pixels_per_byte = 8 / pl11x_bpp;
+            for (uint32_t i=0; i<256; ++i)
+            {
+                // this is the palette format
+                uint32_t rbits = 5;
+                uint32_t gbits = 5;
+                uint32_t bbits = 5;
+
+                uint32_t roff = bgr ? 10 :  0;
+                uint32_t goff = bgr ?  5 :  5;
+                uint32_t boff = bgr ?  0 : 10;
+
+                uint32_t rmask = (1<<rbits)-1;
+                uint32_t gmask = (1<<gbits)-1;
+                uint32_t bmask = (1<<bbits)-1;
+
+                // build up the CLUT data for each pixel in a byte from the PL11x framebuffer
+                for (uint32_t pixel=0;pixel<pixels_per_byte; ++pixel)
+                {
+                    // get the offset within a byte of the pixel
+                    uint32_t poffset = be_pixel_order ? (8 - pl11x_bpp * (pixel + 1))
+                    : pl11x_bpp * pixel;
+                    // and a mask dependent on the size
+                    uint32_t pmask = (1<<pl11x_bpp)-1;
+
+                    // get the lcd palette index number
+                    uint32_t pindex =  (i>>poffset) & pmask;
+
+                    // two entries per palette register, pick the correct one
+                    uint32_t p = palette[pindex>>1];
+                    if (be_byte_order)
+                        p = ((pindex&1) ? p : (p>>16)) & 0xffff;
+                    else
+                        p = ((pindex&1) ? (p>>16) : p) & 0xffff;
+
+
+                    uint32_t rindex = (p>>roff) & rmask;
+                    uint32_t gindex = (p>>goff) & gmask;
+                    uint32_t bindex = (p>>boff) & bmask;
+
+                    uint32_t dpixel = blit.rcomp[rindex<<(8-rbits)] | blit.rcomp[rindex>>rbits]
+                    | blit.gcomp[gindex<<(8-gbits)] | blit.gcomp[gindex>>gbits]
+                    | blit.bcomp[bindex<<(8-bbits)] | blit.bcomp[bindex>>bbits];
+
+                    // copy in the palette data for that pixel
+
+                    switch (f->pbytes) {
+                        case 1: blit.clut_src8[i].dst8[pixel]  = (uint8_t)  dpixel; break;
+                        case 2: blit.clut_src8[i].dst16[pixel] = (uint16_t) dpixel; break;
+                        case 4: blit.clut_src8[i].dst32[pixel] = (uint32_t) dpixel; break;
+                        default: assert(!"Unsupported destination pixel size\n"); break;
+                    }
+                }
+            }
+
+            dst_bytes = f->pbytes * pixels_per_byte;
+        }
+        // 16-bpp passes the source RGB channels through 3 separate gamma
+        // tables. Implement this as a precomputed 16-bit palette.
+        else if (pl11x_bpp == 16)
+        {
+            pl11x_pixel_format  = bgr ? BGR16 : RGB16;
+
+            uint32_t roff, goff, boff, rbits, gbits, bbits;
+            if (pl11x_channel_format == CF_1555)
+            {
+                // intensity is ignored
+
+                rbits = 5;
+                gbits = 5;
+                bbits = 5;
+
+                roff = bgr ? 10 :  0;
+                goff = bgr ?  5 :  5;
+                boff = bgr ?  0 : 10;
+            }
+            else if (pl11x_channel_format == CF_444)
+            {
+                rbits = 4;
+                gbits = 4;
+                bbits = 4;
+
+                roff = bgr ? 8 : 0;
+                goff = bgr ? 4 : 4;
+                boff = bgr ? 0 : 8;
+            }
+            else /* if (pl11x_channel_format == CF_565) */
+            {
+                rbits = 5;
+                gbits = 6;
+                bbits = 5;
+
+                roff = bgr ? 11 :  0;
+                goff = bgr ?  5 :  5;
+                boff = bgr ?  0 : 11;
+            }
+
+            uint32_t rmask = (1<<rbits)-1;
+            uint32_t gmask = (1<<gbits)-1;
+            uint32_t bmask = (1<<bbits)-1;
+
+            // build a _large_ table, might not be the best thing to do
+            for (uint32_t i=0; i<65536; ++i)
+            {
+                uint32_t rindex = (i>>roff) & rmask;
+                uint32_t gindex = (i>>goff) & gmask;
+                uint32_t bindex = (i>>boff) & bmask;
+
+                uint32_t dpixel = blit.rcomp[rindex<<(8-rbits)] | blit.rcomp[rindex>>rbits]
+                | blit.gcomp[gindex<<(8-gbits)] | blit.gcomp[gindex>>gbits]
+                | blit.bcomp[bindex<<(8-bbits)] | blit.bcomp[bindex>>bbits];
+
+                switch (f->pbytes) {
+                    case 1: blit.clut_src16[i].dst8  = (uint8_t)  dpixel; break;
+                    case 2: blit.clut_src16[i].dst16 = (uint16_t) dpixel; break;
+                    case 4: blit.clut_src16[i].dst32 = (uint32_t) dpixel; break;
+                    default: assert(!"Unsupported destination pixel size\n"); break;
+                }
+            }
+
+            dst_bytes = f->pbytes; // 1 pixel per CLUT entry
+        }
+        // 24-bpp doesn't need a lookup table. Endianness conversion is done on blit.
+        else // if (pl11x_bpp == 24)
+        {
+            pl11x_pixel_format = bgr ? BGR24 : RGB24;
+
+            dst_bytes = f->pbytes; // 1 pixel per CLUT entry
+        }
+
+        force_redraw = true;
+
+        palette_changed = false;
+    }
+
+    behavior updateCrsrPalette(uint32_t palette) : uint32_t
+    {
+        uint8_t r, g, b;
+        uint32_t dst_bytes = 0;
+        uint32_t pal = 0;
+                VisPixelFormat const * f = &fdata->format;
+        if(pl11x_bpp <= 8)
+        {
+            dst_bytes = f->pbytes * 8 / pl11x_bpp;
+        } else if ( pl11x_bpp == 16 || pl11x_bpp == 24) {
+            dst_bytes = f->pbytes;
+        }
+
+        switch(dst_bytes)
+        {
+        case 1:
+            if (bgr)
+            {
+                b = ((palette >> 16) & 0xFF);
+                g = ((palette >> 8) & 0xFF);
+                r = ((palette >> 0) & 0xFF);
+            }
+            else
+            {
+                r = ((palette >> 16) & 0xFF);
+                g = ((palette >> 8) & 0xFF);
+                b = ((palette >> 0) & 0xFF);
+            }
+            pal = r | g | b;
+            break;
+        case 2:
+            if (pl11x_channel_format == CF_1555)
+            {
+                if (bgr)
+                {
+                    b = ((palette >> 16) & 0xFF)/8;
+                    g = ((palette >> 8) & 0xFF)/8;
+                    r = ((palette >> 0) & 0xFF)/8;
+                    pal = b << 10 | g << 5 | r << 0;
+                }
+                else
+                {
+                    r = ((palette >> 16) & 0xFF)/8;
+                    g = ((palette >> 8) & 0xFF)/8;
+                    b = ((palette >> 0) & 0xFF)/8;
+                    pal = r << 10 | g << 5 | b << 0;
+                }
+            }
+            else if (pl11x_channel_format == CF_444)
+            {
+                if (bgr)
+                {
+                    b = ((palette >> 16) & 0xFF)/16;
+                    g = ((palette >> 8) & 0xFF)/16;
+                    r = ((palette >> 0) & 0xFF)/16;
+                    pal = b << 8 | g << 4 | r << 0;
+                }
+                else
+                {
+                    r = ((palette >> 16) & 0xFF)/16;
+                    g = ((palette >> 8) & 0xFF)/16;
+                    b = ((palette >> 0) & 0xFF)/16;
+                    pal = r << 8 | g << 4 | b << 0;
+                }
+            }
+            else // pl11x_channel_format == CF_565
+            {
+                if (bgr)
+                {
+                    b = ((palette >> 16) & 0xFF)/8;
+                    g = ((palette >> 8) & 0xFF)/4;
+                    r = ((palette >> 0) & 0xFF)/8;
+                    pal = b << 11 | g << 5 | r << 0;
+                }
+                else
+                {
+                    r = ((palette >> 16) & 0xFF)/8;
+                    g = ((palette >> 8) & 0xFF)/4;
+                    b = ((palette >> 0) & 0xFF)/8;
+                    pal = r << 11 | g << 5 | b << 0;
+                }
+            }
+            break;
+        case 4:
+            pal = palette;
+            break;
+        }
+
+        return pal;
+    }
+
+    behavior update_colour_tables()
+    {
+        // uses the fbuffer information to rebuild the mask table
+        // actually this isn't really necessary as it's such a fast operation
+        VisPixelFormat const * f = &fdata->format;
+        for (uint32_t i=0; i<256; ++i)
+        {
+            blit.rcomp[i] = (i>>(8-f->rbits))<<f->roff;
+            blit.gcomp[i] = (i>>(8-f->gbits))<<f->goff;
+            blit.bcomp[i] = (i>>(8-f->bbits))<<f->boff;
+        }
+        colour_format_changed = false;
+    }
+
+
+
+
+
+    behavior blit_frame()
+    {
+        pixel_double = (pixels_per_line < pixel_double_limit) ? true : false;
+
+        if (pixel_double) {
+            if(display.setPreferredLayout.implemented())
+               display.setPreferredLayout(pixels_per_line*2, lines_per_panel*2, pl11x_bpp);
+        } else {
+            if(display.setPreferredLayout.implemented())
+                display.setPreferredLayout(pixels_per_line, lines_per_panel, pl11x_bpp);
+        }
+        if(display.lock.implemented())
+            fdata = display.lock();
+        else
+            fdata = NULL;
+
+        if (fdata == NULL)
+            return;
+
+        bool crsron = false;
+        if (pl11x_behavior == 1) {
+            crsron = crsr_ctrl & CRSR_ON;
+            // Test if the cursor is enabled
+            if (crsron)
+                blit.f = &fdata->format;
+        }
+
+        if (fdata->changed || colour_format_changed)
+        {
+            update_colour_tables();
+            palette_changed = true;
+            crsr_palette_changed = true;
+        }
+
+        if (palette_changed)
+            update_palette();
+
+        if (crsr_palette_changed)
+        {
+            blit.palette0 = updateCrsrPalette(crsr_palette0);
+            blit.palette1 = updateCrsrPalette(crsr_palette1);
+        }
+
+        unsigned int src_bytes = (pl11x_bpp == 24?32:pl11x_bpp) / 8;
+        unsigned int render_bytes_per_line = fdata->width * src_bytes;
+        unsigned int render_height = fdata->height;
+        if (pixel_double) {
+            render_height /= 2;
+            render_bytes_per_line /= 2;
+        }
+
+        if (render_bytes_per_line > bytes_per_line) {
+            render_bytes_per_line = bytes_per_line;
+        }
+        if (render_height > lines_per_panel) {
+            render_height = lines_per_panel;
+        }
+
+        fbuffer_changed |= force_redraw;
+
+        dma->startDma(up_base);
+
+        const uint8_t* src_ptr;
+        if (pixel_double)
+        {
+            for (uint32_t line = 0; line < render_height; ++line)
+            {
+                uint32_t line_offset = 0;
+
+                uint8_t* dest_ptr0 = fdata->buffer + 2 * line * fdata->pitch;
+                uint8_t* dest_ptr  = dest_ptr0 + fdata->pitch;
+                while (line_offset < bytes_per_line)
+                {
+                    uint32_t dma_bytes = bytes_per_line - line_offset;
+                    bool changed = dma->getDmaData(&src_ptr, &dma_bytes);
+
+                    if (old_crsrx != blit.crsrx || old_crsry != blit.crsry || old_clipx != blit.clipx || old_clipy != blit.clipy)
+                        if (line >= old_crsry && line<(old_crsry+old_ch))
+                        changed = true;
+
+                    // If the line cross the cursor.
+                    const uint8_t* src = NULL;
+                    if(line >= blit.crsry && line<(blit.crsry+blit.ch))
+                        src = src_ptr;
+                    else
+                        src = NULL;
+
+                    if (!changed && !force_redraw) {
+                        src_ptr = NULL;
+                    }
+
+                    fbuffer_changed |= changed;
+
+
+                    if (line_offset < render_bytes_per_line) {
+                        uint32_t render_bytes = render_bytes_per_line - line_offset;
+                        if (render_bytes > dma_bytes) render_bytes = dma_bytes;
+
+                        uint8_t* dst0 = dest_ptr0;
+                        uint8_t* dst  = dest_ptr;
+
+                        dest_ptr0 = blit.blit_line<Double>(dest_ptr0, src_ptr, render_bytes, dst_bytes);
+                        dest_ptr  = blit.blit_line<Double>(dest_ptr, src_ptr, render_bytes, dst_bytes);
+
+                        if (pl11x_behavior == 1)
+                        {
+                            if (crsron && src)
+                            {
+                                uint32_t merge_bytes;
+                                const uint8_t* src0 = src;
+                                merge_bytes = blit.crsrUpdatePointers<Double>(&dst0, &src0, render_bytes/src_bytes, line_offset/src_bytes, line, dst_bytes);
+
+                                if (merge_bytes != 0)
+                                    blit.blit_cursor_line<Double>(dst0, src0, merge_bytes, dst_bytes);
+
+                                merge_bytes = blit.crsrUpdatePointers<Double>(&dst, &src, render_bytes/src_bytes, line_offset/src_bytes, line, dst_bytes);
+
+                                if (merge_bytes != 0)
+                                    blit.blit_cursor_line<Double>(dst, src, merge_bytes, dst_bytes);
+                            }
+                        }
+                    }
+                    line_offset += dma_bytes;
+                }
+            }
+        }
+        else
+        {
+            for (uint32_t line = 0; line < render_height; ++line)
+            {
+                uint32_t line_offset = 0;
+
+                uint8_t* dest_ptr = fdata->buffer + line * fdata->pitch;
+
+                while (line_offset < bytes_per_line)
+                {
+                    uint32_t dma_bytes = bytes_per_line - line_offset;
+                    bool changed = dma->getDmaData(&src_ptr, &dma_bytes);
+
+                    if (old_crsrx != blit.crsrx || old_crsry != blit.crsry || old_clipx != blit.clipx || old_clipy != blit.clipy)
+                        if (line >= old_crsry && line<(old_crsry+old_ch))
+                        changed = true;
+
+                    // If the line cross the cursor.
+                    const uint8_t* src = NULL;
+                    if(line >= blit.crsry && line<(blit.crsry+blit.ch))
+                        src = src_ptr;
+                    else
+                        src = NULL;
+
+                    if (!changed && !force_redraw) {
+                        src_ptr = NULL;
+                    }
+
+                    fbuffer_changed |= changed;
+
+                    if (line_offset < render_bytes_per_line) {
+                        uint32_t render_bytes = render_bytes_per_line - line_offset;
+                        if (render_bytes > dma_bytes) render_bytes = dma_bytes;
+
+                        uint8_t* dst = dest_ptr;
+                        dest_ptr = blit.blit_line<Single>(dest_ptr, src_ptr, render_bytes, dst_bytes);
+                        if (pl11x_behavior == 1)
+                        {
+                            if (crsron && src)
+                            {
+                                uint32_t merge_bytes;
+
+                                merge_bytes = blit.crsrUpdatePointers<Single>(&dst, &src, render_bytes/src_bytes, line_offset/src_bytes, line, dst_bytes);
+
+                                if (merge_bytes != 0)
+                                    blit.blit_cursor_line<Single>(dst, src, merge_bytes, dst_bytes);
+                            }
+                        }
+                    }
+                    line_offset += dma_bytes;
+                }
+            }
+        }
+        if(display.unlock.implemented())
+            display.unlock();
+
+        if (fbuffer_changed)
+        {
+            if (pixel_double) {
+                if(display.update.implemented())
+                    display.update(0,0, pixels_per_line*2, lines_per_panel*2);
+            } else {
+                if(display.update.implemented())
+                    display.update(0,0, pixels_per_line, lines_per_panel);
+            }
+        }
+
+        fbuffer_changed = false;
+        force_redraw = false;
+        crsr_palette_changed = false;
+
+        old_crsrx = blit.crsrx;
+        old_crsry = blit.crsry;
+        old_clipx = blit.clipx;
+        old_clipy = blit.clipy;
+        old_ch = blit.ch;
+
+        // this always occurs here as we can't yet generate interrupts on a particular line
+        irq_raw |= INT_Vcomp;
+        update_interrupts();
+
+    }
+
+    // control register was written
+    behavior control_changed()
+    {
+        // purely for the enable bit - rest of register changes are
+        // picked up on the next event
+
+        bool enabled = (r_control & LCD_ENABLE) != 0;
+
+        if (enabled && !lcd_event)
+        {
+            lcd_event = 1;
+            this->enabled = true;
+
+            // get the timing running after processing current frame
+            timer.timer_control.set(timer_callback());
+        }
+        else if (!enabled && lcd_event)
+        {
+            // disable timing
+            timer.timer_control.cancel();
+
+            event_period = 0;
+            lcd_event = 0;
+
+            this->enabled = false;
+        }
+    }
+
+
+    /* Timer callback.
+    * set up to be called once per frame (for now). In future it may
+    * do line by line updates to be closer to the real hardware. It may
+    * even be an option to do approximate fifo implementation but in this
+    * simulation it doesn't make sense
+    */
+    behavior timer_callback() : uint32_t
+    {
+        PL11x_TRACE("Triger timer_callback()\n");
+        // if the lcd is disabled, stop the clock and return immediately
+        if (!enabled)
+        {
+            PL11x_TRACE("LCD disabled\n");
+            event_period = 0;
+            lcd_event = 0;
+            return 0;
+        }
+
+        // take account of all changes made to registers during the previous frame
+        update_registers();
+
+        // now blit the frame to the framebuffer
+        blit_frame();
+
+        // get called back in one frame time, make sure we don't take too much overhead
+        if (event_period < 10000)
+            return 10000;
+        else
+            return event_period;
+    }
+
+
+    /*! Note - the LCD bits in the CM control actually have nothing to do with
+    *  the PL110.
+    */
+    behavior setCMControl(uint32_t control)
+    {
+        PL11x_TRACE("LCD cm control <- 0x%x\n", control);
+
+        uint32_t changed = control ^ cm_control;
+        if (changed)
+        {
+            if ((changed & LCD_CM_BRIGHTER) && (control & LCD_CM_BRIGHTER)) {
+                PL11x_TRACE("LCD brighter\n");
+            }
+            if ((changed & LCD_CM_DIMMER) && (control & LCD_CM_DIMMER)) {
+                PL11x_TRACE("LCD dimmer\n");
+            }
+            if (changed & LCD_CM_MUX_MASK) {
+                PL11x_TRACE("LCD mux %d\n", (control & LCD_CM_MUX_MASK)>>LCD_CM_MUX_SHIFT);
+            }
+            if (changed & LCD_CM_EN0) {
+                PL11x_TRACE("LCD %s 0\n", (control & LCD_CM_EN0) ? "enable" : "disable");
+            }
+            if (changed & LCD_CM_EN1) {
+                PL11x_TRACE("LCD %s 1\n", (control & LCD_CM_EN1) ? "enable" : "disable");
+            }
+
+            cm_control = control;
+
+            // just deal with mux for now
+            mux = (control & LCD_CM_MUX_MASK)>>LCD_CM_MUX_SHIFT;
+
+            // make sure it gets picked up
+            reg_changed |= (1<<eLCDControl);
+        }
+    }
+
+    behavior registerRead(uint32_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+        uint32_t peri_id = 0;
+        if (pl11x_behavior == 1)
+            peri_id = 0x041111;
+        else
+            peri_id = 0x041110;
+        switch (device_addr) {
+        case 0x00: // LCDTiming0
+            data = timing0;
+
+            PL11x_TRACE("LCDTiming0 -> %x\n", data);
+            return data;
+
+        case 0x04: // LCDTiming1
+            data = timing1;
+
+            PL11x_TRACE("LCDTiming1 -> %x\n", data);
+            return data;
+
+        case 0x08: // LCDTiming2
+            data = timing2;
+
+            PL11x_TRACE("LCDTiming2 -> %x\n", data);
+            return data;
+
+        case 0x0c: // LCDTiming3
+            data = timing3;
+
+            PL11x_TRACE("LCDTiming3 -> %x\n", data);
+            return data;
+
+        case 0x10: // LCDUPBASE
+            data = upbase;
+
+            PL11x_TRACE("LCDUPBASE -> %x\n", data);
+            return data;
+
+        case 0x14: // LCDLPBASE
+            data = lpbase;
+
+            PL11x_TRACE("LCDLPBASE -> %x\n", data);
+            return data;
+        case 0x18: // LCDControl if pl111, LCDIMSC if pl110
+            if (pl11x_behavior == 1)
+            {
+                data = r_control;
+
+                PL11x_TRACE("LCDControl -> %x\n", data);
+
+                return data;
+            }
+            else
+            {
+                data = irq_mask;
+
+                PL11x_TRACE("LCCIMSC -> %x\n", data);
+
+                return data;
+            }
+        case 0x1C: // LCDIMSC if pl111, LCDControl if pl110
+            if (pl11x_behavior == 1)
+            {
+                data = irq_mask;
+
+                PL11x_TRACE("LCCIMSC -> %x\n", data);
+
+                return data;
+            }
+            else
+            {
+                data = r_control;
+
+                PL11x_TRACE("LCDControl -> %x\n", data);
+
+                return data;
+            }
+        case 0x20: // LCDRIS
+            data = irq_raw;
+
+            PL11x_TRACE("LCDRIS -> %x\n", data);
+            return data;
+
+        case 0x24: // LCDMIS
+            data = irq_raw & irq_mask;
+
+            PL11x_TRACE("LCDMIS -> %x\n", data);
+            return data;
+
+        case 0x28:
+            if (pl11x_behavior == 0)  // LCDUPCURR (PL110 / R1P1)
+            {
+                PL11x_TRACE("LCDUPCURR -> %x -- UNIMPLEMENTED\n", data);
+            }
+            else                      // LCDICR    (PL111 / R1P2)
+            {
+                PL11x_TRACE("LCDICR -> %x -- Write only\n", data);
+            }
+            return data;
+
+        case 0x2c:
+            if (pl11x_behavior == 0)  // LCDLPCURR (PL110 / R1P1)
+            {
+                PL11x_TRACE("LCDLPCURR -> %x -- UNIMPLEMENTED\n", data);
+            }
+            else                      // LCDUPCURR (PL111 / R1P2)
+            {
+                PL11x_TRACE("LCDUPCURR -> %x -- UNIMPLEMENTED\n", data);
+            }
+            return data;
+
+        case 0x30: // LCDLPCURR
+            if (pl11x_behavior == 1)  // LCDLPCURR (PL111 / R1P2 only)
+            {
+                PL11x_TRACE("LCDLPCURR -> %x -- UNIMPLEMENTED\n", data);
+                return data;
+            }
+            else
+            {
+                PL11x_TRACE("LCD undefined register %x -> %x\n", (uint32_t)device_addr, data);
+                return 0;
+            }
+        // ********************
+        // CONFIG_PL111 - Start
+        // ********************
+        case 0xC00: // ClcdCrsrCtrl
+            if (pl11x_behavior == 1)
+            {
+                data = crsr_ctrl;
+                PL11x_TRACE("CLCDCRSRCTRL -> %x\n", data);
+                return data;
+            }
+        case 0xC04: // ClcdCrsrConfig
+            if (pl11x_behavior == 1)
+            {
+                data = crsr_config;
+                PL11x_TRACE("CLCDCRSRCONFIG -> %x\n", data);
+                return data;
+            }
+        case 0xC08: // ClcdCrsrPalette0
+            if (pl11x_behavior == 1)
+            {
+                data = crsr_palette0;
+                PL11x_TRACE("CLCDCRSRPALETTE0 -> %x\n", data);
+                return data;
+            }
+        case 0xC0C: // ClcdCrsrPalette1
+            if (pl11x_behavior == 1)
+            {
+                data = crsr_palette1;
+                PL11x_TRACE("CLCDCRSRPALETTE1 -> %x\n", data);
+                return data;
+            }
+        case 0xC10: // ClcdCrsrXY
+            if (pl11x_behavior == 1)
+            {
+                data = crsr_xy;
+                PL11x_TRACE("CLCDCRSRXY -> %x\n", data);
+                return data;
+            }
+        case 0xC14: // ClcdCrsrClip
+            if (pl11x_behavior == 1)
+            {
+                data = crsr_clip;
+                PL11x_TRACE("CLCDCRSRCLIP -> %x\n", data);
+                return data;
+            }
+        case 0xC20: // ClcdCrsrIMSC
+            if (pl11x_behavior == 1)
+            {
+                data = crsr_imsc;
+                PL11x_TRACE("CLCDCRSRIMSC -> %x\n", data);
+                return data;
+            }
+        case 0xC24: // ClcdCrsrICR
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRICR -> %x --  Write only \n", data);
+                return data;
+            }
+        case 0xC28: // ClcdCrsrRIS
+            if (pl11x_behavior == 1)
+            {
+                data = crsr_ris;
+                PL11x_TRACE("CLCDCRSRRIS -> %x\n", data);
+                return data;
+            }
+        case 0xC2C: // ClcdCrsrMIS
+            if (pl11x_behavior == 1)
+            {
+                data = crsr_mis;
+                PL11x_TRACE("CLCDCRSRMIS -> %x\n", data);
+                return data;
+            }
+            else
+            {
+                PL11x_TRACE("LCD undefined register %x -> %x\n", (uint32_t)device_addr, data);
+                return 0;
+            }
+        // *******************
+        // CONFIG_PL111 - End
+        // *******************
+            #define PCELL_ID(ldata,pcellid)                 \
+        case 0xFE0: ldata = pcellid & 0xff; break; \
+        case 0xFE4: ldata = (pcellid >> 8) & 0xff; break;     \
+        case 0xFE8: ldata = (pcellid >> 16) & 0xff; break;    \
+        case 0xFEC: ldata = (pcellid >> 24) & 0xff; break;    \
+        case 0xFF0: ldata = 0x0D; break; \
+        case 0xFF4: ldata = 0xF0; break; \
+        case 0xFF8: ldata = 0x05; break; \
+        case 0xFFC: ldata = 0xB1; break;
+            PCELL_ID(data,peri_id);
+        default:
+            // *********************
+            // CONFIG_PL111 - Start
+            // *********************
+            if (pl11x_behavior == 1)
+            {
+                if (device_addr >= 0x800 && device_addr < 0xC00) // CursorImage RAM
+                {
+                    uint32_t entry = (uint32_t)((device_addr - 0x800)>>2);
+
+                    data = crsr_ram[entry];
+
+                    PL11x_TRACE("CursorImage[%d] -> 0x%x\n", entry, data);
+                    return data;
+                }
+            }
+            // ********************
+            //  CONFIG_PL111 - End
+            // ********************
+            if (device_addr >= 0x200 && device_addr < 0x400) // LCDPalette
+            {
+                uint32_t entry = (uint32_t)((device_addr - 0x200)>>2);
+
+                data = palette[entry];
+
+                PL11x_TRACE("LCDPalette[%d] -> 0x%x\n", entry, data);
+                return data;
+            }
+            else
+            {
+                PL11x_TRACE("LCD undefined register %x -> %x\n", (uint32_t)device_addr, data);
+                return 0;
+            }
+        }
+
+        return data;
+    }
+
+    behavior registerWrite(uint32_t device_addr, uint32_t data)
+    {
+        switch (device_addr) {
+        case 0x00: // LCDTiming0
+            PL11x_TRACE("LCDTiming0 <- %x\n", data);
+
+            timing0 = data & LCD_TIMING0_MASK;
+
+            reg_changed |= (1<<eLCDTiming0);
+
+            break;
+
+        case 0x04: // LCDTiming1
+            PL11x_TRACE("LCDTiming1 <- %x\n", data);
+
+            timing1 = data & LCD_TIMING1_MASK;
+            reg_changed |= (1<<eLCDTiming1);
+
+            break;
+
+        case 0x08: // LCDTiming2
+            PL11x_TRACE("LCDTiming2 <- %x\n", data);
+
+            timing2 = data & LCD_TIMING2_MASK;
+            reg_changed |= (1<<eLCDTiming2);
+
+            break;
+
+        case 0x0c: // LCDTiming3
+            PL11x_TRACE("LCDTiming3 <- %x\n", data);
+
+            timing3 = data & LCD_TIMING3_MASK;
+            reg_changed |= (1<<eLCDTiming3);
+
+            break;
+
+        case 0x10: // LCDUPBASE
+            PL11x_TRACE("LCDUPBASE <- %x\n", data);
+
+            // this is only read once per frame
+            upbase = data &~ 3;
+            reg_changed |= (1<<eLCDUpbase);
+
+            break;
+
+        case 0x14: // LCDLPBASE
+            PL11x_TRACE("LCDLPBASE <- %x\n", data);
+
+            // this is only read once per frame
+            lpbase = data &~ 3;
+            reg_changed |= (1<<eLCDLpbase);
+
+            break;
+        case 0x18: // LCDControl if pl111, LCDIMSC if pl110
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("LCDControl <- %x\n", data);
+
+                r_control = data;
+                reg_changed |= (1<<eLCDControl);
+
+                control_changed();
+            }
+            else
+            {
+                PL11x_TRACE("LCCIMSC <- %x\n", data);
+
+                irq_mask = data & LCD_INT_MASK;
+
+                update_interrupts();
+            }
+            break;
+        case 0x1C: // LCDIMSC if pl111, LCDControl if pl110
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("LCCIMSC <- %x\n", data);
+
+                irq_mask = data & LCD_INT_MASK;
+
+                update_interrupts();
+            }
+            else
+            {
+                PL11x_TRACE("LCDControl <- %x\n", data);
+
+                r_control = data;
+                reg_changed |= (1<<eLCDControl);
+
+                control_changed();
+            }
+            break;
+
+        case 0x20: // LCDRIS
+            if (pl11x_behavior == 0)  // LCDRIS (PL110 / R1P1)
+            {
+                PL11x_TRACE("LCDRIS <- %x\n", data);
+                irq_raw &=~ (data & LCD_INT_MASK);
+                update_interrupts();
+            }
+            else                      // LCDRIS (PL111 / R1P2)
+            {
+                PL11x_TRACE("LCDRIS <- %x -- Read only\n", data);
+            }
+            break;
+
+        case 0x24: // LCDMIS
+            PL11x_TRACE("LCDMIS <- %x -- Read only\n", data);
+            break;
+
+        case 0x28:
+            if (pl11x_behavior == 0)  // LCDUPCURR (PL110 / R1P1)
+            {
+                PL11x_TRACE("LCDUPCURR <- %x -- Read only\n", data);
+            }
+            else                      // LCDICR (PL111 / R1P2)
+            {
+                PL11x_TRACE("LCDICR <- %x\n", data);
+                irq_raw &=~ (data & LCD_INT_MASK);
+                update_interrupts();
+            }
+            break;
+
+        case 0x2C:
+            if (pl11x_behavior == 0)  // LCDLPCURR (PL110 / R1P1)
+            {
+                PL11x_TRACE("LCDLPCURR <- %x -- Read only\n", data);
+            }
+            else                      // LCDUPCURR (PL111 / R1P2)
+            {
+                PL11x_TRACE("LCDUPCURR <- %x -- Read only\n", data);
+            }
+            break;
+
+        case 0x30: // LCDLPCURR
+            if (pl11x_behavior == 1)  // LCDLPCURR (PL111 / R1P1 only)
+            {
+                PL11x_TRACE("LCDLPCURR <- %x -- Read only\n", data);
+                break;
+            }
+            else
+            {
+                PL11x_TRACE("LCD undefined register %x <- %x\n", (uint32_t)device_addr, data);
+                return;
+            }
+
+        // *********************
+        // CONFIG_PL111 - Start
+        // *********************
+        case 0xC00: // ClcdCrsrCtrl
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRCTRL <- %x\n", data);
+                crsr_ctrl = data;
+                reg_changed |= (1<<CrsrCtrl);
+                break;
+            }
+        case 0xC04: // ClcdCrsrConfig
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRCONFIG <- %x\n", data);
+                crsr_config = data;
+                reg_changed |= (1<<CrsrConfig);
+                break;
+            }
+        case 0xC08: // ClcdCrsrPalette0
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRPALETTE0 <- %x\n", data);
+                crsr_palette0 = data;
+                reg_changed |= (1<<CrsrPalette0);
+                break;
+            }
+        case 0xC0C: // ClcdCrsrPalette1
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRPALETTE1 <- %x\n", data);
+                crsr_palette1 = data;
+                reg_changed |= (1<<CrsrPalette1);
+                break;
+            }
+        case 0xC10: // ClcdCrsrXY
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRXY <- %x\n", data);
+                crsr_xy = data;
+                reg_changed |= (1<<CrsrXY);
+                break;
+            }
+        case 0xC14: // ClcdCrsrClip
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRCLIP <- %x\n", data);
+                crsr_clip = data;
+                reg_changed |= (1<<CrsrClip);
+                break;
+            }
+        case 0xC20: // ClcdCrsrIMSC
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRIMSC <- %x\n", data);
+                crsr_imsc = data;
+                reg_changed |= (1<<CrsrIMSC);
+                break;
+            }
+        case 0xC24: // ClcdCrsrICR
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRICR <- %x\n", data);
+                crsr_icr = data;
+                reg_changed |= (1<<CrsrICR);
+                break;
+            }
+        case 0xC28: // ClcdCrsrRIS
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRRIS <- %x -- Read only\n", data);
+                break;
+            }
+        case 0xC2C: // ClcdCrsrMIS
+            if (pl11x_behavior == 1)
+            {
+                PL11x_TRACE("CLCDCRSRMIS <- %x -- Read only\n", data);
+                break;
+            }
+        // *******************
+        // CONFIG_PL111 - End
+        // *******************
+        default:
+            // *********************
+            // CONFIG_PL111 - Start
+            // *********************
+            if (pl11x_behavior == 1)
+            {
+                if(device_addr >= 0x800 && device_addr < 0xC00) // CursorImage RAM
+                {
+                    uint32_t entry = (uint32_t)((device_addr - 0x800)>>2);
+
+                    crsr_ram[entry] = data;
+                    reg_changed |= (1<<CrsrIMG);
+                    PL11x_TRACE("CursorImage[%d] <- 0x%x\n", entry, data);
+                    return;
+                }
+            }
+            // ******************
+            // CONFIG_PL111 - End
+            // ******************
+            if (device_addr >= 0x200 && device_addr < 0x400) // LCDPalette
+            {
+                uint32_t entry = (uint32_t)((device_addr - 0x200)>>2);
+
+                palette[entry] = data;
+                reg_changed |= (1<<eLCDPalette);
+
+                PL11x_TRACE("LCDPalette[%d] <- 0x%x\n", entry, data);
+                return;
+            }
+            else
+            {
+                PL11x_TRACE("LCD undefined register %x <- %x\n", (uint32_t)device_addr, data);
+                return;
+            }
+        }
+
+    }
+
+    // debugger support - slightly more complicated than normal because of the way that register arrays are handled
+
+    // debugger register access support
+
+    behavior debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+
+        return ACCESS_FUNC_OK;
+    }
+
+    behavior debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+
+        return ACCESS_FUNC_OK;
+    }
+}

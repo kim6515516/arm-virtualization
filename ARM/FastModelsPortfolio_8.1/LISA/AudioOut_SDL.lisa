@@ -1,0 +1,65 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+//  SDL based Audio Output for PL041_AACI. 
+
+component AudioOut_SDL
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "SDL based Audio Output for PL041_AACI.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes
+    {
+         #include    "components/PVSDLAudioBuffer.h"
+         #include    <string>
+    }
+    
+    behaviour init()
+    {
+        audioBuf    = NULL;
+    }
+    
+    behaviour terminate()
+    {
+        if(audioBuf != NULL)
+        {
+            delete audioBuf;
+        }
+    }
+    
+    
+    behaviour reset(int level)
+    {
+    }
+    
+    resources
+    {    
+        PVSdlAudioBuffer*   audioBuf;
+    }
+    
+    
+    slave port<AudioControl>  audio
+    {
+        behaviour getPVAudioBuffer(uint32_t depth) : PVAudioBuffer*
+        {
+            audioBuf = new PVSdlAudioBuffer(depth);
+
+            return audioBuf;
+        }
+
+        behaviour releasePVAudioBuffer(PVAudioBuffer* buf)
+        {
+            if(audioBuf != NULL)
+            {
+                delete audioBuf;
+                audioBuf = NULL;
+            }
+        }
+    }
+}

@@ -1,0 +1,452 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    DualClusterSystemConfigurationBlock.sgcanvas
+#//  Created: Thu Jul  8 12:21:13 2010
+#//  By: Fast Models  System Canvas 0.0.281  (Jul  1 2010)
+#//
+# *  Do NOT modify this file. It is for internal use by System Canvas only.
+#//
+#//  Copyright (c) 2004-2008 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "pvbusslave"
+        (
+            x = 0;
+            y = 0;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "control"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "device"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+    )
+    ports
+    (
+        define "daughter_leds_state"
+        (
+            x = 250;
+            y = 0;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "daughter_user_switches"
+        (
+            x = 500;
+            y = 0;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "device"
+        (
+            x = 250;
+            y = 0;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_cfgend"
+        (
+            x = 500;
+            y = 0;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_cfgte"
+        (
+            x = 750;
+            y = 0;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_clusterid"
+        (
+            x = 1000;
+            y = 0;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_corereset"
+        (
+            x = 0;
+            y = 230;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_cpuporeset"
+        (
+            x = 250;
+            y = 230;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_cxreset"
+        (
+            x = 500;
+            y = 230;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_eventi"
+        (
+            x = 750;
+            y = 230;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_evento"
+        (
+            x = 1000;
+            y = 230;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_iminlen"
+        (
+            x = 0;
+            y = 450;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_l2reset"
+        (
+            x = 250;
+            y = 450;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_standbywfi"
+        (
+            x = 500;
+            y = 450;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_vinithi"
+        (
+            x = 750;
+            y = 450;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_cfgend"
+        (
+            x = 1000;
+            y = 450;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_clusterid"
+        (
+            x = 0;
+            y = 680;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_corereset"
+        (
+            x = 250;
+            y = 680;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_cpuporeset"
+        (
+            x = 500;
+            y = 680;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_eventi"
+        (
+            x = 750;
+            y = 680;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_evento"
+        (
+            x = 1000;
+            y = 680;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_scureset"
+        (
+            x = 0;
+            y = 900;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_standbywfi"
+        (
+            x = 250;
+            y = 900;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_teinit"
+        (
+            x = 500;
+            y = 900;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_vinithi"
+        (
+            x = 750;
+            y = 900;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "periphbase"
+        (
+            x = 1000;
+            y = 900;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "pvbus"
+        (
+            x = 0;
+            y = 1130;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "system_reset"
+        (
+            x = 250;
+            y = 1130;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+    )
+    connections
+    (
+    )
+    portmaps
+    (
+        define "pvbusslave.device=>self.device"
+        (
+            point
+            (
+                x = 176;
+                y = 30;
+                automatic = true;
+            )
+            point
+            (
+                x = 176;
+                y = 30;
+                automatic = true;
+            )
+            point
+            (
+                x = 320;
+                y = 30;
+                automatic = true;
+            )
+            point
+            (
+                x = 320;
+                y = 10;
+                automatic = true;
+            )
+        )
+        define "self.pvbus=>pvbusslave.pvbus_s"
+        (
+            point
+            (
+                x = 70;
+                y = 1140;
+                automatic = true;
+            )
+            point
+            (
+                x = 70;
+                y = 930;
+                automatic = true;
+            )
+            point
+            (
+                x = -10;
+                y = 930;
+                automatic = true;
+            )
+            point
+            (
+                x = -10;
+                y = 50;
+                automatic = true;
+            )
+        )
+    )
+    labels
+    (
+    )
+)

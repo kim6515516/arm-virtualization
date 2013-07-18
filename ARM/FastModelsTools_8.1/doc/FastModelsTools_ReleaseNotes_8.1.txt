@@ -1,0 +1,535 @@
+==============================================================================
+Fast Models Tools 8.1 Release Notes
+==============================================================================
+
+Detailed documentation can be found in the 'doc' subfolder for Fast Models
+Tools and the 'Docs' subfolder for the Fast Models Portfolio.
+
+
+A significant number of the examples in the Fast Models Portfolio
+8.1 documentation make use of images containing 3rd-party
+IP. These have been split out into a separate 'Third Party IP' package
+that can be downloaded from:
+  * Connect:
+    http://connect.arm.com
+    http://silver.arm.com
+
+Not installing these images will mean that any examples that require
+dhrystone.axf, dhrystone_v7m.axf or the Linux images will not be
+functional, as well as any example using OSCI System C 2.2 and TLM
+2.0.
+
+
+-------------------------------------------------------------
+Enhancements and Changes in the Fast Models Tools 8.1 Release
+-------------------------------------------------------------
+
+Fast Models 8.1 includes the following enhancements/changes:
+
+* MMU-400
+  Fast Models 8.1 includes the model for the MMU-400 (System MMU) at Beta status.
+  This model is functionally complete and has been unit tested. It requires further
+  system software testing to reach full Release status. As with all models, please
+  report any issues found via support-esl@arm.com.
+
+  The MMU-400 is a System Memory Management Unit. An SMMU translates addresses,
+  transaction attributes and applies permission checking on client device transactions
+  from the upstream port, and presents them on the downstream. The purpose of this
+  is to make the upstream devices more easily virtualizable.
+
+  The SMMU Architecture expects that an incoming transaction be labelled by a "StreamId"
+  and an "SSD_Index" or "SSD". It is up to the SoC designer to form these numbers based on
+  the specific needs of the SoC.
+
+  The (SSD_Index/SSD, StreamId) pair is used to map a transaction to a security world
+  (secure or non-secure) and a translation context that holds the information necessary
+  to perform the translation. Thus all transactions labelled with the same
+  (SSD_Index/SSD,StreamId) are indistinguishable.
+
+  SSD_Index is used indirectly to obtain the security world of the transaction via
+  a mapping table (SMMU_SSDRn) in the SMMU, whilst SSD directly encodes the security
+  state of the transaction. NOTE that the security state of the transaction is independent
+  of the Normal/Secure attribute on the transaction itself and should not be confused.
+
+  In the case of the MMU-400, which can only perform stage 2 translations, the
+  secure transactions can never be routed to a translation context and instead can either
+  only be faulted or bypass the address translation and only have a limited attribute-only
+  transformation applied.
+
+  In a real hardware SoC, then the StreamId and the SSD_Index are usually formed by
+  side-band signals on the bus or by something like AXI routing ids. Models
+  do not have direct correspondance to these signals and instead one must label
+  transactions coming from a device.
+
+  Transactions have a 'master_id' field, which can be set by a master.
+  Many masters simply use zero and those that do, often do not allow you to
+  configure their use.
+
+  The component MMU_400 uses the top 16 bits of the 32 bit master_id as a 'label'.
+  It has parameters such as:
+
+  label0_read_stream_id
+  label0_read_ssd
+  label0_write_stream_id
+  label0_write_ssd
+  ...
+  These are used to map a label N in the top 16 bits of the master_id to a particular
+  StreamID and SSD_Index/SSD. N is limited to 0..31. NOTE that the read and write
+  transactions can have different StreamIds and SSD_Indexes/SSDs.
+
+  If the MMU_400 is configured to use SSD_Indexes then the parameter
+  label{N}_{read/write}_ssd is the index, otherwise it is 0/1 for secure
+  and non-secure respectively.
+
+  To place the 'labels' in the master_id then a Labeller component is supplied
+  that should be placed under each upstream device or bus-segment that the SoC
+  wishes to distinguish. The Labeller is a very simple component and if it doesn't
+  satisfy the SoC needs, then examining the LISA code should show you how to create
+  a more complicated labelling component that meets your needs.
+
+  The MMU_400 components is a wrapper round the component MMU_400_BASE,
+  which if the SoC identifies transactions in a more complicated way than
+  can be easily expressed by the MMU_400 component, then one can write a
+  new wrapper for MMU_400_BASE and implement your own identification scheme.
+  The code for the MMU_400 component shows how to do this, in particular one
+  should replace the 'identify' behavior with the one specific to the SoC.
+
+* PyCADI Shell
+  A new Python interface for debug scripting.
+    The ‘fm.debug’ Python module allows you to:
+        - Configure and instantiate a model from a CADI library
+        - Connect to a remote CADI simulation
+        - Debug the simulation:
+          - Load applications
+          - Add and remove breakpoints
+          - Run/stop/step the execution
+          - Read and write registers
+          - Read and write memory
+
+* Linux Virtio block device
+  Virtio block device and virtio support for A-class VFP_VE platforms.
+  The portfolio now includes a VirtioBlockDevice component which implements
+  a block device controlled by the virtio MMIO protocol. This may be
+  connected to the newly added virtio slave port on several of the A-class
+  cores including the Cortex-A9MP, Cortex-A7, Cortex-A15 and AEMv8.
+
+* Support for SystemC V2.3
+  Fast Models can now generate Exported Virtual Systems using implementations
+  of the SystemC 2.3 standard. Fast Models has been tested with the reference
+  implementation of SystemC 2.3 from Accellera. We do not ship the headers and
+  binaries for SystemC 2.3 in the Third Party IP package at this time in order
+  to use SystemC 2.3 support a runtime must be sourced from Accellera or your
+  SystemC vendor.
+
+* CADI Virtual to Physical address translation
+  CADIAddrComplete_t CADI::VirtualToPhysical(CADIAddrComplete_t vaddr) function is
+  implemented. This funtion will provide the physical address that is
+  associated with a virtual address.
+
+  This CADI function accepts a CADIAddrComplete_t instance as the parameter and returns
+  a CADIAddrComplete_t instance as the result. The success of the query is indicated by
+  the memory space field(addr.location.space) in CADIAddrComplete_t structure.
+
+  If the query fails, CADI_MEM_SPACE_NOTSUPPORTED is returned, otherwise the memory
+  space passed in is returned. The current implementation is intrusive. In other words,
+  internal TLB status will be disrupted by the query.
+
+* Timing Annotation
+  This release introduces support for TLM 2.0 Timing as defined in the SystemC
+  specifications available here: http://www.accellera.org/downloads/standards/systemc.
+
+    The release provides:
+      - Timing information on b_transport() calls for outgoing D-side bus transactions, that is
+        from Fast Models to SystemC and back (via the PVBus to AMBA-PV bridges).
+        Incoming bus transactions (via AMBA-PV to PVBus bridges) and DMI latencies will
+        be addressed in a later release.
+      - Quantum Keeping in the Fast Models with the addition of the sg::QuantumKeeper
+        interface to the Scheduler API.
+      - Preliminary support for Cycle Per Instruction (CPI) parameter on individual cores:
+        cpi_mul, cpi_div, to account for I-side path latencies (limited to Cortex-A15).
+      - Preliminary support for automatic synchronisation when:
+        - a core is about to go to sleep (due to WFE/WFI).
+        - initiating non-DMI memory accesses.
+        - raising externally visible signals (limited to WFE/WFI related signals).
+
+  As Timing Annotation can have a performance impact it is switchable through the
+  use of an environment variable, FASTSIM_DISABLE_TA.
+
+      - FASTSIM_DISABLE_TA=1 (default), Timing Annotation is OFF
+      - FASTSIM_DISABLE_TA=0, Timing Annotation is ON
+      - make SIMGENFLAGS=-DFM_SCX_ENABLE_TA, Timing Annotation is ON for
+        SystemC Export platforms.
+
+  The Fast Models release planned for Q4 2013 further builds on this capability.
+
+* Sleep on WFI and Sleep on WFE is enabled by default
+  The way the model implements low power states such as WFE and WFI has been
+  changed to improve performance. The change means that cores which are WFE
+  or WFI will not consume host CPU resource. Please contact ARM support if
+  you require more details about the effects this may have on your flows.
+
+* Real Time Simulation Models (RTSM) renamed to Fixed Virtual Platforms (FVP)
+  With Fast Models 8.1 and later releases the example platforms and pre-compiled
+  models previously known as RTSM will be named Fixed Virtual Platforms (FVP).
+  This change is to provide better correspondence between the name and the
+  function of the examples as well as being in line with naming practices in
+  the broader industry.  The functionality of the platforms and examples do
+  not change in any way.
+
+      - Within the FastModelsPortfolio/examples folder, the RTSM_* folders are
+        now named FVP_*.
+      - Project names in those folders are renamed from RTSM_* to FVP_*.
+
+* AMBA-PV hierarchical binding
+  This release introduces support for hierarchical binding when using the following
+  interfaces and classes:
+
+      - ext::amba_pv_fw_transport_if
+      - ext::amba_pv_bw_transport_if
+      - ext::amba_pv_ace_bw_transport_if
+      - ext::amba_pv_master_socket
+      - ext::amba_pv_slave_socket
+      - ext::amba_pv_ace_master_socket
+      - ext::amba_pv_ace_slave_socket
+      - ext::amba_pv_master_base
+      - ext::amba_pv_slave_base
+      - ext::amba_pv_ace_master_base
+      - ext::amba_pv_ace_slave_base
+
+  Those classes and interfaces are defined in the ext sub-namespace of the amba_pv one.
+  They will move into the amba_pv namepsace and replace the current ones in a future release.
+  See AMBA-PV/docs/RELEASENOTES.txt for more information.
+
+
+-------------------------------------------
+Platform requirements for Microsoft Windows
+-------------------------------------------
+
+When running Microsoft Windows XP or Microsoft Windows 7 it is
+recommended to use machines with at least 2GB RAM, and preferably at
+least 4GB for best performance. A 2GHz, or faster, Intel Core2Duo,
+or similar performing, processor is recommended.
+
+Operating system:
+Microsoft Windows XP 32 Bit SP2 or SP3.
+Microsoft Windows 7 32 bit RTM or SP1, Professional or Enterprise editions.
+Microsoft Windows 7 64 bit RTM or SP1, Professional or Enterprise editions.
+
+Compiler:
+Microsoft Visual Studio 2008 with Service Pack 1 and the Microsoft
+Visual Studio 2008 Service Pack 1 ATL Security Update.
+
+or
+
+Microsoft Visual Studio 2010 with Service Pack 1.
+
+Runtime Libraries:
+Fast Models Portfolio does not contain the Microsoft Visual Studio
+2008 SP1 or Microsoft Visual Studio 2010 SP1 runtime libraries.
+
+The Fast Models tools require the Microsoft Visual Studio 2008 SP1
+runtime libraries to be installed. These must be downloaded from
+Microsoft.
+
+Models built with Microsoft Visual Studio 2008 SP1 or Microsoft Visual
+Studio 2010 SP1 require the Microsoft Visual Studio 2008/2010 SP1
+Redistributable Package to be installed in order to run.
+
+64-bit host model support:
+In order to build 64-bit host models on Microsoft Windows, a host
+platform with a 64-bit CPU and a 64-bit version of Microsoft Windows
+is required, note that Microsoft Windows XP 64 is not
+supported. Microsoft Visual Studio 2008 SP1 and the Microsoft Visual
+Studio 2008 Service Pack 1 ATL Security Update or Microsoft Visual
+Studio 2010 SP1 is required.
+
+Additional project configurations are available for most recently
+created System Canvas projects and selected updated example
+projects. To build for a Microsoft Windows host choose either
+'Win64-Debug-VC2008', 'Win64-Release-VC2008', 'Win64-Debug-VC2010', or
+'Win64-Release-VC2010'.
+
+Please email support-esl@arm.com with any comments.
+
+To view the documentation, Adobe Acrobat reader (Version 8 or higher)
+needs to be installed on the system.
+
+
+-------------------------------
+Platform requirements for Linux
+-------------------------------
+
+When running on Linux it is recommended to use machines with at least 2GB RAM,
+and preferably at least 4GB for best performance. A 2GHz, or faster, Intel Core2Duo,
+or similar performing, processor is recommended.
+
+Operating system:
+Red Hat Enterprise Linux 4 (on either 32 or 64 bit architecture)
+Red Hat Enterprise Linux 5 (on either 32 or 64 bit architecture)
+Red Hat Enterprise Linux 6 (on either 32 or 64 bit architecture)
+
+Compiler:
+
+When building models for 32bit hosts, Fast Models 8.1 for Linux
+supports the following compilers:
+ - gcc 4.1.2 (built against at least binutils 2.17)
+ - gcc 4.4.4
+
+When building models for 64bit hosts, Fast Models 8.1 for Linux
+supports the following compiler:
+ - gcc 4.1.2 (built against at least binutils 2.17)
+ - gcc 4.4.4
+
+64-bit host model support:
+In order to build 64-bit host models on Linux a host platform with a
+64-bit CPU and a 64 bit version of RedHat Enterprise Linux version 4
+or above is required. GCC 4.1.2 or upwards is required.
+
+Additional project configurations are available for most recently
+created System Canvas projects and selected updated example
+projects. To build for a Linux 64-bit host, start System Canvas and
+change the 'Active Project Configuration' to one of the
+'Linux64-Release-GCC' configurations, then rebuild the project.
+
+To view the documentation, Adobe Acrobat reader (Version 8 or higher) needs to
+be installed on the system.
+
+
+----------------------------
+Licence management utilities
+----------------------------
+
+If you are using floating licenses, you must use FLEXnet license
+management utilities version 9.2 or higher. FLEXnet 10.8 license
+management utilities are available as an optional installable
+component in the product installer.
+
+Use the highest version of the license management utilities provided with
+any ARM tools you are using. It is recommended to setup the user
+environment running applications of the Fast Models product only for one
+armlmd license server, because spreading Fast Models license features
+over different servers could result in license denials for certain features.
+
+For more instructions on installing licenses please consult the ARM
+online documentation:
+* How do I install my floating license?
+    http://infocenter.arm.com/help/topic/com.arm.doc.faqs/ka3861.html
+* How do I install my node locked license?
+    http://infocenter.arm.com/help/topic/com.arm.doc.faqs/ka3510.html
+* FLEXnet for ARM® Tools License Management Guide v4.3
+    http://infocenter.arm.com/help/topic/com.arm.doc.dui0209-/index.html
+
+-------------------------------------------
+Using the ARM Profiler with Fast Models 8.1
+-------------------------------------------
+
+Fast Models version 8.1 supports ARM Profiler version 2.1, as
+shipped in ARM RealView Development Studio 4.0 SP2, and later. It does not
+support the use of ARM Profiler 2.0 or earlier, which was shipped in ARM
+RealView Development Studio 4.0 and 4.0 SP1.
+
+If you currently have ARM Profiler 2.0 and wish to use the ARM Profiler with
+Fast Models 8.1, it will be necessary to upgrade to ARM RVDS 4.0
+SP2.  Please contact ARM support for further details.
+
+
+------------------
+Outstanding Issues
+------------------
+
+
+Installation
+------------
+   * Limitations on Linux:
+      * The installer does not work if install paths contain spaces.
+        (TA-621466/SDDKW-4153)
+   * Non-Latin characters, e.g. Japanese or Korean characters must not
+     be used in installation or project file paths, as they can cause
+     corrupted installations or failure to find the specified libraries.
+     (TA-491064/SDDKW-2566)
+   * It should be avoided to run two uninstaller instances at the same
+     time.
+     (TA-642168/SDDKW-4506)
+   * The Fast Model Portfolio installs its examples into the specified install
+     location, which is normally under C:\Program Files\ARM\. On Microsoft Windows
+     Vista, without Administrative privilege, it is not possible to build and run
+     the examples from C:\Program Files\ARM. It is therefore necessary to copy the file
+     hierarchy under C:\Program Files\ARM\FastModelPortfolio_8.1\examples to a
+     local directory to which the user has read/write permissions. Once this is done,
+     it is necessary to load examples into the System Canvas tool from this new location.
+     (TA-588366/SDDKW-3784)
+
+
+GUI
+---
+   * It is not possible to stop the build process on Microsoft Windows 7.
+     (SDDKW-9286)
+   * Sgcanvas re-centers view on 'Save All'.
+     (TA-498619/SDDKW-2656)
+   * 'Files' Tab  marks project files as modified (*) even after 'Save All'
+     although the file was actually saved.
+     (TA-555667/SDDKW-3291)
+   * Error messages are sometimes not completely visible.
+     (TA-529467/SDDKW-2972)
+   * Double-clicking a newly created file using 'Add New..' in context menu
+     of 'Files' tab reports an error. Workaround: Save project after
+     addition, then open file.
+     (TA-521914/SDDKW-2928)
+   * The project is not updated automatically if a repository file used
+     by the project is modified via the built-in source editor. Workaround:
+     Reopen the project after editing
+     (TA-584565/SDDKW-3751)
+
+   * Improved support for non-Latin characters in the build log
+     provided in the System Canvas on Microsoft Windows. To utilize
+     the new feature you need to set an environment variable,
+     SG_VS_LANG, to one of the following values depending on the
+     configuration of Microsoft Visual Studio. For example if your
+     Microsoft Visual Studio is setup to use Big5 then set SG_VS_LANG
+     to 'Big5'.
+
+     Possible values for SG_VS_LANG:
+        Big5        -- Chinese
+        Big5-HKSCS  -- Chinese
+        eucJP       -- Japanese
+        eucKR       -- Korean
+        GB2312      -- Chinese
+        GBK         -- Chinese
+        GB18030     -- Chinese
+        JIS7        -- Japanese
+        Shift-JIS   -- Japanese
+        SJIS        -- Japanese
+        TSCII       -- Tamil
+        utf8        -- Unicode, 8-bit
+        utf16       -- Unicode
+        KOI8-R      -- Russian
+        KOI8-U      -- Ukrainian
+        ISO8859-1   -- Western
+        ISO8859-2   -- Central European
+        ISO8859-3   -- Central European
+        ISO8859-4   -- Baltic
+        ISO8859-5   -- Cyrillic
+        ISO8859-6   -- Arabic
+        ISO8859-7   -- Greek
+        ISO8859-8   -- Hebrew, visually ordered
+        ISO8859-8-i -- Hebrew, logically ordered
+        ISO8859-9   -- Turkish
+        ISO8859-10
+        ISO8859-13
+        ISO8859-14
+        ISO8859-15  -- Western
+        IBM 850
+        IBM 866
+        CP874
+        CP1250      -- Central European
+        CP1251      -- Cyrillic
+        CP1252      -- Western
+        CP1253      -- Greek
+        CP1254      -- Turkish
+        CP1255      -- Hebrew
+        CP1256      -- Arabic
+        CP1257      -- Baltic
+        CP1258
+        Apple Roman
+        TIS-620     -- Thai
+
+     (TA-727375/SDDKW-7591)
+
+   * In the System Canvas 'Run' dialog box, the command line for
+     running ModelDebugger or ModelShell needs editing so that there
+     are quotes added around the model argument, if there are spaces
+     in the path to the model library.
+     (SDDKW-13782)
+
+   * Sgcanvas shows peer ports as broadcast ports.
+     (TA-535342/SDDKW-20596)
+
+Model Generation
+----------------
+   * #include preprocessor statements in behaviors are not recognized.
+     Use the 'includes' section in LISA+ instead
+     (TA-497563/SDDKW-2620)
+   * A single forward tick in sufficiently large (> 4KB) LISA files
+     crashes simgen/GUI
+     (TA-493478/SDDKW-2589)
+   * It is not possible to return references as return values of protocol
+     behaviors
+     (TA-542970/SDDKW-3100)
+   * Parameters:
+      * For unsigned 64 bit parameters it is not possible to specify min() and
+        max() outside the range of signed 64 bit [0..0x7fffffffffffffff].  To
+        ensure range check please implement checking in the model.
+        (TA-636220/SDDKW-4364)
+      * In component instantiation statements, assigning values to integer
+        parameters which are not wide enough to hold, or assigning values
+        of inverse sign does not issue warnings. In the first case, simple
+        truncation occurs. In the second, the bit-pattern of the incoming
+        value is reinterpreted according to the parameter's signedness
+        (TA-634166/SDDKW-4343).
+   * Debug section: Unpublishing a subcomponent to which parameters are
+     forwarded results in build error.
+     (TA-674668/SDDKW-4892)
+   * The implementation of behaviors of ports with multiple instances is
+     duplicated for each instance. This has undesirable effects, e.g.
+     when using static variables
+     (TA-710768/SDDKW-5267)
+
+LISA language
+-------------
+   * Port array size and REGISTER reg_number cannot come from a #define
+     (TA-487368/SDDKW-2552)
+   * Preprocessor directives do not work in the very first line of a *.lisa
+     file
+     (TA-450529/SDDKW-2074)
+   * Declaring a behavior as returning "char const *" gives a parser error
+     (TA-679719/SDDKW-4963)
+   * Parameter write behaviors should not be called before init()
+     (TA-674517/SDDKW-4888)
+
+Debugging
+---------
+  * Model Debugger:
+    * ModelDebugger cannot load 64-bit CADI libraries.
+      (SDDKW-10292)
+    * Model Debugger ignore config files when loading 64-bit models.
+      (TA-544675/SDDKW-21777)
+    * Modeldebugger deson't read extended target feature register
+      if not ending in a semicolon.
+      (TA-540430/SDDDKW-21348)
+
+  * RVD 3.1/4.0:
+    * RVD does not recognize that a model was killed or shut down. The
+      connection will still be marked as 'connected'. Disconnecting may
+      lead to issues and crashes, especially if a new SystemC Export model
+      or model_shell with the CADI server enabled was started.
+      Workaround: A new RVD session should be used for each new model_shell
+      session.
+      (TA-507866)
+    * SystemC Export models: A number of successive connections to the
+      same SystemC model in the same RVD session will confuse/crash RVD
+      (TA-508977)
+    * Parameters with large default values aren't exposed correctly in RVD
+      (TA-485867)
+    * RVD does not report model initialization errors or warnings correctly.
+      Please refer to messages printed to the console or in Model Shell /
+      Model Debugger.
+
+System C Export
+---------------
+  * Port arrays are not supported when exported to SystemC.
+    (TA-633766/SDDKW-4336)
+
+-------
+Support
+-------
+For support requests including defect notifications, enhancement requests
+and other feedback, please contact us at support-esl@arm.com.
+
+Date:  2013/06/18 13:25:11 GMT
+Build: 8.1:32
+
+Confidential
+
+==============================================================================
+END
+==============================================================================

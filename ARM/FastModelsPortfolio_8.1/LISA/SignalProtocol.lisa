@@ -1,0 +1,47 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// The Signal protocol provides a single method the allows a master
+// to set or clear a signal.  This can be used for any level-sensitive
+// signalling
+//
+// The sg::Signal::State enumeration provides two values:
+//    sg::Signal::Set
+//    sg::Signal::Clear
+
+protocol Signal
+{
+    includes
+    {
+        #include "sg/SGSignal.h"
+    }
+
+    properties { 
+        version = "8.1.37";
+        description = "Signal Protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    behavior setValue(sg::Signal::State); 
+}
+
+protocol StateSignal
+{
+    includes
+    {
+        #include "sg/SGSignal.h"
+    }
+
+    properties { 
+        version = "8.1.37";
+        description = "Signal Protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    behavior setValue(sg::Signal::State); 
+    behavior getValue() : sg::Signal::State; 
+}
+

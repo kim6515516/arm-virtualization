@@ -1,0 +1,52 @@
+// Test PVBusMaster by doing a DMA transfer
+
+component DmaTransfer
+{
+   properties {
+        version = "8.1.37";
+   }
+   master port<PVBus> pvbus_m;
+   master port<PVTransactionMaster> busmaster_control;
+   composition {
+       busmaster : PVBusMaster;
+   }
+   resources {
+       pv::TransactionGenerator *stream_in;
+       pv::TransactionGenerator *stream_out;
+       pv::bus_addr_t            read_addr;
+       pv::bus_addr_t            read_end;
+       pv::bus_addr_t            write_addr;
+   }
+   connection {
+       busmaster.pvbus_m => self.pvbus_m;
+       self.busmaster_control => busmaster.control;
+   }
+
+   behavior init() {
+       stream_in = busmaster_control.createTransactionGenerator();
+       stream_out = busmaster_control.createTransactionGenerator();
+       composition.init();
+   }
+
+   behavior terminate() {
+       composition.terminate();
+       delete stream_in;
+       delete stream_out;
+   }
+
+   behavior transfer(pv::bus_addr_t start,
+                      pv::bus_addr_t end,
+                      pv::bus_addr_t destination)
+   {
+       uint32_t data;
+       bool ok = true;
+       while (ok && start < end) {
+           ok = stream_in->read32(start, &data);
+           if (ok) {
+               ok = stream_out->write32(destination, &data);
+           }
+           start += 4;
+           destination += 4;
+       }
+   }
+}

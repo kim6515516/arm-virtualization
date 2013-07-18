@@ -1,0 +1,131 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// A wrapper of remapper for EB
+component EBRemapper
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Remapping control component for EB remap logic.";
+        documentation_file = "../../../#DUI0423#";
+    }
+    
+    includes
+    {
+        #define EBREMAPPER_TRACE if (!0) ; else printf
+    }
+
+    composition
+    {
+        remapdecoder_0 : RemapDecoder();
+        remapdecoder_1 : RemapDecoder();
+        remapdecoder_2 : RemapDecoder();
+    }
+    
+    resources
+    {   
+        sg::Signal::State current_state; // clear state
+        uint32_t boot;
+        bool remap_enable;
+    }
+    
+    connection
+    {
+        self.input => remapdecoder_0.input;
+        remapdecoder_0.output_remap_set => remapdecoder_1.input;
+        remapdecoder_0.output_remap_clear => self.sdram;
+        remapdecoder_1.output_remap_set => remapdecoder_2.input;
+        remapdecoder_1.output_remap_clear => self.ssram;
+        remapdecoder_2.output_remap_set => self.nor_flash_0;
+        remapdecoder_2.output_remap_clear => self.nor_flash_1;
+    }
+    slave port<PVBus> input;
+    master port<PVBus> sdram;
+    master port<PVBus> nor_flash_0;
+    master port<PVBus> nor_flash_1;
+    master port<PVBus> ssram;
+
+    slave port<ValueState>  control
+    {
+        behavior setValue(uint32_t value)
+        {
+            boot = value & 0xf;
+            if (remap_enable)
+                set_state(sg::Signal::Clear);
+            else
+                set_state(sg::Signal::Set);
+        }
+    }
+
+    slave port<StateSignal> remap_clear
+    {
+        // Handle changing the state of the remap setting.
+        behavior setValue(sg::Signal::State new_state) 
+        {
+            if (new_state != current_state) {
+                set_state(new_state);
+            }
+        }
+        
+        behavior getValue() : sg::Signal::State
+        {
+            return current_state;
+        }
+    } // slave port remap
+    
+    behavior init()
+    {
+        composition.init();
+        remap_enable = false;
+        boot = 0;
+    }
+    
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        if (remap_enable)
+            set_state(sg::Signal::Clear);
+        else
+            set_state(sg::Signal::Set);
+    }
+    
+    behavior set_state(sg::Signal::State new_state)
+    {
+        current_state = new_state;
+
+        if(current_state == sg::Signal::Set)
+        {
+            remapdecoder_0.remap.setValue(sg::Signal::Clear);
+            remap_enable = false;
+            EBREMAPPER_TRACE("EBREMAPPER: Remap is cleared\n");
+        }
+        else
+        {
+            remapdecoder_0.remap.setValue(sg::Signal::Set);
+            remap_enable = true;
+        }
+        if (remap_enable)
+        {
+            switch(boot) {
+            case 0x0: // NOR Flash 0
+                EBREMAPPER_TRACE("EBREMAPPER: Remap to NOR Flash 0\n");
+                remapdecoder_1.remap.setValue(sg::Signal::Set);
+                remapdecoder_2.remap.setValue(sg::Signal::Set);
+                break;
+            case 0x1: // NOR Flash 1
+                EBREMAPPER_TRACE("EBREMAPPER: Remap to NOR Flash 1\n");
+                remapdecoder_1.remap.setValue(sg::Signal::Set);
+                remapdecoder_2.remap.setValue(sg::Signal::Clear);
+                break;          
+            case 0x2: // SSRAM
+                EBREMAPPER_TRACE("EBREMAPPER: Remap to SSRAM \n");
+                remapdecoder_1.remap.setValue(sg::Signal::Clear);
+                break;
+            }
+        }
+    }
+}

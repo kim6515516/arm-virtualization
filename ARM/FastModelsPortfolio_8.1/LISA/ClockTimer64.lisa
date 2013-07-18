@@ -1,0 +1,41 @@
+/*
+ * Copyright 2006-2008 ARM Limited. All rights reserved.
+ * Copyright 2011 ARM Limited. All rights reserved.
+ */
+
+// A ClockTimer64 provides support for counting a number of ticks at the rate
+// determined by the input clock.  When the countdown reaches zero, the timer
+// can send a signal to another component.  That component can return a value
+// that will cause the timer to start counting down again.
+//
+// Setting up a timer is very efficient, and no host processing time is used
+// while a counter is counting down: when a timer is started, the scheduler
+// precomputes the finish time.
+//
+// This version of the timer provides 64 bit resolution.
+//
+// See ClockSignalProtocol64.lisa and CounterDivider.lisa for more details
+// of the scheduler system.  See TimerControlProtocol64.lisa and
+// TimerCallbackProtocol.lisa for the methods used to control a timer and
+// to handle the signal when the countdown is complete.
+//
+// To use a ClockTimer64:
+//  1. Connect the ClockTimer64's 'timer_callback' port to a slave port 
+//     that implements the 'signal()' behaviour.
+//  2. Connect a clock signal to the clk_in port.
+//  3. Use the 'timer_control' port to start the timer counting down for a
+//     given number of ticks.
+
+extern component ClockTimer64
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Other";
+        description = "A ClockTimer64 provides support for counting a number of ticks at the rate determined by the input clock.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    master port<TimerCallback64> timer_callback;
+    slave port<TimerControl64> timer_control;
+    slave port<ClockSignal> clk_in;
+}

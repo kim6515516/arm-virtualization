@@ -1,0 +1,13 @@
+{
+  global:
+      extern "C++"
+      { 
+         *CADI*;
+      };
+      CreateCADIFactory;
+      DestroyCADIFactory;
+      CreateMxDIFactory;	
+      DestroyMxDIFactory;
+  local:
+     *;
+};

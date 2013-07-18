@@ -1,0 +1,199 @@
+/*!
+ *  \file   RealtimeClockTimer_Linux.lisa
+ *  \brief  Host Time Based Timer Module for Generic Timers.
+ *  \date   Copyright ARM Limited 2013 All Rights Reserved.
+ *
+ *  This file implements a host-time based timer module for the SoC Level
+ *  Counters which may be used by MemoryMappedCounter.lisa
+ */
+
+component RealtimeClockTimer
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Host Time Based Timer Module for Generic Timers";
+        documentation_file = "";
+    }
+
+
+    includes
+    {
+        #include <sys/time.h>
+        #include <signal.h>
+
+        #include "protocol_AsyncSignalControl.h"
+
+        enum
+        {
+            BILLION = 1000000000
+        };
+
+        static inline void host_notify_fn(sigval_t handler_)
+        {
+            protocol_AsyncSignalControl* handler = reinterpret_cast<protocol_AsyncSignalControl*>(handler_.sival_ptr);
+            handler->signal();
+        }
+    }
+
+    composition
+    {
+        async_signal_handler : AsyncSignal();
+        // get back to the simulation thread from the host timer thread
+    }
+
+    connection
+    {
+        async_signal_handler.async_callback => self.async_callback;
+    }
+
+    resources
+    {
+        PARAMETER { name("frequency"), type(uint64_t), default(100000000), description("Frequency in Hz") } frequency;
+
+        timer_t host_timer;
+        uint64_t host_timer_target;
+
+        bool host_timer_initialized;
+
+        uint64_t ns_per_realtime_tick;
+    }
+
+    behavior init()
+    {
+        ns_per_realtime_tick = BILLION / frequency;
+        assert(ns_per_realtime_tick >= 1);
+        if ((ns_per_realtime_tick * frequency) != BILLION)
+        {
+            // accuracy problem
+            fprintf(stderr,"RealtimeClockTimer accuracy problem - frequency should be a divisor of 10^9\n");
+        }
+
+        host_timer_initialized = false;
+        host_timer_target = 0;
+
+        composition.init();
+    }
+
+    behavior init_host_timer()
+    {
+        struct sigevent sevp;
+        sevp.sigev_notify = SIGEV_THREAD;
+        sevp.sigev_notify_function = host_notify_fn;
+        sevp.sigev_notify_attributes = NULL;
+        sevp.sigev_value.sival_ptr = async_signal_handler.async_control.getAbstractInterface();
+
+        timer_create(CLOCK_MONOTONIC, &sevp, &host_timer);
+
+        host_timer_initialized = true;
+    }
+
+    behavior terminate()
+    {
+        // Cancel any pending host timers.
+        self.timer_control.cancel();
+
+        composition.terminate();
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+    }
+
+    master port<TimerCallback64> timer_callback;
+    // Invoked when a clock timer reaches zero.  If a non-zero value
+    // is returned, the clock will restart its countdown from the
+    // given value.
+
+    slave port<TimerControl64> timer_control
+    {
+        // Cancel the current countdown on the ClockTimer64.
+        behavior cancel()
+        {
+            if (host_timer_target != 0)
+            {
+                struct itimerspec target = {{0,0},{0,0}};
+                timer_settime(host_timer, TIMER_ABSTIME, &target, NULL);
+                host_timer_target = 0;
+            }
+        }
+
+        // Start the timer counting for the given number of ticks of its
+        // input clock.  When the timer reaches zero, the scheduler will
+        // invoke the 'signal' behaviour on its callback port (see
+        // TimerCallback64.lisa).
+        behavior set(uint64_t ticks)
+        {
+            if (!host_timer_initialized) init_host_timer();
+
+            // get the current real time
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+
+            // calculate the required target
+            uint64_t seconds = ticks / frequency;
+            uint64_t nanoseconds = (ticks % frequency) * ns_per_realtime_tick;
+
+            nanoseconds += now.tv_nsec;
+            if (nanoseconds > BILLION)
+            {
+                seconds ++;
+                nanoseconds -= BILLION;
+                assert( nanoseconds < BILLION );
+            }
+            seconds += now.tv_sec;
+
+            struct itimerspec target;
+            target.it_interval.tv_sec = 0;
+            target.it_interval.tv_nsec = 0;
+
+            target.it_value.tv_sec = seconds;
+            target.it_value.tv_nsec = nanoseconds;
+
+            host_timer_target = (seconds * frequency) + (nanoseconds / ns_per_realtime_tick);
+            timer_settime(host_timer, TIMER_ABSTIME, &target, NULL);
+        }
+
+        // Test whether the timer is currently actively counting.
+        behavior isSet() : bool
+        {
+            return (host_timer_target != 0);
+        }
+
+        // How many clock ticks are left until the timer's callback event
+        // will be signalled.
+        behavior remaining() : uint64_t
+        {
+            if ( host_timer_target == 0)
+                return 0;
+
+            // get the current real time
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+
+            uint64_t now_ticks = (now.tv_sec * frequency) + (now.tv_nsec / ns_per_realtime_tick);
+
+            return host_timer_target - now_ticks;
+        }
+    }
+
+    internal slave port<AsyncSignalCallback> async_callback
+    {
+        behavior signal()
+        {
+            if ( host_timer_target == 0) return;
+
+            host_timer_target = 0;
+
+            // call back to the requestor
+            uint64_t next_t_request = timer_callback.signal();
+            // a non-zero value is a request to call back again in that number of ticks
+
+            if (next_t_request != 0)
+                self.timer_control.set(next_t_request);
+        }
+    }
+}
+
+/* eof RealtimeClockTimer_Linux.lisa */

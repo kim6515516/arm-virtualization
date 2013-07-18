@@ -1,0 +1,20 @@
+### BEGIN INIT INFO
+# Provides: ARM Ltd
+# Required-Start: $local_fs $network $syslog
+# Should-Start:
+# Required-Stop: $local_fs $network $syslog
+# Should-Stop:
+# Default-Start: 3 4 5
+# Default-Stop: 0 1 2 6
+# Short-Description: FM Network Setup
+# Description: FM Network Setup
+#              Create TAP deivces and network bridge for Fast Models
+#              See http://www.arm.com/products/tools/fast-models.php 
+#              for more information.
+### END INIT INFO
+
+# This is an example of a Linux LSB conforming init script.
+# See http://refspecs.freestandards.org/ for more information on LSB.
+
+# $FastModels$
+

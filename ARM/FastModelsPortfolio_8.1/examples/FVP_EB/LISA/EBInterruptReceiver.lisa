@@ -1,0 +1,41 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// LISA Implementation of Interrupt Receiver which receive interrupts from
+// EB baseboard
+
+component EBInterruptReceiver
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description  = "The component that receives interrupts from EB baseboard";
+    }
+    
+    resources
+    {
+        uint32_t num;
+    }
+    
+    master port<Signal> int_out[64];
+    
+    slave port<ValueState> int_num
+    {
+        behavior setValue(MxU32 num_in)
+        {
+            num = num_in;
+        }
+    }
+    
+    slave port<Signal> int_in
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            if(num<64 && int_out[num].setValue.implemented())
+                int_out[num].setValue(state);
+        }
+    }
+}

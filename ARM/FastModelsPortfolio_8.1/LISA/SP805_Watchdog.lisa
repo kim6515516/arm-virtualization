@@ -1,0 +1,391 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ * 
+ */
+
+component SP805_Watchdog
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM Watchdog Module(SP805)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes {
+        #define SP805_TRACE if (!0) ; else printf
+    }
+
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+        
+        // A timer subcomponent to count ticks for us
+        clocktimer : ClockTimer;
+    }    
+
+    resources
+    {
+        // These should be registers
+
+        uint32_t load_value;
+        uint32_t int_status;
+        uint32_t int_mask;
+        uint32_t reset_status;
+        uint32_t reset_mask;
+        uint32_t lock_status;
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x000) } SP805_WDOG_Load;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x004) } SP805_WDOG_VALUE;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x008) } SP805_WDOG_CONTROL;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x00c) } SP805_WDOG_INT_CLR;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x010) } SP805_WDOG_RAW_INT_STATUS;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x014) } SP805_WDOG_MASKED_INT_STATUS;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xC00) } SP805_WDOG_LOCK;
+ 
+        PARAMETER { description("Halt on reset."), type(bool), runtime("true"), default("false")  } simhalt;
+    }
+   
+    connection
+    {
+        self.pvbus_s => busslave.pvbus_s;
+        busslave.device => self.device;
+        
+        self.clk_in => clocktimer.clk_in;
+        clocktimer.timer_callback => self.timer_callback;
+    }
+
+
+
+    // Master ports
+
+    master port<Signal> irq_out;
+    master port<Signal> reset_out;
+
+    // Slave ports
+    
+    slave port<ClockSignal> clk_in;    
+    slave port<PVBus>       pvbus_s;
+    slave port<Signal>      reset_in
+    {
+        behaviour setValue(sg::Signal::State state)
+        {
+            if (state == sg::Signal::Set)
+                reset(1);
+        }   
+    }
+ 
+    // Internal ports
+
+    // handle callbacks from the counter module
+    internal slave port<TimerCallback> timer_callback
+    {
+        behaviour signal() : uint32_t
+        {
+            return handleTimeout();
+        }
+    }
+    
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32(registerRead(tx.getAddress() & ~3));
+        }
+        
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(), tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    behavior init()
+    {
+        composition.init();
+        commonReset();
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        commonReset();
+
+        clocktimer.timer_control.cancel();
+
+        updateInterrupt();
+        updateReset();
+    }
+
+    behaviour commonReset()
+    {
+        load_value  = 0xffffffff;
+        int_status  = 0;
+        int_mask    = 0;
+        reset_status= 0;
+        reset_mask  = 0;
+        lock_status = 0;
+    }
+
+    behavior updateInterrupt()
+    {
+        if (irq_out.setValue.implemented())
+        {
+            if (int_status & int_mask)
+                irq_out.setValue(sg::Signal::Set);
+            else
+                irq_out.setValue(sg::Signal::Clear);
+        }
+    }
+
+    behavior updateReset()
+    {
+        if (simhalt)
+        {
+            if (reset_status & reset_mask)
+                simHalt();
+        }
+        else if (reset_out.setValue.implemented())
+        {
+            if (reset_status & reset_mask)
+                reset_out.setValue(sg::Signal::Set);
+            else
+                reset_out.setValue(sg::Signal::Clear);
+        }
+    }
+
+    behaviour reloadTimer()
+    {
+        if (load_value > 0)
+        {
+            clocktimer.timer_control.set(load_value);
+        }
+        else
+        {
+            clocktimer.timer_control.cancel();
+
+            int_status = 1;
+            updateInterrupt();
+        }
+    }
+
+    behavior handleTimeout() : uint32_t
+    {
+        if (int_status)
+        {
+            reset_status = 1;
+            updateReset();
+        }
+        else
+        {
+            int_status = 1;
+            updateInterrupt();
+        }
+        
+        return load_value;
+    }
+
+    behavior registerRead(pv::bus_addr_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+
+        switch (device_addr) 
+        {        
+        case 0x000:
+            data = load_value;
+            
+            SP805_TRACE("SP805_WdogLoad -> 0x%x\n", data);
+
+            break;
+        
+        case 0x004: 
+            data = clocktimer.timer_control.remaining();
+ 
+            SP805_TRACE("SP805_WdogValue -> 0x%x\n", data);
+
+            break;
+
+        case 0x008:                                         
+            data = (reset_mask << 1) | (int_mask << 0);
+
+            SP805_TRACE("SP805_WdogControl -> 0x%x\n", data);
+    
+            break;
+            
+        case 0x00c: 
+            SP805_TRACE("SP805_WdogIntClr (WO)\n");
+
+            break;
+
+        case 0x010:                                         
+            data = int_status;
+
+            SP805_TRACE("SP805_WdogRIS -> 0x%x\n", data);
+
+            break;
+
+        case 0x014:                                         
+            data = int_status & int_mask;
+
+            SP805_TRACE("SP805_WdogMIS -> 0x%x\n", data);
+
+            break;
+
+        case 0xc00:                                        
+            data = lock_status;
+            
+            SP805_TRACE("SP805_Lock -> 0x%x\n", data);
+
+            break;
+          
+        // ID registers        
+        case 0xfe0:                                        // Timer ID register 0
+            return 0x00000005;
+        case 0xfe4:                                        // Timer ID register 1
+            return 0x00000018;
+        case 0xfe8:                                        // Timer ID register 2
+            return 0x00000014;    
+        case 0xfec:                                        // Timer ID register 3
+            return 0x00000000;    
+        case 0xff0:                                        // Primecell ID register 0
+            return 0x0000000d;
+        case 0xff4:                                        // Primecell ID register 1
+            return 0x000000f0;
+        case 0xff8:                                        // Primecell ID register 2
+            return 0x00000005;
+        case 0xffc:                                        // Primecell ID register 3
+            return 0x000000b1;
+        
+        default:
+            SP805_TRACE("SP805_Wdog (UNMAPPED) 0x%x\n", (uint32_t)device_addr);
+        break;
+        }
+
+        return data;
+    }
+
+    behavior registerWrite(pv::bus_addr_t device_addr, uint32_t data)
+    {
+        if ((lock_status != 0) && (device_addr != 0xc00))
+        {
+            SP805_TRACE("SP805_Wdog (LOCKED) 0x%x <- 0x%x\n",(uint32_t)device_addr, data);
+            return;
+        }
+
+        switch (device_addr) 
+        {
+        case 0x000: 
+            SP805_TRACE("SP805_WdogLoad <- 0x%x\n", data);
+
+            load_value = data;
+            reloadTimer();
+
+            return;
+
+        case 0x004:                                         
+            SP805_TRACE("SP805_WdogValue <- 0x%x (RO)\n", data);
+
+            return;    
+         
+        case 0x008:  
+        {                                       
+            SP805_TRACE("SP805_WdogControl <- 0x%x\n", data);
+
+            uint32_t new_int_mask = (data >> 0) & 1;
+            uint32_t new_reset_mask = (data >> 1) & 1;
+
+            if (new_int_mask && !int_mask)
+            {
+                // enabling the interrupt reloads the timer
+                reloadTimer();
+            }
+            else if (!new_int_mask)
+            {
+                clocktimer.timer_control.cancel();
+            }
+        
+            int_mask = new_int_mask;
+            reset_mask = new_reset_mask;
+
+            updateInterrupt();
+            updateReset();
+
+            return;
+        }
+
+        case 0x00c:                                         
+            SP805_TRACE("SP805_WdogIntClr <- 0x%x\n", data);
+
+            int_status = 0;
+
+            // reset also?
+            reset_status = 0;
+
+            if (int_mask)
+                reloadTimer();
+
+            updateInterrupt();
+            updateReset();
+
+           return;
+
+        case 0x010:                                         
+            SP805_TRACE("SP805_WdogRIS <- 0x%x (RO)\n", data);
+            
+            return;
+
+        case 0x014:                                         
+            SP805_TRACE("SP805_WdogMIS <- 0x%x (RO)\n", data);
+
+           return;
+             
+        case 0xc00:                                         
+            SP805_TRACE("SP805_WdogLock <- 0x%x\n", data);
+
+            if (data == 0x1acce551)
+                lock_status = 0;
+            else
+                lock_status = 1;
+            return;
+             
+        default: 
+            SP805_TRACE("SP805_Wdog (UNMAPPED) 0x%x <- 0x%x\n", (uint32_t)device_addr, data); 
+        return;
+        }
+    }        
+
+
+    // debugger register access support
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+
+        return ACCESS_FUNC_OK;
+    }
+
+
+}// end of the component

@@ -1,0 +1,33 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// LISA Implementation of Interrupt Mapper which forward interrupts from
+// EB baseboard to core module
+
+component EBInterruptForwarder
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "The component that forwards interrupts from EB baseboard to core module.";
+        documentation_file = "../../../#DUI0423#";
+    }
+    
+    master port<Signal> int_out;
+    master port<ValueState> int_num;
+    
+    slave port<Signal> int_in[64]
+    {
+        behavior setValue(uint32_t index, sg::Signal::State state)
+        {
+            if(int_num.setValue.implemented())
+                int_num.setValue(index);
+            if(int_out.setValue.implemented())
+                int_out.setValue(state);
+            //printf("EBInterruptForwarder: Received %s signal from int %d \n", state==sg::Signal::Set? "Set":"Clear", index);
+        }
+    }
+}

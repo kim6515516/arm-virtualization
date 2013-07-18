@@ -1,0 +1,725 @@
+/*
+* Copyright 2006 ARM Limited. All rights reserved.
+* Copyright 2007 ARM Limited. All rights reserved.
+* Copyright 2008 ARM Limited. All rights reserved.
+*/
+
+// The model of PrimeXsys System Controller (SP810)
+
+component SP810_SysCtrl
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "PrimeXsys System Controller(SP810) NB: Only EB relevant functionalities are fully implemented.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes
+    {
+        #define SP810_TRACE if (!0) ; else printf
+        
+        // create a mask of bits in a word
+        #define sp810_mask(s, e) (0xffffffff>>(31-(s)) & (0xffffffff << (e)))
+        #define sp810_bit(b) (1<<(b))
+    }
+    
+    resources
+    {
+        // SCCTRL
+        enum {
+            WDOGENOV_MASK = sp810_bit(23),
+            WDOGENOV_SHIFT = 23,
+            TIMEREN3OV_MASK = sp810_bit(22),
+            TIMEREN3OV_SHIFT = 22,
+            TIMEREN3SEL_MASK = sp810_bit(21),
+            TIMEREN3SEL_SHIFT = 21,
+            TIMEREN2OV_MASK = sp810_bit(20),
+            TIMEREN2OV_SHIFT = 20,
+            TIMEREN2SEL_MASK = sp810_bit(19),
+            TIMEREN2SEL_SHIFT = 19,
+            TIMEREN1OV_MASK = sp810_bit(18),
+            TIMEREN1OV_SHIFT = 18,
+            TIMEREN1SEL_MASK = sp810_bit(17),
+            TIMEREN1SEL_SHIFT = 17,
+            TIMEREN0OV_MASK = sp810_bit(16),
+            TIMEREN0OV_SHIFT = 16,
+            TIMEREN0SEL_MASK = sp810_bit(15),
+            TIMEREN0SEL_SHIFT = 15,
+            HCLKDIVSEL_MASK = sp810_mask(14, 12),
+            HCLKDIVSEL_SHIFT = 12,
+            REMAPSTAT_MASK = sp810_bit(9),
+            REMAPSTAT_SHIFT = 9,
+            REMAPCLEAR_MASK = sp810_bit(8),
+            REMAPCLEAR_SHIFT = 8,
+            MODESTATUS_MASK = sp810_mask(6, 3),
+            MODESTATUS_SHIFT = 3,
+            MODECTRL_MASK = sp810_mask(2, 0),
+            MODECTRL_SHIFT = 0
+        };
+        // SCSYSID
+        enum {
+            SCSYSID3_MASK = sp810_mask(31, 24),
+            SCSYSID3_SHIFT = 24,
+            SCSYSID2_MASK = sp810_mask(23, 16),
+            SCSYSID2_SHIFT = 16,
+            SCSYSID1_MASK = sp810_mask(15, 8),
+            SCSYSID1_SHIFT = 8,
+            SCSYSID0_MASK = sp810_mask(7, 0),
+            SCSYSID0_SHIFT = 0
+        };
+        // SCPERIPHID
+        enum {
+            SCPeriphID3_MASK = sp810_mask(31, 24),
+            SCPeriphID3_SHIFT = 24,
+            SCPeriphID2_MASK = sp810_mask(23, 16),
+            SCPeriphID2_SHIFT = 16,
+            SCPeriphID1_MASK = sp810_mask(15, 8),
+            SCPeriphID1_SHIFT = 8,
+            SCPeriphID0_MASK = sp810_mask(7, 0),
+            SCPeriphID0_SHIFT = 0
+        };
+        
+        // SCPCellID
+        enum {
+            SCPCellID3_MASK = sp810_mask(31, 24),
+            SCPCellID3_SHIFT = 24,
+            SCPCellID2_MASK = sp810_mask(23, 16),
+            SCPCellID2_SHIFT = 16,
+            SCPCellID1_MASK = sp810_mask(15, 8),
+            SCPCellID1_SHIFT = 8,
+            SCPCellID0_MASK = sp810_mask(7, 0),
+            SCPCellID0_SHIFT = 0
+        };
+        
+        // Mode status
+        enum ModeStatus {
+            SLEEP       = 0 << MODESTATUS_SHIFT,
+            DOZE        = 1 << MODESTATUS_SHIFT,
+            XTAL_CTL    = 3 << MODESTATUS_SHIFT,
+            SW_TO_XTAL  = 11<< MODESTATUS_SHIFT,
+            SW_FROM_XTAL= 9 << MODESTATUS_SHIFT,
+            SLOW        = 2 << MODESTATUS_SHIFT,
+            PLL_CTL     = 6 << MODESTATUS_SHIFT,
+            SW_TO_PLL   = 14<< MODESTATUS_SHIFT,
+            SW_FROM_PLL = 10<< MODESTATUS_SHIFT,
+            NORMAL      = 4 << MODESTATUS_SHIFT
+        };
+
+
+        PARAMETER { description("System Identification Register."), type(uint32_t), default(0x00000000) } sysid;
+        // If use_s8 is true, the boot device can be selected as a real hardware
+        // But you need to load boot monitor into the flash. For convenience, we
+        // set the default value to false which is using sdram as the boot device
+        PARAMETER { description("Use Switch 8 (S1-S4)"), type(bool), default("false") } use_s8;
+        
+        REGISTER { description("System Control (RW)"),                  bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x000) } SCCTRL;
+        REGISTER { description("System Status (RW)"),                   bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x004) } SCSYSSTAT;
+        REGISTER { description("Interrupt Mode Control (RW)"),          bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x008) } SCIMCTRL;
+        REGISTER { description("Interrupt Mode Status (RW)"),           bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x00C) } SCIMSTAT;
+        REGISTER { description("Crystal Control (RW)"),                 bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x010) } SCXTALCTRL;
+        REGISTER { description("PLL Control (RW)"),                     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x014) } SCPLLCTRL;
+        REGISTER { description("PLL Frequency Control (RW)"),           bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x018) } SCPLLFCTRL;
+        REGISTER { description("Peripheral Control (RW)"),              bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x01C) } SCPERCTRL0;
+        REGISTER { description("Peripheral Control (RW)"),              bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x020) } SCPERCTRL1;
+        REGISTER { description("Peripheral Clock Enable (WO)"),         bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x024) } SCPEREN;
+        REGISTER { description("Peripheral Clock Disable (WO)"),        bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x028) } SCPERDIS;
+        REGISTER { description("Peripheral Clock Enable Status (RO)"),  bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x02C) } SCPERCLKEN;
+        REGISTER { description("Peripheral Clock Status (RO)"),         bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x030) } SCPERSTAT;
+        REGISTER { description("System Identification 0 (RO)"),         bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xEE0) } SCSysID0;
+        REGISTER { description("System Identification 1 (RO)"),         bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xEE4) } SCSysID1;
+        REGISTER { description("System Identification 2 (RO)"),         bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xEE8) } SCSysID2;
+        REGISTER { description("System Identification 3 (RO)"),         bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xEEC) } SCSysID3;
+        REGISTER { description("Integration Test Control (RW)"),        bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xF00) } SCITCR;
+        REGISTER { description("Integration Test Input 0 (RW)"),        bitwidth(16), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xF04) } SCITIR0;
+        REGISTER { description("Integration Test Input 1 (RW)"),        bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xF08) } SCITIR1;
+        REGISTER { description("Integration Test Output (RW)"),         bitwidth(16), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xF0C) } SCITOR;
+        REGISTER { description("Counter Test Control (RW)"),            bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xF10) } SCCNTCTRL;
+        REGISTER { description("Counter Data (RW)"),                    bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xF14) } SCCNTDATA;
+        REGISTER { description("Counter Step (WO)"),                    bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xF18) } SCCNTSTEP;
+        REGISTER { description("Peripheral Identification 0(RO)"),      bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFE0) } SCPeriphID0;
+        REGISTER { description("Peripheral Identification 1(RO)"),      bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFE4) } SCPeriphID1;
+        REGISTER { description("Peripheral Identification 2(RO)"),      bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFE8) } SCPeriphID2;
+        REGISTER { description("Peripheral Identification 3(RO)"),      bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFEC) } SCPeriphID3;
+        REGISTER { description("PrimeCell Identification 0(RO)"),       bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFF0) } SCPCellID0;
+        REGISTER { description("PrimeCell Identification 1(RO)"),       bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFF4) } SCPCellID1;
+        REGISTER { description("PrimeCell Identification 2(RO)"),       bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFF8) } SCPCellID2;
+        REGISTER { description("PrimeCell Identification 3(RO)"),       bitwidth(8),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFFC) } SCPCellID3;
+        
+        uint32_t sc_ctrl;
+        uint32_t sc_sys_stat;
+        uint32_t sc_imctrl;
+        uint32_t sc_xtal_ctrl;
+        uint32_t sc_pll_ctrl;
+        uint32_t sc_pll_fctrl;
+        uint32_t sc_perctrl0;
+        uint32_t sc_perctrl1;
+        uint32_t sc_perclk_en;
+        uint32_t sc_perclk_stat;
+        uint32_t sc_sysid;
+        uint32_t sc_periphid;
+        uint32_t sc_pcellid;
+        
+        // Status variables
+        bool s_fiq; // nFIQ
+        bool s_irq; // nIRQ
+        bool s_por; // nPOR
+        sg::Signal::State s_remap;
+        bool s_wd_clk;
+        bool s_im_stat;
+        bool s_timer_enov0;
+        bool s_timer_enov1;
+        bool s_timer_enov2;
+        bool s_timer_enov3;
+        bool s_sbw; // stand by wait
+        ModeStatus mode_status;
+        uint32_t BASE_CLOCK;
+    }
+    
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+        clkdiv_clk0 : ClockDivider;
+        clkdiv_clk1 : ClockDivider;
+        clkdiv_clk2 : ClockDivider;
+        clkdiv_clk3 : ClockDivider;
+    }
+    
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        self.ref_clk_in => clkdiv_clk0.clk_in;
+        self.ref_clk_in => clkdiv_clk1.clk_in;
+        self.ref_clk_in => clkdiv_clk2.clk_in;
+        self.ref_clk_in => clkdiv_clk3.clk_in;
+    }
+    
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32((uint32_t)registerRead(tx.getAddress() & ~3));
+        }
+        
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(),tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    // Externally visible ports:
+    // input
+    slave port<PVBus> pvbus;
+    slave port<ClockSignal> clk_in;
+    slave port<ClockSignal> ref_clk_in;
+    slave port<Signal> npor;
+    slave port<ValueState> sys_id;
+    slave port<ValueState> sys_stat;
+    slave port<Signal> wd_en;
+    slave port<ValueState> sys_mode;
+    slave port<StateSignal> remap_stat
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            if(state == sg::Signal::Set)
+                if(s_remap != state)
+                    s_remap = state;
+        }
+        
+        behavior getValue() : sg::Signal::State
+        {
+            if(s_remap)
+                return sg::Signal::Set;
+            else
+                return sg::Signal::Clear;
+        }
+    }
+
+    // output
+    master port<ClockRateControl> timer_clk_en[4];
+    master port<StateSignal> remap_clear;
+    master port<Signal> wd_clk_en;
+    master port<ValueState> hclkdivsel;
+    master port<Signal> sleep_mode;
+    master port<Signal> pll_en;
+    
+    behavior init()
+    {        
+        s_fiq = false;
+        s_irq = false;
+        s_por = false;
+        s_remap = sg::Signal::Clear;
+        s_wd_clk = false;
+        s_im_stat = false;
+        s_timer_enov0 = false;
+        s_timer_enov1 = false;
+        s_timer_enov2 = false;
+        s_timer_enov3 = false;
+        s_sbw = false;
+
+        mode_status = NORMAL;
+        
+        sc_xtal_ctrl = 0x00000;
+        sc_pll_ctrl = 0x0000000;
+        sc_pll_fctrl = 0x00000000;
+        sc_perctrl0 = 0x00000000;
+        sc_perctrl1 = 0x00000000;
+        BASE_CLOCK = 35000000;
+        composition.init();
+    }
+    
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        sc_ctrl = 0x000009;
+        sc_imctrl = 0x00;
+        if(s_por)
+        {
+            sc_xtal_ctrl = 0x00000;
+            sc_pll_ctrl = 0x0000000;
+            sc_pll_fctrl = 0x00000000;
+            sc_perctrl0 = 0x00000000;
+            sc_perctrl1 = 0x00000000;
+        }
+        sc_perclk_en = 0xFFFFFFFF;
+        sc_sysid = sysid;
+        sc_periphid = 0x10180400;
+        sc_pcellid = 0x0DF005B1;
+        if(use_s8)
+        {
+          remap_clear.setValue(sg::Signal::Clear);
+          sc_ctrl |= 0x1 << REMAPSTAT_SHIFT;
+        }
+        BASE_CLOCK = 35000000;
+        updateSystemControl();
+    }
+
+    behavior changeClock(bool b, uint32_t p)
+    {
+        uint32_t mul;
+        uint32_t div;
+
+        if(b) 
+        {
+           mul = 1;
+           div = 1;
+        }
+        else
+        {
+           div = (uint32_t)ref_clk_in.rateInHz();
+           mul = (uint32_t)clk_in.rateInHz();
+        }
+        if(timer_clk_en[p].set.implemented())
+        {
+            timer_clk_en[p].set(mul,div);
+        }
+    }
+    
+    behavior updateSystemControl()
+    {
+        if((sc_ctrl & WDOGENOV_MASK) >> WDOGENOV_SHIFT)
+        {
+        }
+
+        if(timer_clk_en[3].set.implemented())
+        {
+            if((sc_ctrl & TIMEREN3OV_MASK) >> TIMEREN3OV_SHIFT)
+                s_timer_enov3 = true;
+            else
+                s_timer_enov3 = false;
+
+            if(s_timer_enov3) {
+                timer_clk_en[3].set(1,1); // Let SP804's timer module use 35MHz clock
+            }
+            else
+            {
+               if((sc_ctrl & TIMEREN3SEL_MASK) >> TIMEREN3SEL_SHIFT)
+               {
+                   timer_clk_en[3].set(1,35); // 1MHz TIMCLK
+               }
+               else
+               {
+                   timer_clk_en[3].set(32768, BASE_CLOCK);  //32kHz REFCLK
+               }
+            }
+        }
+
+        if(timer_clk_en[2].set.implemented())
+        {
+            if((sc_ctrl & TIMEREN2OV_MASK) >> TIMEREN2OV_SHIFT)
+                s_timer_enov2 = true;
+            else
+                s_timer_enov2 = false;
+                
+            if(s_timer_enov2) {
+               timer_clk_en[2].set(1,1); // Let SP804's timer module use 35MHz clock
+            }
+            else
+            {
+               if((sc_ctrl & TIMEREN2SEL_MASK) >> TIMEREN2SEL_SHIFT)
+               {
+                   timer_clk_en[2].set(1,35); // 1MHz TIMCLK
+               }
+               else
+               {
+                   timer_clk_en[2].set(32768, BASE_CLOCK);  //32kHz REFCLK
+               }
+            }
+        }
+
+        if(timer_clk_en[1].set.implemented())
+        {
+            if((sc_ctrl & TIMEREN1OV_MASK) >> TIMEREN1OV_SHIFT)
+                s_timer_enov1 = true;
+            else
+                s_timer_enov1 = false;
+                
+            if(s_timer_enov1) {
+               timer_clk_en[1].set(1,1); // Let SP804's timer module use 35MHz clock
+            }
+            else
+            {
+               if((sc_ctrl & TIMEREN1SEL_MASK) >> TIMEREN1SEL_SHIFT)
+               {
+                   timer_clk_en[1].set(1,35); // 1MHz TIMCLK
+               }
+               else
+               {
+                   timer_clk_en[1].set(32768, BASE_CLOCK);  //32kHz REFCLK
+               }
+            }
+        }
+
+        if(timer_clk_en[0].set.implemented())
+        {
+            if((sc_ctrl & TIMEREN0OV_MASK) >> TIMEREN0OV_SHIFT)
+                s_timer_enov0 = true;
+            else
+                s_timer_enov0 = false;
+                
+            if(s_timer_enov0) {
+               timer_clk_en[0].set(1,1); // Let SP804's timer module use 35MHz clock
+            }
+            else
+            {
+               if((sc_ctrl & TIMEREN0SEL_MASK) >> TIMEREN0SEL_SHIFT)
+               {
+                   timer_clk_en[0].set(1,35); // 1MHz TIMCLK
+               }
+               else
+               {
+                   timer_clk_en[0].set(32768, BASE_CLOCK);  //32kHz REFCLK
+               }
+            }
+        }
+
+        if((sc_ctrl & HCLKDIVSEL_MASK) >> HCLKDIVSEL_SHIFT)
+        {
+            
+        }
+        
+        sc_ctrl |= s_remap?sg::Signal::Set:sg::Signal::Clear << REMAPSTAT_SHIFT;
+
+        if((sc_ctrl & REMAPCLEAR_MASK) >> REMAPCLEAR_SHIFT)
+        {
+            if(remap_clear.setValue.implemented())
+                remap_clear.setValue(sg::Signal::Set);
+            sc_ctrl = ~(~sc_ctrl | 0x1 << REMAPSTAT_SHIFT);
+        }
+        else
+        {
+            sc_ctrl |= 0x1 << REMAPSTAT_SHIFT;
+        }
+        if((sc_ctrl & MODESTATUS_MASK) >> MODESTATUS_SHIFT)
+            sc_ctrl |= mode_status;
+        if((sc_ctrl & MODECTRL_MASK) >> MODECTRL_SHIFT)
+        {
+            
+        }
+    }
+    
+    behavior registerRead(uint32_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+        switch(device_addr) {
+        case 0x00: // SCCTRL
+            data = sc_ctrl;
+            SP810_TRACE("SCCTRL -> %x\n", data);
+            return data;
+        case 0x004: // SCSYSSTAT
+            data = sc_sys_stat;
+            SP810_TRACE("SCSYSSTAT -> %x\n", data);
+            return data;
+        case 0x008: // SCIMCTRL
+            data = sc_imctrl;
+            SP810_TRACE("SCIMCTRL -> %x\n", data);
+            return data;
+        case 0x00C: // SCIMSTAT
+            data = s_im_stat?1:0;
+            SP810_TRACE("SCIMSTAT -> %x\n", data);
+            return data;
+        case 0x010: // SCXTALCTRL
+            data = sc_xtal_ctrl;
+            SP810_TRACE("SCXTALCTRL -> %x\n", data);
+            return data;
+        case 0x014: // SCPLLCTRL
+            data = sc_pll_ctrl;
+            SP810_TRACE("SCPLLCTRL -> %x\n", data);
+            return data;
+        case 0x018: // SCPLLFCTRL
+            data = sc_pll_fctrl;
+            SP810_TRACE("SCPLLFCTRL -> %x\n", data);
+            return data;
+        case 0x01C: // SCPERCTRL0
+            data = sc_perctrl0;
+            SP810_TRACE("SCPERCTRL0 -> %x\n", data);
+            return data;
+        case 0x020: // SCPERCTRL1
+            data = sc_perctrl1;
+            SP810_TRACE("SCPERCTRL1 -> %x\n", data);
+            return data;
+        case 0x024: // SCPEREN
+            SP810_TRACE("SCPEREN -> %x -- Write only\n", data);
+            return data;
+        case 0x028: // SCPERDIS
+            SP810_TRACE("SCPERDIS -> %x -- Write only\n", data);
+            return data;
+        case 0x02C: // SCPERCLKEN
+            data = sc_perclk_en;
+            SP810_TRACE("SCPERCLKEN -> %x\n", data);
+            return data;
+        case 0x030: // SCPERSTAT
+            data = sc_perclk_stat;
+            SP810_TRACE("SCPERSTAT -> %x\n", data);
+            return data;
+        case 0xEE0: // SCSysID0
+            data = (sc_sysid & SCSYSID0_MASK) >> SCSYSID0_SHIFT;
+            SP810_TRACE("SCSysID0 -> %x\n", data);
+            return data;
+        case 0xEE4: // SCSysID1
+            data = (sc_sysid & SCSYSID1_MASK) >> SCSYSID1_SHIFT;
+            SP810_TRACE("SCSysID1 -> %x\n", data);
+            return data;
+        case 0xEE8: // SCSysID2
+            data = (sc_sysid & SCSYSID2_MASK) >> SCSYSID2_SHIFT;
+            SP810_TRACE("SCSysID2 -> %x\n", data);
+            return data;
+        case 0xEEC: // SCSysID3
+            data = (sc_sysid & SCSYSID3_MASK) >> SCSYSID3_SHIFT;
+            SP810_TRACE("SCSysID3 -> %x\n", data);
+            return data;
+        case 0xF00: // SCITCR
+            SP810_TRACE("SCITCR -> %x -- UNIMPLEMENTED\n", data);
+            return data;
+        case 0xF04: // SCITIR0
+            SP810_TRACE("SCITIR0 -> %x -- UNIMPLEMENTED\n", data);
+            return data;
+        case 0xF08: // SCITIR1
+            SP810_TRACE("SCITIR1 -> %x -- UNIMPLEMENTED\n", data);
+            return data;
+        case 0xF0C: // SCITOR
+            SP810_TRACE("SCITOR -> %x -- UNIMPLEMENTED\n", data);
+            return data;
+        case 0xF10: // SCCNTCTRL
+            SP810_TRACE("SCCNTCTRL -> %x -- UNIMPLEMENTED\n", data);
+            return data;
+        case 0xF14: // SCCNTDATA
+            SP810_TRACE("SCCNTDATA -> %x -- UNIMPLEMENTED\n", data);
+            return data;
+        case 0xF18: // SCCNTSTEP
+            SP810_TRACE("SCCNTSTEP -> %x -- UNIMPLEMENTED\n", data);
+            return data;
+        case 0xFE0: // SCPeriphID0
+            data = (sc_periphid & SCPeriphID0_MASK) >> SCPeriphID0_SHIFT;
+            SP810_TRACE("SCPeriphID0 -> %x\n", data);
+            return data;
+        case 0xFE4: // SCPeriphID1
+            data = (sc_periphid & SCPeriphID1_MASK) >> SCPeriphID1_SHIFT;
+            SP810_TRACE("SCPeriphID1 -> %x\n", data);
+            return data;
+        case 0xFE8: // SCPeriphID2
+            data = (sc_periphid & SCPeriphID2_MASK) >> SCPeriphID2_SHIFT;
+            SP810_TRACE("SCPeriphID2 -> %x\n", data);
+            return data;
+        case 0xFEC: // SCPeriphID3
+            data = (sc_periphid & SCPeriphID3_MASK) >> SCPeriphID3_SHIFT;
+            SP810_TRACE("SCPeriphID3 -> %x\n", data);
+            return data;
+        case 0xFF0: // SCPCellID0
+            data = (sc_pcellid & SCPCellID0_MASK) >> SCPCellID0_SHIFT;
+            SP810_TRACE("SCPCellID0 -> %x\n", data);
+            return data;
+        case 0xFF4: // SCPCellID1
+            data = (sc_pcellid & SCPCellID1_MASK) >> SCPCellID1_SHIFT;
+            SP810_TRACE("SCPCellID1 -> %x\n", data);
+            return data;
+        case 0xFF8: // SCPCellID2
+            data = (sc_pcellid & SCPCellID2_MASK) >> SCPCellID2_SHIFT;
+            SP810_TRACE("SCPCellID2 -> %x\n", data);
+            return data;
+        case 0xFFC: // SCPCellID3
+            data = (sc_pcellid & SCPCellID3_MASK) >> SCPCellID3_SHIFT;
+            SP810_TRACE("SCPCellID3 -> %x\n", data);
+            return data;
+        default:
+            SP810_TRACE("SP810 undefined register %x -> %x\n", (uint32_t)device_addr, data);
+            return 0;
+        }
+        return data;
+    }
+    
+    behavior registerWrite(uint32_t device_addr, uint32_t data)
+    {
+        switch (device_addr)
+        {
+        case 0x000: // SCCTRL
+            SP810_TRACE("SCCTRL <- %x\n", data);
+            
+            sc_ctrl = data;
+            updateSystemControl();
+            break;
+        case 0x004: // SCSYSSTAT
+            SP810_TRACE("SCSYSSTAT <- %x\n", data);
+            
+            sc_sys_stat = data;
+            break;
+        case 0x008: // SCIMCTRL
+            SP810_TRACE("SCIMCTRL <- %x\n", data);
+            
+            sc_imctrl = data;
+            break;
+        case 0x00C: // SCIMSTAT
+            SP810_TRACE("SCIMSTAT <- %x\n", data);
+            
+            s_im_stat = data?true:false;
+            break;
+        case 0x010: // SCXTALCTRL
+            SP810_TRACE("SCXTALCTRL <- %x\n", data);
+            
+            sc_xtal_ctrl = data;
+            break;
+        case 0x014: // SCPLLCTRL
+            SP810_TRACE("SCPLLCTRL <- %x\n", data);
+            sc_pll_ctrl = data;
+            break;
+        case 0x018: // SCPLLFCTRL
+            SP810_TRACE("SCPLLFCTRL <- %x\n", data);
+            sc_pll_fctrl = data;
+            break;
+        case 0x01C: // SCPERCTRL0
+            SP810_TRACE("SCPERCTRL0 <- %x\n", data);
+            sc_perctrl0 = data;
+            break;
+        case 0x020: // SCPERCTRL1
+            SP810_TRACE("SCPERCTRL1 <- %x\n", data);
+            sc_perctrl1 = data;
+            break;
+        case 0x024: // SCPEREN
+            SP810_TRACE("SCPEREN <- %x\n", data);
+            break;
+        case 0x028: // SCPERDIS
+            SP810_TRACE("SCPERDIS <- %x\n", data);
+            break;
+        case 0x02C: // SCPERCLKEN
+            SP810_TRACE("SCPERCLKEN <- %x -- Read only\n", data);
+            break;
+        case 0x030: // SCPERSTAT
+            SP810_TRACE("SCPERSTAT <- %x -- Read only\n", data);
+            break;
+        case 0xEE0: // SCSysID0
+            SP810_TRACE("SCSysID0 <- %x\n", data);
+            sc_sysid |= (data << SCSYSID0_SHIFT) & SCSYSID0_MASK ;
+            break;
+        case 0xEE4: // SCSysID1
+            SP810_TRACE("SCSysID1 <- %x\n", data);
+            sc_sysid |= (data << SCSYSID1_SHIFT) & SCSYSID1_MASK ;
+            break;
+        case 0xEE8: // SCSysID2
+            SP810_TRACE("SCSysID2 <- %x\n", data);
+            sc_sysid |= (data << SCSYSID2_SHIFT) & SCSYSID2_MASK ;
+            break;
+        case 0xEEC: // SCSysID3
+            SP810_TRACE("SCSysID3 <- %x\n", data);
+            sc_sysid |= (data << SCSYSID3_SHIFT) & SCSYSID3_MASK ;
+            break;
+        case 0xF00: // SCITCR
+            SP810_TRACE("SCITCR <- %x -- UNIMPLEMENTED\n", data);
+            break;
+        case 0xF04: // SCITIR0
+            SP810_TRACE("SCITIR0 <- %x -- UNIMPLEMENTED\n", data);
+            break;
+        case 0xF08: // SCITIR1
+            SP810_TRACE("SCITIR1 <- %x -- UNIMPLEMENTED\n", data);
+            break;
+        case 0xF0C: // SCITOR
+            SP810_TRACE("SCITOR <- %x -- UNIMPLEMENTED\n", data);
+            break;
+        case 0xF10: // SCCNTCTRL
+            SP810_TRACE("SCCNTCTRL <- %x -- UNIMPLEMENTED\n", data);
+            break;
+        case 0xF14: // SCCNTDATA
+            SP810_TRACE("SCCNTDATA <- %x -- UNIMPLEMENTED\n", data);
+            break;
+        case 0xFE0: // SCPeriphID0
+            SP810_TRACE("SCPeriphID0 <- %x -- Read only\n", data);
+            break;
+        case 0xFE4: // SCPeriphID1
+            SP810_TRACE("SCPeriphID1 <- %x -- Read only\n", data);
+            break;
+        case 0xFE8: // SCPeriphID2
+            SP810_TRACE("SCPeriphID2 <- %x -- Read only\n", data);
+            break;
+        case 0xFEC: // SCPeriphID3
+            SP810_TRACE("SCPeriphID3 <- %x -- Read only\n", data);
+            break;
+        case 0xFF0: // SCPCellID0
+            SP810_TRACE("SCPCellID0 <- %x -- Read only\n", data);
+            break;
+        case 0xFF4: // SCPCellID1
+            SP810_TRACE("SCPCellID1 <- %x -- Read only\n", data);
+            break;
+        case 0xFF8: // SCPCellID2
+            SP810_TRACE("SCPCellID2 <- %x -- Read only\n", data);
+            break;
+        case 0xFFC: // SCPCellID3
+            SP810_TRACE("SCPCellID3 <- %x -- Read only\n", data);
+            break;
+        }
+        
+    }
+    
+    // debugger register access support
+    
+    behavior debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+        
+        return ACCESS_FUNC_OK;
+    }
+    
+    behavior debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+        
+        return ACCESS_FUNC_OK;
+    }
+}

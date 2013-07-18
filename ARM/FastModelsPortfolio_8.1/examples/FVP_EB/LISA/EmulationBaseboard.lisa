@@ -1,0 +1,260 @@
+/*
+ * Copyright 2007-2010 ARM Limited. All rights reserved.
+ */
+
+component EmulationBaseboard
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Emulation Baseboard";
+    }
+
+    resources
+    {
+        PARAMETER { description("Processor ID Register. "), type(uint32_t), default(0x04000000) } proc_id_tile_site1;
+        PARAMETER { description("Processor ID Register. "), type(uint32_t), default(0x04000000) } proc_id_tile_site2;
+        PARAMETER { description("Tile 1 fitted."), type(bool), default("true")  } tile1;
+        PARAMETER { description("Tile 2 fitted."), type(bool), default("true")  } tile2;
+        PARAMETER { description("Tile 2 SDRAM Size"), type(int),min(0x00000000), max(0x40000000), default(0x00000000) } sdram_size;
+    }
+
+    composition
+    {
+        ebmemorycoretile : EBMemoryCoreTile("size"=sdram_size);
+        vfs2 : VFS2();
+        pl022_ssp : PL022_SSP();
+        tsci : TSC2200(touch_max_x=3900, touch_min_x=250, touch_max_y=3550, touch_min_y=270);
+        dmac : PL080_DMAC(fifo_size=16,max_transfer=256,generate_clear=0,activate_delay=0);
+        clkdiv_100HZ : ClockDivider(div=32768,mul=100);
+        clkdiv_35MHZ : ClockDivider(mul=35);
+        clkdiv_32kHz : ClockDivider(div=1,mul=32768);
+        ebremapper_0 : EBRemapper;
+        pl340_dmc_0 : PL340_DMC(IF_CHIP0=-1,IF_CHIP1=-1,IF_CHIP2=-1,IF_CHIP3=-1,MEMORY_WIDTH=32);
+        sci : RAMDevice(size=0x1000);
+        character_lcd : RAMDevice(size=0x1000);
+        mmci : PL180_MCI();
+        mmc : MMC();
+        two_wire_serial_bus : RAMDevice(size=0x1000);
+        sdram : RAMDevice("size"=0x40000000);
+        ebinterruptforwarder_0 : EBInterruptForwarder();
+        flash0 : IntelStrataFlashJ3(size=0x4000000);
+        flashldr_0 : FlashLoader();
+        flash1 : IntelStrataFlashJ3(size=0x4000000);
+        flashldr_1 : FlashLoader();
+        pl111_clcd_0 : PL111_CLCD();
+        eb_sysregs_0 : EB_SysRegs(clcdid = 1,tile1 = tile1,tile2 = tile2, sys_id = 0x01400400, \
+                                  proc_id_tile_site1 = proc_id_tile_site1, \
+                                  proc_id_tile_site2 = proc_id_tile_site2);
+        ics307_4 : ICS307(od=3,rdr=6,vdw=4);
+        ics307_3 : ICS307(od=3,rdr=6,vdw=4);
+        ics307_2 : ICS307(od=3,rdr=6,vdw=4);
+        ics307_1 : ICS307(od=3,rdr=6,vdw=4);
+        ics307_0 : ICS307(od=1,rdr=46,vdw=52);
+        sp810_sysctrl : SP810_SysCtrl(sysid=0);
+        sp805_watchdog_0 : SP805_Watchdog();
+        clk_ref1Hz : ClockDivider(div=1000000,mul=1);
+        clkdiv_1MHZ : ClockDivider(div=24);
+        ps2mouse_0 : PS2Mouse();
+        ps2keyboard_0 : PS2Keyboard();
+        clkdiv_ref12_288 : ClockDivider(mul=12288000);
+        clkdiv_ref25 : ClockDivider(mul=25000000);
+        clkdiv_uart : ClockDivider();
+        clkdiv_ref24 : ClockDivider(mul=24000000);
+        smsc_91c111_0 : SMSC_91C111();
+        pl041_aaci_0 : PL041_AACI();
+        socket : EBSocket();
+        pvbusdecoder_0 : PVBusDecoder();
+        uart_3 : PL011_Uart();
+        uart_2 : PL011_Uart();
+        uart_1 : PL011_Uart();
+        uart_0 : PL011_Uart();
+        rtc : PL031_RTC();
+        kmi_1_mse : PL050_KMI();
+        kmi_0_kbd : PL050_KMI();
+        gpio_2 : PL061_GPIO(init_inputs = 0);
+        gpio_1 : PL061_GPIO(init_inputs = 0);
+        gpio_0 : PL061_GPIO(init_inputs = 0);
+        Timer_2_3 : SP804_Timer();
+        Timer_0_1 : SP804_Timer();
+        smc : PL350_SMC("REMAP" = -1,"IF0_MEM_TYPE_PARAMETER"=0,"IF1_MEM_TYPE_PARAMETER"=0,\
+                        "IF0_CHIP0"=0,"IF0_CHIP1"=1,"IF0_CHIP2"=1,"IF0_CHIP3"=-1, \
+                        "IF1_CHIP0"=-1,"IF1_CHIP1"=1,"IF1_CHIP2"=0,"IF1_CHIP3"=-1, \
+                        "IF0_CHIP0_BASE"=0,"IF0_CHIP1_BASE"=0,"IF0_CHIP2_BASE"=0,"IF0_CHIP3_BASE"=0, \
+                        "IF1_CHIP0_BASE"=0,"IF1_CHIP1_BASE"=0,"IF1_CHIP2_BASE"=0,"IF1_CHIP3_BASE"=0, \
+                        "IF0_CHIP0_SIZE"=0,"IF0_CHIP1_SIZE"=0,"IF0_CHIP2_SIZE"=0,"IF0_CHIP3_SIZE"=0, \
+                        "IF1_CHIP0_SIZE"=0,"IF1_CHIP1_SIZE"=0,"IF1_CHIP2_SIZE"=0,"IF1_CHIP3_SIZE"=0, \
+                        "PERIPH_ID_0"=0x52);
+        ssram : RAMDevice(size=0x10000000);
+        usb : EB_USB();
+    }
+    connection
+    {
+        self.hdr => socket.connector;
+        self.clk_in_master => clkdiv_ref24.clk_in;
+        self.clk_in_master => clkdiv_ref25.clk_in;
+        clkdiv_ref25.clk_out => smsc_91c111_0.clock;
+        clkdiv_uart.clk_out => uart_0.clk_in_ref;
+        clkdiv_uart.clk_out => uart_1.clk_in_ref;
+        clkdiv_uart.clk_out => uart_2.clk_in_ref;
+        clkdiv_uart.clk_out => uart_3.clk_in_ref;
+        self.clk_in_master => clkdiv_ref12_288.clk_in;
+        clkdiv_ref12_288.clk_out => pl041_aaci_0.clk_in_ref;
+        ps2keyboard_0.ps2 => kmi_0_kbd.ps2device;
+        ps2mouse_0.ps2 => kmi_1_mse.ps2device;
+        self.keyboard => ps2keyboard_0.keyboard;
+        self.mouse => ps2mouse_0.mouse;
+        clk_ref1Hz.clk_out => rtc.clock;
+        eb_sysregs_0.osc0 => ics307_0.configuration;
+        eb_sysregs_0.osc1 => ics307_1.configuration;
+        eb_sysregs_0.osc2 => ics307_2.configuration;
+        eb_sysregs_0.osc3 => ics307_3.configuration;
+        eb_sysregs_0.osc4 => ics307_4.configuration;
+        eb_sysregs_0.sysreg_overrides => socket.sysreg_overrides;
+        pl111_clcd_0.display => self.display;
+        clkdiv_ref24.clk_out => eb_sysregs_0.clk_in_24mhz;
+        clkdiv_ref24.clk_out => mmc.clk_in;
+        clkdiv_ref24.clk_out => ics307_0.clk_in;
+        flashldr_0.flash_device0 => flash0.flashloader;
+        sp805_watchdog_0.irq_out => ebinterruptforwarder_0.int_in[32];
+        Timer_0_1.irq_out0 => ebinterruptforwarder_0.int_in[36];
+        Timer_0_1.irq_out1 => ebinterruptforwarder_0.int_in[36];
+        Timer_2_3.irq_out0 => ebinterruptforwarder_0.int_in[37];
+        Timer_2_3.irq_out1 => ebinterruptforwarder_0.int_in[37];
+        gpio_0.GPIO_Intr => ebinterruptforwarder_0.int_in[38];
+        gpio_1.GPIO_Intr => ebinterruptforwarder_0.int_in[39];
+        gpio_2.GPIO_Intr => ebinterruptforwarder_0.int_in[40];
+        vfs2.intr => ebinterruptforwarder_0.int_in[41];
+        rtc.intr => ebinterruptforwarder_0.int_in[42];
+        pl022_ssp.intr => ebinterruptforwarder_0.int_in[43];
+        uart_0.intr => ebinterruptforwarder_0.int_in[44];
+        uart_1.intr => ebinterruptforwarder_0.int_in[45];
+        uart_2.intr => ebinterruptforwarder_0.int_in[46];
+        uart_3.intr => ebinterruptforwarder_0.int_in[47];
+        mmci.MCIINTR[0] => ebinterruptforwarder_0.int_in[49];
+        mmci.MCIINTR[1] => ebinterruptforwarder_0.int_in[50];
+        pl041_aaci_0.irq => ebinterruptforwarder_0.int_in[51];
+        kmi_0_kbd.intr => ebinterruptforwarder_0.int_in[52];
+        kmi_1_mse.intr => ebinterruptforwarder_0.int_in[53];
+        pl111_clcd_0.intr => ebinterruptforwarder_0.int_in[55];
+        dmac.intr => ebinterruptforwarder_0.int_in[56];
+        smsc_91c111_0.intr => ebinterruptforwarder_0.int_in[60];
+        ebinterruptforwarder_0.int_num => socket.intr_num;
+        ebinterruptforwarder_0.int_out => socket.intr;
+        ics307_0.clk_out_ref => clkdiv_1MHZ.clk_in;
+        ics307_1.clk_out_ref => ics307_2.clk_in;
+        ics307_2.clk_out_ref => ics307_3.clk_in;
+        ics307_3.clk_out_ref => ics307_4.clk_in;
+        clkdiv_1MHZ.clk_out => sp805_watchdog_0.clk_in;
+        ics307_0.clk_out_ref => clkdiv_uart.clk_in;
+        pl340_dmc_0.axi_if_out[3] => sdram.pvbus;
+        smc.axi_chip_if0_out[0] => flash0.pvbus;
+        smc.axi_chip_if0_out[1] => flash1.pvbus;
+        smc.axi_chip_if0_out[2] => ssram.pvbus;
+        sp810_sysctrl.remap_clear => ebremapper_0.remap_clear;
+        ebremapper_0.nor_flash_0 => smc.axi_chip_if0_in[0];
+        ebremapper_0.sdram => pl340_dmc_0.axi_if_in[3];
+        ebremapper_0.ssram => smc.axi_chip_if0_in[2];
+        ics307_0.clk_out_clk1 => socket.clk_bus;
+        socket.pvbus => pvbusdecoder_0.pvbus_s;
+        eb_sysregs_0.leds => self.leds;
+        eb_sysregs_0.user_switches => self.user_switches;
+        eb_sysregs_0.boot_switch => self.boot_switch;
+        eb_sysregs_0.boot_control => ebremapper_0.control;
+        clkdiv_1MHZ.clk_out => clk_ref1Hz.clk_in;
+        clk_ref1Hz.clk_out => clkdiv_32kHz.clk_in;
+        pl111_clcd_0.pvbus_m => pvbusdecoder_0.pvbus_s;
+        flashldr_0.flash_device1 => flash1.flashloader;
+        ebremapper_0.nor_flash_1 => smc.axi_chip_if0_in[1];
+        flashldr_1.flash_device0 => flash1.flashloader;
+        ics307_4.clk_out_clk1 => pl111_clcd_0.clk_in;
+        ics307_0.clk_out_ref => ics307_1.clk_in;
+        clkdiv_1MHZ.clk_out => clkdiv_35MHZ.clk_in;
+        clkdiv_32kHz.clk_out => clkdiv_100HZ.clk_in;
+        clkdiv_100HZ.clk_out => eb_sysregs_0.clk_in_100hz;
+        clkdiv_32kHz.clk_out => sp810_sysctrl.ref_clk_in;
+        clkdiv_1MHZ.clk_out => sp810_sysctrl.clk_in;
+        clkdiv_ref24.clk_out => ps2keyboard_0.clk_in;
+        clkdiv_ref24.clk_out => ps2mouse_0.clk_in;
+        sp810_sysctrl.timer_clk_en[0] => Timer_0_1.timer_en[0];
+        sp810_sysctrl.timer_clk_en[1] => Timer_0_1.timer_en[1];
+        sp810_sysctrl.timer_clk_en[2] => Timer_2_3.timer_en[0];
+        sp810_sysctrl.timer_clk_en[3] => Timer_2_3.timer_en[1];
+        clkdiv_35MHZ.clk_out => Timer_2_3.clock;
+        clkdiv_35MHZ.clk_out => Timer_0_1.clock;
+        uart_1.serial_out => self.terminal[1];
+        uart_2.serial_out => self.terminal[2];
+        uart_3.serial_out => self.terminal[3];
+        uart_0.serial_out => self.terminal[0];
+        dmac.pvbus0_m => pvbusdecoder_0.pvbus_s;
+        dmac.pvbus1_m => pvbusdecoder_0.pvbus_s;
+        ics307_0.clk_out_clk1 => dmac.clk_in;
+        pl041_aaci_0.audio => self.aaci_audio_out;
+        pl041_aaci_0.dma_tx => dmac.dma_port[4];
+        pl041_aaci_0.dma_rx => dmac.dma_port[5];
+        pl022_ssp.tx_dma_port => dmac.dma_port[9];
+        pl022_ssp.rx_dma_port => dmac.dma_port[8];
+        mmci.mmc_m => mmc.mmc;
+        self.touch_screen => tsci.touch_screen;
+        self.lcd_layout => tsci.lcd_layout;
+        tsci.MOSI => pl022_ssp.rxd;
+        pl022_ssp.txd => tsci.MISO;
+        tsci.PENIRQ => ebinterruptforwarder_0.int_in[62];
+        pvbusdecoder_0.pvbus_m_range[0x0..0xfffffff] => pl340_dmc_0.axi_if_in[3];
+        pvbusdecoder_0.pvbus_m_range[0x0..0x3ffffff] => ebremapper_0.input;
+        pvbusdecoder_0.pvbus_m_range[0x10018000..0x10018fff] => pl340_dmc_0.apb_interface;
+        pvbusdecoder_0.pvbus_m_range[0x10030000..0x1003ffff] => dmac.pvbus_s;
+        pvbusdecoder_0.pvbus_m_range[0x10080000..0x1008ffff] => smc.apb_interface;
+        pvbusdecoder_0.pvbus_m_range[0x100a0000..0x100affff] => vfs2.pvbus_s;
+        pvbusdecoder_0.pvbus_m_range[0x10008000..0x10008fff] => character_lcd.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10005000..0x10005fff] => mmci.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x1000e000..0x1000efff] => sci.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x1000d000..0x1000dfff] => pl022_ssp.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10002000..0x10002fff] => two_wire_serial_bus.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10020000..0x1002ffff] => pl111_clcd_0.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10011000..0x10011fff] => Timer_0_1.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10012000..0x10012fff] => Timer_2_3.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10000000..0x10000fff] => eb_sysregs_0.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10013000..0x10013fff] => gpio_0.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10014000..0x10014fff] => gpio_1.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10015000..0x10015fff] => gpio_2.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10006000..0x10006fff] => kmi_0_kbd.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10007000..0x10007fff] => kmi_1_mse.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10017000..0x10017fff] => rtc.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x4e000000..0x4effffff] => smsc_91c111_0.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10010000..0x10010fff] => sp805_watchdog_0.pvbus_s;
+        pvbusdecoder_0.pvbus_m_range[0x10001000..0x10001fff] => sp810_sysctrl.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10004000..0x10004fff] => pl041_aaci_0.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10009000..0x10009fff] => uart_0.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x1000a000..0x1000afff] => uart_1.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x1000b000..0x1000bfff] => uart_2.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x1000c000..0x1000cfff] => uart_3.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x70000000..0x7fffffff] => pl340_dmc_0.axi_if_in[3];
+        pvbusdecoder_0.pvbus_m_range[0x40000000..0x43ffffff] => smc.axi_chip_if0_in[0];
+        pvbusdecoder_0.pvbus_m_range[0x44000000..0x47ffffff] => smc.axi_chip_if0_in[1];
+        pvbusdecoder_0.pvbus_m_range[0x48000000..0x4bffffff] => smc.axi_chip_if0_in[2];
+        pvbusdecoder_0.pvbus_m_range[0x4f000000..0x4f00ffff] => usb.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x80000000..0xbfffffff] => ebmemorycoretile.pvbus;
+        smsc_91c111_0.eth => self.ethernet[0];
+        sp805_watchdog_0.reset_out => socket.reset_coretile;
+        sp805_watchdog_0.reset_out => dmac.reset_in;
+        socket.reset_board => dmac.reset_in;
+        socket.reset_board => sp805_watchdog_0.reset_in;
+        mmc.card_present => eb_sysregs_0.mmc_card_present;
+    }
+
+    slave port<CompoundPortLisa> hdr;
+    slave port<ClockSignal> clk_in_master;
+    master port<AudioControl> aaci_audio_out;
+    slave port<KeyboardStatus> keyboard;
+    slave port<MouseStatus> mouse;
+    master port<LCD> display;
+    master port<SerialData> terminal[4];
+    master port<ValueState> leds;
+    master port<ValueState> user_switches;
+    master port<ValueState> boot_switch;
+    slave port<MouseStatus> touch_screen;
+    slave port<LCDLayoutInfo> lcd_layout;
+    master port<VirtualEthernet> ethernet[1];
+}

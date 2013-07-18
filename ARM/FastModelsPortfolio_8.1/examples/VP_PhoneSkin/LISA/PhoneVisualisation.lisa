@@ -1,0 +1,321 @@
+/*
+ * Copyright 2007-2008 ARM Limited. All rights reserved.
+ */
+
+// Demonstration of using the Visualisation library to create a skinnable
+// display window.
+
+component PhoneVisualisation
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Demonstration of using the Visualisation library to create a skinnable display window.";
+    }
+    includes
+    {
+        // Include the visualisation API
+        #include "components/Visualisation.h"
+
+        // Define some constants
+        enum {
+           PHONE_BUTTONS = 25,
+           PHONE_STATUS_HEIGHT = 15,
+           PHONE_SKIN_WIDTH = 400,
+           PHONE_SKIN_HEIGHT = 741
+        };
+    }
+    
+    resources
+    {
+        // An instance of the Visualisation library.
+        Visualisation *vis;
+
+        // LCD display region for output of PL110.
+        VisRenderRegion *render_lcd;
+
+        // One display region for status information.
+        VisRenderRegion *render_status;
+
+        // Push button regions for the keypad.
+        VisPushButtonRegion *buttons[25];
+    }
+
+    composition
+    {
+        // Visualisation subcomponent responsible for generating real-time callbacks.
+        idler : GUIPoll(delay_ms = 20);
+    }
+
+    // Handle real-time callback events from the GUIPoll subcomponent.
+    internal slave port<GUIPollCallback> gui_callback
+    {
+        behavior gui_callback()
+        {
+            processMessages();
+        }
+    }
+
+    // Connect up the callback.
+    connection
+    {
+        idler.gui_callback => self.gui_callback;
+    }
+
+    // Implement the PL110 LCD port protocol
+    slave port<LCD> display
+    {
+        behavior lock() : const VisRasterLayout * {
+            return render_lcd->lock();
+        }
+        behavior unlock() {
+            return render_lcd->unlock();
+        }
+        behavior update(int x, int y, unsigned int w, unsigned int h) {
+            return render_lcd->update(x, y, w, h);
+        }
+        behavior setPreferredLayout(unsigned int w, unsigned int h, unsigned int d) {
+            // Ignore - can't resize the LCD panel in this model.
+        }
+    }
+
+    // Get instruction count from CPU.
+    slave port<InstructionCount> ticks;
+
+    // Send keypress events to a PS2Keyboard device.
+    master port<KeyboardStatus> keyboard;
+
+
+    behavior init()
+    {
+        composition.init(); // Allow subcomponents to be initialised.
+        init_gui();
+    }
+    behavior terminate()
+    {
+        delete render_status;
+        delete render_lcd;
+        for (int i = 0; i < PHONE_BUTTONS; ++i) {
+            delete buttons[i];
+        }
+        delete vis;
+
+        // Explicitly invoke subcomponent's terminate() behavior.
+        composition.terminate();
+    }
+
+
+    behavior init_gui()
+    {
+        vis = createVisualisation();
+        vis->configureWindow(PHONE_SKIN_WIDTH,
+                             PHONE_SKIN_HEIGHT + PHONE_STATUS_HEIGHT,
+                             24);
+
+        VisBitmap *background_bmp = vis->loadImage("phone-background.bmp");
+        vis->setBackground(background_bmp, 0, PHONE_STATUS_HEIGHT);
+        vis->releaseImage(background_bmp);
+
+        render_lcd = vis->createRenderRegion();
+        render_lcd->setLocation(86, 99 + PHONE_STATUS_HEIGHT, 222, 300);
+        render_lcd->setVisible(true);
+
+        render_status = vis->createRenderRegion();
+        render_status->setLocation(0, 0, 320, PHONE_STATUS_HEIGHT);
+        render_status->setVisible(true);
+
+        init_gui_buttons();
+
+        init_status();
+    }
+
+    behavior init_gui_buttons()
+    {
+        // When the buttons are pressed, these are the keycodes they will
+        // generate for the KEYDOWN/KEYUP events.
+        static const int buttonCode[] =
+        {
+        KC_0,
+        KC_1,
+        KC_2,
+        KC_3,
+        KC_4,
+        KC_5,
+        KC_6,
+        KC_7,
+        KC_8,
+        KC_9,
+        KC_BREAK, // left softkey
+        KC_BREAK, // right softkey
+        KC_BREAK, // send
+        KC_BREAK, // end
+        KC_BREAK, // cancel
+        KC_SLASH, // asterisk
+        KC_HASH,
+        KC_UP,
+        KC_DOWN,
+        KC_LEFT,
+        KC_RIGHT,
+        KC_RETURN, // centre
+        KC_BREAK, // menu
+        KC_BREAK, // pencil
+        KC_ADD
+        };
+
+        // Temporary structure to store rectangles for button bitmaps.
+        struct BtnRect { int x, y, w, h; };
+
+        // Source location of the button decals on the source bitmap.
+        static const BtnRect btn_read[PHONE_BUTTONS] =
+        {
+        {126, 181, 67, 33}, { 58,  73, 67, 35}, {126,  75, 67, 33}, {194,  73, 67, 35}, { 58, 109, 67, 34},
+        {126, 110, 67, 33}, {194, 109, 67, 34}, { 58, 144, 67, 34}, {126, 146, 67, 33}, {194, 144, 67, 34},
+        {  0,   0, 56, 28}, { 57,   0, 56, 28}, {  0,  29, 56, 28}, { 57,  29, 56, 28}, { 29, 126, 28, 55},
+        { 58, 179, 67, 35}, {194, 179, 67, 35}, {128,   0, 44, 14}, {128,  58, 44, 14}, {114,  14, 14, 44},
+        {172,  14, 14, 44}, {142,  28, 16, 16}, { 29,  58, 28, 67}, {  0, 126, 28, 55}, {  0,  58, 28, 67}
+        };
+
+        // Render location for the buttons over the background bitmap.
+        static const BtnRect btn_draw[PHONE_BUTTONS] =
+        {
+                            {141, 658, 67, 33},                       //  0
+        { 73, 555, 67, 35}, {141, 557, 67, 33}, {209, 555, 67, 35},   // 123
+        { 73, 590, 67, 34}, {141, 591, 67, 33}, {209, 590, 67, 34},   // 456
+        { 73, 623, 67, 34}, {141, 625, 67, 33}, {209, 623, 67, 34},   // 789
+        { 70, 489, 56, 28},                     {221, 489, 56, 28},   // soft1, soft2
+        { 70, 519, 56, 28},                     {221, 519, 56, 28},   // send, end
+                                                {276, 620, 28, 55},   // cancel
+        { 73, 656, 67, 35},                     {209, 656, 67, 35},   // * #
+        {152, 495, 44, 14}, {152, 525, 44, 14},                       // up, down
+        {152, 495, 14, 44}, {181, 495, 14, 44},                       // left, right
+                            {166, 509, 16, 16},                       // centre
+                                                {276, 554, 28, 67},   // menu
+        { 43, 620, 28, 55}, { 43, 554, 28, 67}                        // pencil rotate
+        };
+
+        VisBitmap *buttons_bmp = vis->loadImageWithAlphaKey("phone-buttons.bmp", 0, 0xff, 0);
+        for (int i = 0; i < PHONE_BUTTONS; ++i) {
+            // Crop the button's decal from the buttons bitmap.
+            VisBitmap *button_bmp = 
+                vis->cropImage(buttons_bmp,
+                               btn_read[i].x,
+                               btn_read[i].y,
+                               btn_read[i].w,
+                               btn_read[i].h);
+            // Place the button in the appropriate place on the background.
+            buttons[i] = vis->createPushButtonRegion();
+            buttons[i]->setLocation(btn_draw[i].x + 23,
+                                    btn_draw[i].y - 27 + PHONE_STATUS_HEIGHT,
+                                    btn_draw[i].w,
+                                    btn_draw[i].h);
+            buttons[i]->setButtonDownImage(button_bmp);
+            buttons[i]->setKeyCode(buttonCode[i]);
+            buttons[i]->setVisible(true);
+            vis->releaseImage(button_bmp);
+        }
+        vis->releaseImage(buttons_bmp);
+    }
+
+
+
+    // Initialise the status panel display to a black background
+    // with a white separator bar.
+    behavior init_status()
+    {
+        // Black background
+        render_status->fillRect(render_status->mapRGB(0, 0, 0),
+                                0, 0, PHONE_SKIN_WIDTH, PHONE_STATUS_HEIGHT - 1);
+
+        // White divider
+        render_status->fillRect(render_status->mapRGB(255, 255, 255),
+                                0, PHONE_STATUS_HEIGHT -1,
+                                PHONE_SKIN_WIDTH, 1);
+ 
+        // Update it.
+        render_status->update(0, 0,
+                              PHONE_SKIN_WIDTH, PHONE_STATUS_HEIGHT);
+    }
+
+
+    // Display a 64-bit number as a comma-divided decimal at the
+    // given location of the status region.
+    // Returns the x-coordinate at the end of the text.
+
+    behavior write_uint64(uint64_t value, int num_digits, int x, int y) : int
+    {
+        char buffer[30], str[30];
+        int  buff_size=0;
+
+        for(int place=0; place < num_digits; place++)
+        {
+            int digit = (int)(value % 10);
+
+            buffer[buff_size++] = '0' + digit;
+
+            value /= 10;
+            if (value == 0) break;
+
+            if ((place % 3) == 2) buffer[buff_size++] = ',';
+        }
+
+        // Reverse copy into rendered string
+        for(int i=0; i<buff_size; i++)
+        {
+            str[i] = buffer[buff_size-i-1];
+        }
+        str[buff_size] = '\0';
+
+        return render_status->writeText(str, x, y);
+    }
+
+    // Render the status panel display.
+    behavior draw_status()
+    {
+        // Clear background to black
+        render_status->fillRect(render_status->mapRGB(0, 0, 0),
+                                0, 0, PHONE_SKIN_WIDTH, PHONE_STATUS_HEIGHT - 1);
+
+        uint64_t instruction_count = ticks.getValue();
+
+        int start_x = 10;
+        int pos_x = start_x;
+        int pos_y = 1;
+        pos_x = write_uint64(instruction_count, 13 /* digits */,
+                             pos_x, pos_y);
+
+        render_status->update(start_x, 0, 
+                              pos_x - start_x, PHONE_STATUS_HEIGHT - 1);
+    }
+        
+
+    // Called from gui_callback handler at periodic intervals.
+    behavior processMessages()
+    {
+        draw_status();
+
+        VisEvent event;
+        while (vis->poll(&event))
+        {
+            switch(event.type)
+            {
+                case VisEvent::KEYDOWN:
+                    keyboard.keyDown((ATKeyCode)event.keysym);
+                    break;
+                case VisEvent::KEYUP:
+                    keyboard.keyUp((ATKeyCode)event.keysym);
+                    break;
+                case VisEvent::MOUSEBUTTONDOWN: break;
+                case VisEvent::MOUSEBUTTONUP: break;
+                case VisEvent::MOUSEMOTION: break;
+                case VisEvent::QUIT:
+                    if(!control_port.quit.empty())
+                        control_port.quit();
+                    break;
+                case VisEvent::None: break;
+            }
+        }
+    }
+
+
+}

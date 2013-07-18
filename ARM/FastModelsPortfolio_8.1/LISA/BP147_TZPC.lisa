@@ -1,0 +1,298 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// LISA Implementation of  TrustZone Protection Controller
+
+component BP147_TZPC
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "TrustZone Protection Controller";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes
+    {
+        #define TZPC_TRACE_REG if (!0) ; else printf
+    }
+    
+    master port<Value> TZPCDECPROT0;
+    master port<Value> TZPCDECPROT1;
+    master port<Value> TZPCDECPROT2;
+    master port<Value> TZPCR0SIZE;
+    slave port<PVBus> bus_in_s;
+    
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32((uint32_t)registerRead(tx.getAddress() & ~3));
+        }
+        
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(),tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+    }
+    connection
+    {
+        self.bus_in_s => busslave.pvbus_s;
+        busslave.device => self.device; 
+    }
+   
+    resources
+    {
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0), reset_value(0x200) } R0SIZE;  
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x800) } DECPROT0Stat; 
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x804) } DECPROT0Set; 
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x808) } DECPROT0Clr; 
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x80c) } DECPROT1Stat;  
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x810) } DECPROT1Set;  
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x814) } DECPROT1Clr;  
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x818) } DECPROT2Stat;  
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x81c) } DECPROT2Set;  
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x820) } DECPROT2Clr;  
+    }
+    
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        
+        updateROSIZE();
+        updateDECPROT0();
+        updateDECPROT1();
+        updateDECPROT2();
+    }
+    
+    behavior updateROSIZE()
+    {
+        uint32_t size = (R0SIZE < 0x200) ? R0SIZE : 0x200;
+        
+        if (TZPCR0SIZE.setValue.implemented())
+            TZPCR0SIZE.setValue(size);
+    }
+    
+    behaviour updateDECPROT0()
+    {
+        if (TZPCDECPROT0.setValue.implemented())
+            TZPCDECPROT0.setValue(DECPROT0Stat);
+    }
+    
+    behaviour updateDECPROT1()
+    {
+        if (TZPCDECPROT1.setValue.implemented())
+            TZPCDECPROT1.setValue(DECPROT1Stat);
+    }
+    
+    behaviour updateDECPROT2()
+    {
+        if (TZPCDECPROT2.setValue.implemented())
+            TZPCDECPROT2.setValue(DECPROT2Stat);
+    }
+    
+    behavior registerRead(uint32_t addr) : uint32_t
+    {
+        uint32_t data = 0;
+        
+        switch (addr)
+        {
+        case 0x000:
+            data = R0SIZE;
+            
+            TZPC_TRACE_REG("%s: ROSIZE -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x800:
+            data = DECPROT0Stat;
+            
+            TZPC_TRACE_REG("%s: DECPROT0Stat -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x80C:
+            data = DECPROT1Stat;
+            
+            TZPC_TRACE_REG("%s: DECPROT1Stat -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+            
+        case 0x818:
+            data = DECPROT2Stat;
+             
+            TZPC_TRACE_REG("%s: DECPROT2Stat -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0xFE0:
+            data = 0x70;
+             
+            TZPC_TRACE_REG("%s: PeriphID0 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0xFE4:
+            data = 0x18;
+             
+            TZPC_TRACE_REG("%s: PeriphID1 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0xFE8:
+            data = 0x04;
+             
+            TZPC_TRACE_REG("%s: PeriphID2 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0xFEC:
+            data = 0x00;
+             
+            TZPC_TRACE_REG("%s: PeriphID3 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0xFF0:
+            data = 0x0D;
+             
+            TZPC_TRACE_REG("%s: PcellID0 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0xFF4:
+            data = 0xF0;
+            
+            TZPC_TRACE_REG("%s: PcellID1 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0xFF8:
+            data = 0x05;
+            
+            TZPC_TRACE_REG("%s: PcellID2 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0xFFC:
+            data = 0xB1;
+             
+            TZPC_TRACE_REG("%s: PcellID3 -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        default:
+            TZPC_TRACE_REG("%s: Read implemented register at 0x%x\n", getInstanceName().c_str(), addr);
+        break;
+        }
+        return data;
+    }
+    
+    behavior registerWrite(uint32_t addr, uint32_t data)
+    {
+        switch(addr & ~3)
+        {
+        case 0x000:
+            TZPC_TRACE_REG("%s: ROSIZE <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            R0SIZE = data & 0x3ff;
+            
+            updateROSIZE();
+        break;
+        
+        
+        case 0x800:
+            TZPC_TRACE_REG("%s: DECPROT0Stat (RO) <- 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x804:
+            TZPC_TRACE_REG("%s, DECPROT0Set <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            DECPROT0Stat |= (data & 0xff);
+            
+            updateDECPROT0(); 
+        break;
+        
+        case 0x808:
+            TZPC_TRACE_REG("%s: DECPROT0Clr <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            DECPROT0Stat &= ~(data & 0xff);
+            
+            updateDECPROT0();
+        break;
+        
+        
+        case 0x80C:
+            TZPC_TRACE_REG("%s: DECPROT1Stat (RO) <- 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x810:
+            TZPC_TRACE_REG("%s: DECPROT1Set <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            DECPROT1Stat |= (data & 0xff);
+            
+            updateDECPROT1();         
+        break;
+        
+        case 0x814:
+            TZPC_TRACE_REG("%s: DECPROT1Clr <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            DECPROT1Stat &= ~(data & 0xff);
+            
+            updateDECPROT1();
+        break;
+        
+        
+        case 0x818:
+            TZPC_TRACE_REG("%s: DECPROT2Stat (RO) <- 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x81C:
+            TZPC_TRACE_REG("%s: DECPROT2Set <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            DECPROT2Stat |= (data & 0xff);
+            
+            updateDECPROT2();
+        break;
+        
+        case 0x820:
+            TZPC_TRACE_REG("%s, DECPROT2Clr <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            DECPROT2Stat &= ~(data & 0xff);
+            
+            updateDECPROT2();
+        break;
+                
+        default:
+            TZPC_TRACE_REG("%s: Wrote to implemented register at 0x%x <- 0x%x\n", getInstanceName().c_str(), addr, data);
+        break;
+        }
+    }
+    
+    // debugger register access support
+    
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+        
+        return ACCESS_FUNC_OK;
+    }
+    
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+        
+        return ACCESS_FUNC_OK;
+    }
+}

@@ -1,0 +1,184 @@
+/*
+ * Copyright 2012 ARM Limited. All rights reserved.
+ */
+
+///
+/// Utilizing PVBusMapper to mimic the behavior
+///
+
+component TZFilterUnit
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Component";
+        description = "TrustZone Filter Unit";
+    }
+
+    includes
+    {
+#include "pv/RemapRequest.h"
+#include "pv/PVBusMapper.h"
+#include "pv/TransactionAttributes.h"
+//#include "sg/FsManip.h"
+    }
+
+    composition {
+        filter : PVBusMapper();
+        dummy : TZDummyDevice()
+    }
+
+    connection {
+        filter.pvbus_m[0] => self.pvbus_m;
+        filter.pvbus_m[1] => dummy.pvbus_s;
+        self.pvbus_s => filter.pvbus_s;
+
+        filter.control => self.mapper_control;
+    }
+
+
+    resources
+    {
+        bool wr_spec_enable;
+        bool rd_spec_enable;
+        uint32_t action;
+    }
+
+    internal slave port<PVBusMapperControl> mapper_control
+    {
+        // Returns:
+        //   a port number of pvbus_m
+        //   PVBUSMAPPER_ABORT -- abort all accesses
+        //   PVBUSMAPPER_IGNORE -- ignore all accesses read-as-zero/write-ignored (RAZ/WI)
+        slave behaviour remap( pv::RemapRequest& req_ ) : unsigned
+        {
+            if(!self.control.isEnabled()) // TODO - Check the bus behavior, abort or ignore
+                return PVBUSMAPPER_IGNORE;
+
+            pv::TransactionAttributes * attributes = req_.getModifiableTransactionAttributes();
+
+            if(self.control.isSecureSlave.implemented())
+            {
+                if(self.control.isSecureSlave())
+                {
+                    // Secure Slave port: all transactions should be marked Secure
+                    attributes->setNormalWorld(false);
+                    return 0;   // Transaction OK
+                }
+            }
+
+            bool abort_on_error = false;
+            if(self.control.checkPermission.implemented())
+            {
+                // Check the transaction against the rules defined in the control block
+                if(self.control.checkPermission(attributes, req_.getPageBase(), req_.isRead(), req_, abort_on_error))
+                {
+                    return 0;   // Transaction OK
+                }
+                else // Transaction failed
+                {
+                    if(action != 0xFFFFFFFF) // action is not set
+                    {
+                        // Depends on the action register
+                        if((action==0) || (action==2)) // OKAY response, but RAZ/WI
+                            return 1;
+                        else // DECERR
+                            return PVBUSMAPPER_ABORT;
+                    }
+                }
+            }
+
+            // No access, or the filter isn't set up right.
+            if (abort_on_error)
+                return PVBUSMAPPER_ABORT;
+            return PVBUSMAPPER_IGNORE;
+        }
+    }
+
+    master port<TZFilterControl> control
+    {
+        behaviour setConfig(bool rd_spec_enable_, bool wr_spec_enable_, uint32_t action_)
+        {
+            wr_spec_enable = wr_spec_enable_;
+            rd_spec_enable = rd_spec_enable_;
+            action = action_;
+        }
+    }
+
+    behaviour init()
+    {
+        wr_spec_enable = false;
+        rd_spec_enable = false;
+        action = 0xFFFFFFFF;
+        composition.init();
+    }
+
+    slave port<PVBus> pvbus_s;
+    master port<PVBus> pvbus_m;
+}
+
+/* This a dummy device which does RAZ/WI, used internally by TZFilter */
+component TZDummyDevice
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Component";
+        description = "Used internally by TrustZone Filter Unit";
+    }
+
+    composition
+    {
+        apbslave : PVBusSlave(size = 0x1000);
+    }
+
+    connection
+    {
+        self.pvbus_s => apbslave.pvbus_s;
+        apbslave.device => self.device;
+    }
+
+    internal slave port<PVDevice> device
+    {
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            // Read as Zero
+            return tx.setReturnData32(0x0);
+        }
+
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            // Write ignored
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }
+    }
+
+    slave port<PVBus> pvbus_s;
+}
+
+protocol TZFilterControl
+{
+    /// checkPermission - Utilizing the information in the APB control block
+    optional slave behavior checkPermission(const pv::TransactionAttributes* attributes_,
+                                    pv::bus_addr_t page_base_,
+                                    bool is_read_,
+                                    pv::RemapRequest& req_,
+                                    bool & abort_on_error_) : bool;
+    // Enable the bus filter
+    slave behavior isEnabled() : bool;
+
+    // Optional method: port is an always-Secure Slave
+    optional slave behavior isSecureSlave() : bool;
+    // Optional method: pass the configuration to the filter
+    optional master behavior setConfig(bool rd_spec_enable, bool wr_spec_enable, uint32_t action);
+}

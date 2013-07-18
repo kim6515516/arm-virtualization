@@ -1,0 +1,196 @@
+/*
+ * Copyright (C) 2008-2010 ARM Limited. All rights reserved.
+ */
+
+
+extern component ARMCortexR7x1CT
+{
+    properties {
+        executes_software = 1; 
+        version = "8.1.37";
+        component_type = "Core";
+        description = "ARMCortexR7x1CT CPU component";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    resources
+    {
+
+        // Processor component parameters
+        PARAMETER { name("LOCK_STEP"), type(uint32_t), default(0), description("Affects dual-processor configurations only, and ignored by single-processor configurations. 0 - Disable. Set for two independent processors. 1 - Lock Step. Appears to the system as two processors but is internally modeled as a single processor. 3 - Split Lock. Appears to the system as two processors but can be statically configured from reset either as two independent processors or two locked processors. For the model, these are equivalent to Disable and Lock Step, respectively, except for the value of build options registers. The model does not support dynamically splitting and locking the processor.") } LOCK_STEP;
+        PARAMETER { name("PERIPHBASE"), type(uint32_t), default(0xAE000000), min(0x0), max(0xFFFFFFFF), description("Base address of peripheral memory space") } PERIPHBASE;
+        PARAMETER { name("CLUSTER_ID"), type(uint32_t), default(0x0), min(0x0), max(0xF), description("Processor cluster ID value") } CLUSTER_ID;
+        PARAMETER { name("dic-spi_count"), type(uint32_t), default(0x40), min(0x0), max(0xE0), description("Number of shared peripheral interrupts implemented") } dic_spi_count;
+        PARAMETER { name("ecc_on"), type(bool), default(false), description("Enable Error Correcting Code") } ecc_on;
+        PARAMETER { name("icache-state_modelled"), type(bool), default(false), description("Set whether I-cache has stateful implementation") } icache_state_modelled;
+        PARAMETER { name("dcache-state_modelled"), type(bool), default(false), description("Set whether D-cache has stateful implementation") } dcache_state_modelled;
+        PARAMETER { name("MFILTEREN"), type(bool),  default(false), description("Enables filtering of address ranges") } MFILTEREN;
+        PARAMETER { name("MFILTERSTART"), type(uint32_t), min(0), max(0xFFFFFFFF), default(0x0), description("Specifies the start address for address filtering") } MFILTERSTART;
+        PARAMETER { name("MFILTEREND"), type(uint32_t), min(0), max(0xFFFFFFFF), default(0x0), description("Specifies the end address for address filtering") } MFILTEREND;
+
+        // Core subcomponent parameters
+        PARAMETER { name("cpu0.vfp-present"), type(bool), default(true), description("Set whether model has VFP support") } cpu0_vfp_present;
+        PARAMETER { name("cpu0.DP_FLOAT"), type(bool), default(true), description("Sets whether double-precision instructions are available") } cpu0_DP_FLOAT;
+        PARAMETER { name("cpu0.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu0_CFGEND;
+        PARAMETER { name("cpu0.CFGNMFI"), type(bool), default(false), description("Enable nonmaskable FIQ interrupts on startup") } cpu0_CFGNMFI;
+        PARAMETER { name("cpu0.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu0_TEINIT;
+        PARAMETER { name("cpu0.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu0_VINITHI;
+        PARAMETER { name("cpu0.SMPnAMP"), type(bool), default(false), description("Set whether the processor is part of a coherent domain") } cpu0_SMPnAMP;
+        PARAMETER { name("cpu0.POWERCTLI"), type(uint32_t), default(0), min(0), max(3), description("Default power control state for processor") } cpu0_POWERCTLI;
+        PARAMETER { name("cpu0.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset") } cpu0_vfp_enable_at_reset;
+        PARAMETER { name("cpu0.dcache-size"), type(uint32_t), default(0x8000), min(0x0), max(0x10000), description("Set D-cache size in bytes") } cpu0_dcache_size;
+        PARAMETER { name("cpu0.icache-size"), type(uint32_t), default(0x8000), min(0x0), max(0x10000), description("Set I-cache size in bytes") } cpu0_icache_size;
+        PARAMETER { name("cpu0.itcm_size"), type(uint32_t), default(0x8), min(0x0), max(0x80), description("Size of ITCM in KB") } cpu0_itcm_size;
+        PARAMETER { name("cpu0.dtcm_size"), type(uint32_t), default(0x8), min(0x0), max(0x80), description("Size of DTCM in KB") } cpu0_dtcm_size;
+        PARAMETER { name("cpu0.NUM_MPU_REGION"), type(uint32_t), default(12), min(12), max(16), description("Sets the number of MPU regions") } cpu0_mpu_region;
+        PARAMETER { name("cpu0.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false.") } cpu0_semihosting_enable;
+        PARAMETER { name("cpu0.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting") } cpu0_semihosting_ARM_SVC;
+        PARAMETER { name("cpu0.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting") } cpu0_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu0.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu0_semihosting_cmd_line;
+        PARAMETER { name("cpu0.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base") } cpu0_semihosting_heap_base;
+        PARAMETER { name("cpu0.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap") } cpu0_semihosting_heap_limit;
+        PARAMETER { name("cpu0.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack") } cpu0_semihosting_stack_base;
+        PARAMETER { name("cpu0.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit") } cpu0_semihosting_stack_limit;
+        PARAMETER { name("cpu0.semihosting-cwd"), type(string), default(""), description("Virtual address of CWD")} cpu0_semihosting_root;
+        PARAMETER { name("cpu0.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu0_min_sync_level;
+        PARAMETER { name("cpu0.tcm-present"), type(bool), default(true), description("Disables the DTCM and ITCM") } cpu0_tcm_present;
+    }
+
+    /***********************************
+     * Clock and Clock Control signals *
+     ***********************************/
+
+    // The clock signal connected to the clk_in port is used to determine
+    // the rate at which the core executes instructions.
+    slave port<ClockSignal> clk_in;
+
+    // the timer and the watchdog take need a clk that is scaled down 
+    // atleast by factor of two.
+    slave port<ClockSignal> periphclk_in;
+
+    /*********
+     * Buses *
+     *********/
+
+    // The core will generate bus requests on this port.
+    master port<PVBus> pvbus_m0;
+
+    // AXI ACP slave port
+    slave port<PVBus> acp_s;
+
+    // I-TCM bus slave port
+    slave port<PVBus> itcm[1];
+
+    // D-TCM bus slave port
+    slave port<PVBus> dtcm[1];
+
+    /***********************************
+     * Reset and reset control signals *
+     ***********************************/
+
+    // Raising this signal will put the core into reset mode.
+    slave port<Signal> reset[1];
+
+    // This signal resets SCU
+    slave port<Signal> scureset;
+
+    // This signal resets individual watchdog
+    slave port<Signal> wdreset[1];
+
+    // CPU watchdog reset requests.
+    master port<Signal> wdresetreq[1];
+
+    // This signal resets timer and interrupt controller
+    slave port<Signal> periphreset;
+
+    /**************
+     * Interrupts *
+     **************/
+
+    // Legacy IRQ request input line
+    slave port<Signal> irq[1];
+
+    // Legacy FIQ request input line
+    slave port<Signal> fiq[1];
+
+    // Interrupt distributor interrupt lines
+    slave port<Signal> ints[480];
+
+    // Output of individual processor nIRQ from the interrupt controller
+    master port<Signal> irqout[1];
+
+    // Output of individual processor nFIQ from the interrupt controller
+    master port<Signal> fiqout[1];
+
+    /*************************
+     * Configuration signals *
+     *************************/
+
+    // This port sets the base address of private peripheral region
+    slave port<Value> periphbase;
+
+    // This signals AMP or SMP mode for each Cortex-R7 processor
+    master port<Signal> smpnamp[1];
+
+    // The port reads the value in CPU ID register field, bits[11:8] of the MPIDR.
+    slave port<Value> clusterid;
+
+    // This signal enables the processor to boot from the instruction TCM
+    slave port<Signal> initram[1];
+
+    // This signal disables FIQ mask in CPSR
+    slave port<Signal> cfgnmfi[1];
+
+    // This signal if for EE bit initialisation
+    slave port<Signal> cfgend[1];
+
+    // This signal provides default exception handling state
+    slave port<Signal> teinit[1];
+
+    // This signal controls of the location of the exception vectors at reset    
+    slave port<Signal> vinithi[1];
+
+
+    /*******************
+     * Standby signals *
+     *******************/
+
+    // This peer port of event input (and output) is for wakeup from WFE
+    peer port<Signal> event;
+
+    // This signal indicates if a core is in WFE state
+    master port<Signal> standbywfe[1];
+
+    // This signal indicates if a core is in WFI state
+    master port<Signal> standbywfi[1];
+
+
+    /***************************************
+     * Performance Monitoring Unit signals *
+     ***************************************/
+
+    // Interrupt signal from performance monitoring unit.
+    master port<Signal> pmuirq[1];
+
+    // This signal gives the status of the Cortex-R7 processor
+    // 0 in user mode, 1 in privileged mode
+    master port<StateSignal> pmupriv[1];
+
+
+    /***************************
+     * Exception flags signals *
+     ***************************/
+
+    // Floating-Point Unit output flags
+    master port<ValueState> fpuflags[1];
+
+
+    /*******************************
+     * Fast Model specific signals *
+     *******************************/
+    // This port should be connected to one of the two ticks ports
+    // on a 'visualisation' component, in order to display a running
+    // instruction count.
+    master port<InstructionCount> ticks[1];
+}
+

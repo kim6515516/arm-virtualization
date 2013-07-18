@@ -1,0 +1,852 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    PhoneSkin.sgcanvas
+#//  Created: Tue May  1 13:11:27 2007
+#//  By: ARM RealView System Generator Canvas 2.3.041 (Apr 25 2007 / 15:01:43) - Linux
+#//
+# *  Do NOT modify this file. It is for internal use by System Generator Canvas only.
+#//
+#//  Copyright (c) 2004-2007 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "clk_1MHz"
+        (
+            x = 240;
+            y = -500;
+            width = 171;
+            height = 41;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+            )
+        )
+        instance "clk_core"
+        (
+            x = 240;
+            y = -60;
+            width = 171;
+            height = 41;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+            )
+        )
+        instance "clk_lcd"
+        (
+            x = 240;
+            y = -380;
+            width = 171;
+            height = 41;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "clk_out"
+                (
+                x = 160;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+            )
+        )
+        instance "cpu"
+        (
+            x = 450;
+            y = -190;
+            width = 171;
+            height = 171;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 132;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "dmaexterrirq"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "dmairq"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "dmasirq"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "fiq"
+                (
+                x = 0;
+                y = 52;
+                side = 16;
+                clock_type = 0;
+                enabled = false;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "irq"
+                (
+                x = 0;
+                y = 32;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "pmuirq"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "pvbus_m"
+                (
+                x = 180;
+                y = 32;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "reset"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = false;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "ticks"
+                (
+                x = 160;
+                y = 52;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "vic_ack"
+                (
+                x = 0;
+                y = 122;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "vic_addr"
+                (
+                x = 0;
+                y = 102;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+            )
+        )
+        instance "decoder"
+        (
+            x = 450;
+            y = -290;
+            width = 171;
+            height = 92;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m_range"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "pvbus_s"
+                (
+                x = 180;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+            )
+        )
+        instance "masterclock"
+        (
+            x = 250;
+            y = -580;
+            width = 171;
+            height = 41;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_out"
+                (
+                x = -10;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+            )
+        )
+        instance "mem1"
+        (
+            x = 240;
+            y = -270;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 170;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+            )
+        )
+        instance "phonevisualisation"
+        (
+            x = 680;
+            y = -400;
+            width = 171;
+            height = 101;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "display"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "keyboard"
+                (
+                x = 180;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "ticks"
+                (
+                x = 0;
+                y = 43;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+            )
+        )
+        instance "pl050_kmi"
+        (
+            x = 450;
+            y = -460;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clock"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = true;
+                )
+                define "ps2device"
+                (
+                x = 160;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 23;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+            )
+        )
+        instance "pl110_clcd"
+        (
+            x = 450;
+            y = -380;
+            width = 171;
+            height = 81;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "control"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "display"
+                (
+                x = 160;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+            )
+        )
+        instance "ps2keyboard"
+        (
+            x = 680;
+            y = -500;
+            width = 171;
+            height = 81;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "keyboard"
+                (
+                x = 170;
+                y = 32;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "ps2"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+            )
+        )
+    )
+    ports
+    (
+    )
+    connections
+    (
+        define "clk_1MHz.clk_out=>pl050_kmi.clock"
+        (
+            point
+            (
+                x = 430;
+                y = -470;
+                automatic = false;
+            )
+            point
+            (
+                x = 430;
+                y = -430;
+                automatic = false;
+            )
+        )
+        define "clk_1MHz.clk_out=>ps2keyboard.clk_in"
+        (
+        )
+        define "clk_core.clk_out=>cpu.clk_in"
+        (
+        )
+        define "clk_lcd.clk_out=>pl110_clcd.clk_in"
+        (
+        )
+        define "cpu.pvbus_m=>decoder.pvbus_s"
+        (
+            point
+            (
+                x = 640;
+                y = -130;
+                automatic = false;
+            )
+            point
+            (
+                x = 640;
+                y = -260;
+                automatic = false;
+            )
+        )
+        define "cpu.ticks=>phonevisualisation.ticks"
+        (
+            point
+            (
+                x = 660;
+                y = -110;
+                automatic = false;
+            )
+            point
+            (
+                x = 660;
+                y = -309;
+                automatic = false;
+            )
+        )
+        define "decoder.pvbus_m_range=>mem1.pvbus"
+        (
+            point
+            (
+                x = 430;
+                y = -260;
+                automatic = false;
+            )
+            point
+            (
+                x = 430;
+                y = -230;
+                automatic = false;
+            )
+        )
+        define "decoder.pvbus_m_range=>pl050_kmi.pvbus"
+        (
+            point
+            (
+                x = 430;
+                y = -260;
+                automatic = false;
+            )
+            point
+            (
+                x = 430;
+                y = -409;
+                automatic = false;
+            )
+        )
+        define "decoder.pvbus_m_range=>pl110_clcd.pvbus"
+        (
+            point
+            (
+                x = 430;
+                y = -260;
+                automatic = false;
+            )
+            point
+            (
+                x = 430;
+                y = -310;
+                automatic = false;
+            )
+        )
+        define "masterclock.clk_out=>clk_1MHz.clk_in"
+        (
+            point
+            (
+                x = 220;
+                y = -550;
+                automatic = false;
+            )
+            point
+            (
+                x = 220;
+                y = -470;
+                automatic = false;
+            )
+        )
+        define "masterclock.clk_out=>clk_core.clk_in"
+        (
+            point
+            (
+                x = 220;
+                y = -550;
+                automatic = false;
+            )
+            point
+            (
+                x = 220;
+                y = -30;
+                automatic = false;
+            )
+        )
+        define "masterclock.clk_out=>clk_lcd.clk_in"
+        (
+            point
+            (
+                x = 220;
+                y = -550;
+                automatic = false;
+            )
+            point
+            (
+                x = 220;
+                y = -350;
+                automatic = false;
+            )
+        )
+        define "phonevisualisation.keyboard=>ps2keyboard.keyboard"
+        (
+            point
+            (
+                x = 870;
+                y = -340;
+                automatic = false;
+            )
+            point
+            (
+                x = 870;
+                y = -440;
+                automatic = false;
+            )
+        )
+        define "pl110_clcd.display=>phonevisualisation.display"
+        (
+        )
+        define "pl110_clcd.pvbus_m=>decoder.pvbus_s"
+        (
+            point
+            (
+                x = 640;
+                y = -310;
+                automatic = false;
+            )
+            point
+            (
+                x = 640;
+                y = -260;
+                automatic = false;
+            )
+        )
+        define "ps2keyboard.ps2=>pl050_kmi.ps2device"
+        (
+            point
+            (
+                x = 640;
+                y = -430;
+                automatic = false;
+            )
+        )
+    )
+    portmaps
+    (
+    )
+    labels
+    (
+        instance "Label 0"
+        (
+            text  = "ARM 1176";
+            x = 450;
+            y = -260;
+            width = 171;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 14;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -2889473;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+    )
+)

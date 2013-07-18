@@ -1,0 +1,205 @@
+/*
+ * Copyright (C) 2008 ARM Limited. All rights reserved.
+ */
+
+
+extern component ARMCortexA15x3CT
+{
+    properties {
+        executes_software = 1; 
+        version = "8.1.37";
+        component_type = "Core";
+        description = "ARMCortexA15x3CT CPU component";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    resources
+    {
+
+        // Processor component parameters
+        PARAMETER { description("Base address of peripheral memory space"), name("PERIPHBASE"), type(uint32_t), default(0x13080000), min(0x0), max(0xFFFFFFFF) } PERIPHBASE;
+        PARAMETER { description("CPU cluster ID value"), name("CLUSTER_ID"), type(uint32_t), default(0x0), min(0x0), max(0xF) } CLUSTER_ID;
+        PARAMETER { description("Number of shared peripheral interrupts implemented"), name("dic-spi_count"), type(uint32_t), default(0x40), min(0x0), max(0xE0) } dic_spi_count;
+        PARAMETER { description("Disable some accesses to DIC registers"), name("CFGSDISABLE"), type(bool), default(false) } CFGSDISABLE;
+        PARAMETER { description("Set whether L1 I-cache has stateful implementation"), name("l1_icache-state_modelled"), type(bool), default(false) } l1_icache_state_modelled;
+        PARAMETER { description("Set whether L1 D-cache has stateful implementation"), name("l1_dcache-state_modelled"), type(bool), default(false) } l1_dcache_state_modelled;
+        PARAMETER { description("Set whether L2 cache has stateful implementation"), name("l2_cache-state_modelled"), type(bool), default(false) } l2_cache_state_modelled;
+        PARAMETER { description("Set L2 cache size in bytes"), name("l2_cache-size"), type(uint32_t), default(0x80000), min(0x80000), max(0x400000) } l2_cache_size;
+        PARAMETER { name("IMINLN"), type(bool), default(true), description("Instruction cache minimum line size: false=32 bytes, true=64 bytes") } IMINLN;
+        PARAMETER { name("internal_vgic"), type(bool), default(true), description("Configures whether the model of the processor contains a Virtualized Generic Interrupt Controller (VGIC)") } internal_vgic;
+
+        // Core subcomponent parameters
+        PARAMETER { name("cpu0.vfp-present"), type(bool), default(true), description("Set whether the model has VFP support") } cpu0_vfp_present;
+        PARAMETER { name("cpu0.ase-present"), type(bool), default(true), description("Set whether model has NEON support") } cpu0_ase_present;
+        PARAMETER { name("cpu0.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu0_CFGEND;
+        PARAMETER { name("cpu0.CP15SDISABLE"), type(bool), default(false), description("Initialize to disable access to some CP15 registers") } cpu0_CP15SDISABLE;
+        PARAMETER { name("cpu0.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu0_TEINIT;
+        PARAMETER { name("cpu0.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu0_VINITHI;
+        PARAMETER { name("cpu0.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset ") } cpu0_vfp_enable_at_reset;
+        PARAMETER { name("cpu0.dcache-size"), type(uint32_t), default(0x8000), description("Set D-cache size in bytes ") } cpu0_dcache_size;
+        PARAMETER { name("cpu0.icache-size"), type(uint32_t), default(0x8000), description("Set I-cache size in bytes ") } cpu0_icache_size;
+        PARAMETER { name("cpu0.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false") } cpu0_semihosting_enable;
+        PARAMETER { name("cpu0.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting ") } cpu0_semihosting_ARM_SVC;
+        PARAMETER { name("cpu0.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting ") } cpu0_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu0.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu0_semihosting_cmd_line;
+        PARAMETER { name("cpu0.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base ") } cpu0_semihosting_heap_base;
+        PARAMETER { name("cpu0.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap ") } cpu0_semihosting_heap_limit;
+        PARAMETER { name("cpu0.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack ") } cpu0_semihosting_stack_base;
+        PARAMETER { name("cpu0.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit ") } cpu0_semihosting_stack_limit;
+        PARAMETER { name("cpu0.semihosting-cwd"), type(string), default(""), description("Virtual address if CWD")} cpu0_semihosting_cwd;
+        PARAMETER { name("cpu0.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu0_min_sync_level;
+        PARAMETER { name("cpu0.DBGROMADDRV"), type(bool), default(true), description("If true, this sets bits[1:0] of the CP15 DBGDRAR to indicate that the address is valid") } cpu0_DBGROMADDRV;
+        PARAMETER { name("cpu0.DBGROMADDR"), type(uint32_t), default(0x12000003), min(0x0), max(0xFFFFFFFF), description("This value is used to initialize the CP15 DBGDRAR register. Bits[39:12] of this register specify the ROM table physical address") } cpu0_DBGROMADDR;
+        PARAMETER { name("cpu0.DBGSELFADDRV"), type(bool), default(true), description("If true, this sets bits[1:0] of the CP15 DBGDSAR to indicate that the address is valid") } cpu0_DBGSELFADDRV;
+        PARAMETER { name("cpu0.DBGSELFADDR"), type(uint32_t), default(0x00010003), min(0x0), max(0xFFFFFFFF), description("This value is used to initialize the CP15 DBGDSAR register. Bits[39:17] of this register specify the ROM table physical address") } cpu0_DBGSELFADDR;
+
+
+        PARAMETER { name("cpu1.vfp-present"), type(bool), default(true), description("Set whether the model has VFP support") } cpu1_vfp_present;
+        PARAMETER { name("cpu1.ase-present"), type(bool), default(true), description("Set whether model has NEON support") } cpu1_ase_present;
+        PARAMETER { name("cpu1.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu1_CFGEND;
+        PARAMETER { name("cpu1.CP15SDISABLE"), type(bool), default(false), description("Initialize to disable access to some CP15 registers") } cpu1_CP15SDISABLE;
+        PARAMETER { name("cpu1.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu1_TEINIT;
+        PARAMETER { name("cpu1.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu1_VINITHI;
+        PARAMETER { name("cpu1.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset ") } cpu1_vfp_enable_at_reset;
+        PARAMETER { name("cpu1.dcache-size"), type(uint32_t), default(0x8000), description("Set D-cache size in bytes ") } cpu1_dcache_size;
+        PARAMETER { name("cpu1.icache-size"), type(uint32_t), default(0x8000), description("Set I-cache size in bytes ") } cpu1_icache_size;
+        PARAMETER { name("cpu1.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false") } cpu1_semihosting_enable;
+        PARAMETER { name("cpu1.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting ") } cpu1_semihosting_ARM_SVC;
+        PARAMETER { name("cpu1.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting ") } cpu1_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu1.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu1_semihosting_cmd_line;
+        PARAMETER { name("cpu1.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base ") } cpu1_semihosting_heap_base;
+        PARAMETER { name("cpu1.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap ") } cpu1_semihosting_heap_limit;
+        PARAMETER { name("cpu1.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack ") } cpu1_semihosting_stack_base;
+        PARAMETER { name("cpu1.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit ") } cpu1_semihosting_stack_limit;
+        PARAMETER { name("cpu1.semihosting-cwd"), type(string), default(""), description("Virtual address if CWD")} cpu1_semihosting_cwd;
+        PARAMETER { name("cpu1.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu1_min_sync_level;
+        PARAMETER { name("cpu1.DBGROMADDRV"), type(bool), default(true), description("If true, this sets bits[1:0] of the CP15 DBGDRAR to indicate that the address is valid") } cpu1_DBGROMADDRV;
+        PARAMETER { name("cpu1.DBGROMADDR"), type(uint32_t), default(0x12000003), min(0x0), max(0xFFFFFFFF), description("This value is used to initialize the CP15 DBGDRAR register. Bits[39:12] of this register specify the ROM table physical address") } cpu1_DBGROMADDR;
+        PARAMETER { name("cpu1.DBGSELFADDRV"), type(bool), default(true), description("If true, this sets bits[1:0] of the CP15 DBGDSAR to indicate that the address is valid") } cpu1_DBGSELFADDRV;
+        PARAMETER { name("cpu1.DBGSELFADDR"), type(uint32_t), default(0x00010003), min(0x0), max(0xFFFFFFFF), description("This value is used to initialize the CP15 DBGDSAR register. Bits[39:17] of this register specify the ROM table physical address") } cpu1_DBGSELFADDR;
+
+
+        PARAMETER { name("cpu2.vfp-present"), type(bool), default(true), description("Set whether the model has VFP support") } cpu2_vfp_present;
+        PARAMETER { name("cpu2.ase-present"), type(bool), default(true), description("Set whether model has NEON support") } cpu2_ase_present;
+        PARAMETER { name("cpu2.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu2_CFGEND;
+        PARAMETER { name("cpu2.CP15SDISABLE"), type(bool), default(false), description("Initialize to disable access to some CP15 registers") } cpu2_CP15SDISABLE;
+        PARAMETER { name("cpu2.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu2_TEINIT;
+        PARAMETER { name("cpu2.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu2_VINITHI;
+        PARAMETER { name("cpu2.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset ") } cpu2_vfp_enable_at_reset;
+        PARAMETER { name("cpu2.dcache-size"), type(uint32_t), default(0x8000), description("Set D-cache size in bytes ") } cpu2_dcache_size;
+        PARAMETER { name("cpu2.icache-size"), type(uint32_t), default(0x8000), description("Set I-cache size in bytes ") } cpu2_icache_size;
+        PARAMETER { name("cpu2.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false") } cpu2_semihosting_enable;
+        PARAMETER { name("cpu2.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting ") } cpu2_semihosting_ARM_SVC;
+        PARAMETER { name("cpu2.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting ") } cpu2_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu2.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu2_semihosting_cmd_line;
+        PARAMETER { name("cpu2.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base ") } cpu2_semihosting_heap_base;
+        PARAMETER { name("cpu2.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap ") } cpu2_semihosting_heap_limit;
+        PARAMETER { name("cpu2.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack ") } cpu2_semihosting_stack_base;
+        PARAMETER { name("cpu2.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit ") } cpu2_semihosting_stack_limit;
+        PARAMETER { name("cpu2.semihosting-cwd"), type(string), default(""), description("Virtual address if CWD")} cpu2_semihosting_cwd;
+        PARAMETER { name("cpu2.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu2_min_sync_level;
+        PARAMETER { name("cpu2.DBGROMADDRV"), type(bool), default(true), description("If true, this sets bits[1:0] of the CP15 DBGDRAR to indicate that the address is valid") } cpu2_DBGROMADDRV;
+        PARAMETER { name("cpu2.DBGROMADDR"), type(uint32_t), default(0x12000003), min(0x0), max(0xFFFFFFFF), description("This value is used to initialize the CP15 DBGDRAR register. Bits[39:12] of this register specify the ROM table physical address") } cpu2_DBGROMADDR;
+        PARAMETER { name("cpu2.DBGSELFADDRV"), type(bool), default(true), description("If true, this sets bits[1:0] of the CP15 DBGDSAR to indicate that the address is valid") } cpu2_DBGSELFADDRV;
+        PARAMETER { name("cpu2.DBGSELFADDR"), type(uint32_t), default(0x00010003), min(0x0), max(0xFFFFFFFF), description("This value is used to initialize the CP15 DBGDSAR register. Bits[39:17] of this register specify the ROM table physical address") } cpu2_DBGSELFADDR;
+
+    }
+
+    // The clock signal connected to the clk_in port is used to determine
+    // the rate at which the core executes instructions.
+    slave port<ClockSignal> clk_in;
+
+    // The core will generate bus requests on this port.
+    master port<PVBus> pvbus_m0;
+
+    // AXI ACP slave port
+    slave port<PVBus> acp_s;
+
+    // The virtio coherent port, hooks directly into the L2 system and
+    // becomes coherent (assuming attributes are set correctly).
+    slave port<PVBus> virtio_s;
+
+    // Raising this signal will put the core into reset mode.
+    slave port<Signal> reset[4];
+
+    // Signal initializes all processor logic including NEON, VFP, Debug, PTM, breakpoint and watchpoint
+    slave port<Signal> cpuporeset[4];
+
+    // Signal initializes the shared Debug APB, CTI and CTM logic
+    slave port<Signal> presetdbg;
+
+    // This peer port of event input (and output) is for wakeup from WFE
+    peer port<Signal> event;
+
+    // This signal indicates if a core is in WFE state
+    master port<Signal> standbywfe[4];
+
+    // This signal indicates if a core is in WFI state
+    master port<Signal> standbywfi[4];
+
+    // This signal resets the shared L2 memory system, interrupt controller and timer logic
+    slave port<Signal> l2reset;
+
+    // This signal disables write access to some secure Interrupt Controller registers
+    slave port<Signal> cfgsdisable;
+
+    // This signal drives the CPU's interrupt handling.
+    slave port<Signal> irq[4];
+
+    // This signal drives the CPU's fast-interrupt handling.
+    slave port<Signal> fiq[4];
+
+    // These signals drive the CPU's interrupt controller interrupt lines.
+    slave port<Signal> irqs[224];
+
+    // Interrupt signal from performance monitoring unit.
+    master port<Signal> pmuirq[4];
+
+    // This port sets the value in the CLUSTERID field (bits[11:8]) of the MPIDR.
+    slave port<Value> clusterid;
+
+    // This signal disables write access to some secure system control processor registers
+    slave port<Signal> cp15sdisable[4];
+
+    // This port sets the base address of the private peripheral region
+    slave port<Value_64> periphbase;
+
+    // This signal enables Thumb exceptions (controls the SCTLR.TE bit)
+    slave port<Signal> teinit[4];
+
+    // This port should be connected to one of the two ticks ports
+    // on a 'visualisation' component, in order to display a running
+    // instruction count.
+    master port<InstructionCount> ticks[4];
+    
+    // This signal controls the location of the exception vectors at reset
+    slave port<Signal> vinithi[4];
+
+    // This signal controls the SCTLR.EE bit
+    slave port<Signal> cfgend[4];
+
+    // Virtual IRQ/FIQ inputs.  Note that the irq/fiq pins above are wired
+    // directly to the core if there is no internal VGIC.  If there is an
+    // internal VGIC then these are ignored.
+    slave port<Signal> virq[4];
+    slave port<Signal> vfiq[4];
+    
+    // Interface to SoC level counter module
+    slave port<CounterInterface>    cntvalueb;
+
+    master port<Signal> CNTPNSIRQ[4];
+    master port<Signal> CNTPSIRQ[4];
+    master port<Signal> CNTVIRQ[4];
+    master port<Signal> CNTHPIRQ[4];
+
+    //
+    // ACE defined pins
+    //
+    slave port<Signal>  broadcastinner;
+    slave port<Signal>  broadcastouter;
+    slave port<Signal>  broadcastcachemaint;
+
+    // Model specific - control ports to prevent cores running
+    slave port<Signal> halt[3];
+}
+

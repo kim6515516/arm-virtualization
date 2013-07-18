@@ -1,0 +1,25 @@
+/*
+ * Copyright 2013 ARM Limited. All rights reserved.
+ */
+
+extern component VirtioBlockDevice
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "virtio block device";
+        documentation_file = "../#DUDI0423#";
+    }
+
+    resources
+    {
+        PARAMETER { description("image file path"), type(string) } image_path;
+        PARAMETER { description("Only allow device to be read"), type(bool), default(false) } read_only;
+        PARAMETER { description("Make device generate transactions with NS=0"), type(bool), default(false) } secure_accesses;
+    }
+
+    slave  port<PVBus>  pvbus;    /* Virtio MMIO control/config/status registers */
+    master port<Signal> intr;     /* Virtio device sets interrupt to signal completion */
+    master port<PVBus>  virtio_m; /* Virtio device performs DMA accesses via master */
+}

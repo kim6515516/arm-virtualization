@@ -1,0 +1,109 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+
+component FVP_VE_AEMv8A
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Top level component of the AEMv8A Versatile Express inspired model.";
+    }
+
+    composition
+    {
+        // These items are on the testchip
+        cluster : ARMAEMv8AMPCT("PERIPHBASE"=0x2C000000, "NUM_CORES".default=4,
+                                "cpu0.DBGROMADDR" = 0x22000000, "cpu0.DBGROMADDRV" = true,
+                                "cpu1.DBGROMADDR" = 0x22000000, "cpu1.DBGROMADDRV" = true,
+                                "cpu2.DBGROMADDR" = 0x22000000, "cpu2.DBGROMADDRV" = true,
+                                "cpu3.DBGROMADDR" = 0x22000000, "cpu3.DBGROMADDRV" = true
+
+                                ,"cpu0.semihosting-heap_base".default =0x00000000
+                                ,"cpu1.semihosting-heap_base".default =0x00000000
+                                ,"cpu2.semihosting-heap_base".default =0x00000000
+                                ,"cpu3.semihosting-heap_base".default =0x00000000
+                                ,"cpu0.semihosting-heap_limit".default =0xff000000
+                                ,"cpu1.semihosting-heap_limit".default =0xff000000
+                                ,"cpu2.semihosting-heap_limit".default =0xff000000
+                                ,"cpu3.semihosting-heap_limit".default =0xff000000
+                                ,"cpu0.semihosting-stack_base".default =0xffff0000
+                                ,"cpu1.semihosting-stack_base".default =0xffff0000
+                                ,"cpu2.semihosting-stack_base".default =0xffff0000
+                                ,"cpu3.semihosting-stack_base".default =0xffff0000
+                                ,"cpu0.semihosting-stack_limit".default =0xff000000
+                                ,"cpu1.semihosting-stack_limit".default =0xff000000
+                                ,"cpu2.semihosting-stack_limit".default =0xff000000
+                                ,"cpu3.semihosting-stack_limit".default =0xff000000
+                               );
+
+        // Motherboard and Daughter Card
+        motherboard   : VEMotherBoard();
+        daughterboard : VEDaughterBoard( dram_size.default=8 );
+
+        // Debug access port.
+        dap: DebugAccessPort("ap0_rom_base_address" = 0x00000000,  // Debug bus base.
+                             "ap0_has_debug_rom" = true);
+        dapmemlogger: PVBusLogger;
+
+        elfloader: ElfLoader();
+
+        globalcounter: MemoryMappedCounterModule("non_arch_start_at_default".default=true);
+    }
+
+    resources
+    {
+        PARAMETER { description("Debug authentication signal spiden"),  type(bool), default(true) } spiden;
+        PARAMETER { description("Debug authentication signal spniden"), type(bool), default(true) } spniden;
+        PARAMETER { description("Debug authentication signal niden"),   type(bool), default(true) } niden;
+        PARAMETER { description("Debug authentication signal dbgen"),   type(bool), default(true) } dbgen;
+    }
+
+    connection
+    {
+        // Daughterboard <-> cluster connections
+        daughterboard.cpu_clk => cluster.clk_in;  
+        cluster.pvbus_m0 => daughterboard.cpu_pvbus;
+        daughterboard.cpu_irqs => cluster.irqs;  
+
+        // Motherboard <-> Daughterboard connections
+        motherboard.masterclk  => daughterboard.clk_in;
+        motherboard.interrupts => daughterboard.interrupts;
+        daughterboard.smb_cs   => motherboard.smb_cs;
+        motherboard.clcd_pvbus => daughterboard.clcd_pvbus;
+        daughterboard.mmb      => motherboard.mmb_db1;
+        motherboard.CB[0]      => daughterboard.CB;
+
+        // Motherboard <-> cluster connections
+        cluster.ticks => motherboard.cluster0_ticks;
+
+        motherboard.virtio_m => cluster.virtio_s;
+
+        elfloader.pvbus_m => daughterboard.cpu_pvbus;
+
+        // DAP connections
+        daughterboard.cpu_clk => dap.clock;
+        dap.ap_pvbus_m[0] => cluster.dev_debug_s;
+        dap.ap_pvbus_m[1] => dapmemlogger.pvbus_s;
+        dapmemlogger.pvbus_m => daughterboard.cpu_pvbus;
+
+        // Memory mapped debug
+        daughterboard.cpu_memorymapped_debug => cluster.memorymapped_debug_s;
+
+        // system global counter module
+        daughterboard.cpu_clk => globalcounter.clk_in;
+        globalcounter.cntvalueb => cluster.cntvalueb;
+    }
+
+    behavior init
+    {
+        composition.init();
+
+        cluster.spiden.setValue( spiden ? sg::Signal::Set : sg::Signal::Clear );
+        cluster.spniden.setValue( spniden ? sg::Signal::Set : sg::Signal::Clear );
+        cluster.niden.setValue( niden ? sg::Signal::Set : sg::Signal::Clear );
+        cluster.dbgen.setValue( dbgen ? sg::Signal::Set : sg::Signal::Clear );
+    }
+
+}

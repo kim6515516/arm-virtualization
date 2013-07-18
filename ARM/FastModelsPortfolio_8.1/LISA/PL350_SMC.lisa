@@ -1,0 +1,1034 @@
+/*!
+ * \file  PL350_SMC.lisa
+ * \brief LISA Implementation of the PL350 SMC.
+ * \date Copyright 2007-2008 ARM Limited. All rights reserved.
+ *
+ */
+
+component PL350_SMC
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell Static Memory Controller(PL350)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #include <iostream>
+        #define PL350_TRACE(x)
+
+        #define PL350_MSG_ERROR sg::message::MSG_ERROR
+
+        enum PL350_SIZES {
+            PL350_SMC_APB_SPACE_SIZE = 0x1000,
+            PL350_SMC_NAND_PAGE_SIZE = 0x800
+        };
+
+        enum PL350_SMC_MEMORY_TYPES {
+            PL350_RAM  = 0x0,
+            PL350_NAND = 0x1,
+            PL350_NOT_CONNECTED = -1
+        };
+
+        enum PL350_REG_OFFSET
+        {
+            PL350_SMC_MEMC_STATUS       = 0x000,
+            PL350_SMC_MEMIF_CFG         = 0x004,
+            PL350_SMC_MEMC_CFG_SET      = 0x008,
+            PL350_SMC_MEMC_CFG_CLR      = 0x00C,
+            PL350_SMC_DIRECT_CMD        = 0x010,
+            PL350_SMC_SET_CYCLES        = 0x014,
+            PL350_SMC_SET_OPMODE        = 0x018,
+            PL350_SMC_REFRESH_PERIOD_0  = 0x020,
+            PL350_SMC_REFRESH_PERIOD_1  = 0x024,
+
+            PL350_SMC_DEV_CYCLE_0_0     = 0x100,
+            PL350_SMC_OPMODE_0_0        = 0x104,
+
+            PL350_SMC_DEV_CYCLE_0_1     = 0x120,
+            PL350_SMC_OPMODE_0_1        = 0x124,
+
+            PL350_SMC_DEV_CYCLE_0_2     = 0x140,
+            PL350_SMC_OPMODE_0_2        = 0x144,
+
+            PL350_SMC_DEV_CYCLE_0_3     = 0x160,
+            PL350_SMC_OPMODE_0_3        = 0x164,
+
+            PL350_SMC_DEV_CYCLE_1_0     = 0x180,
+            PL350_SMC_OPMODE_1_0        = 0x184,
+
+            PL350_SMC_DEV_CYCLE_1_1     = 0x1A0,
+            PL350_SMC_OPMODE_1_1        = 0x1A4,
+
+            PL350_SMC_DEV_CYCLE_1_2     = 0x1C0,
+            PL350_SMC_OPMODE_1_2        = 0x1C4,
+
+            PL350_SMC_DEV_CYCLE_1_3     = 0x1E0,
+            PL350_SMC_OPMODE_1_3        = 0x1E4,
+
+            PL350_SMC_USER_STATUS       = 0x200,
+            PL350_SMC_USER_CONFIG       = 0x204,
+
+            PL350_SMC_INT_CFG           = 0xE00,
+            PL350_SMC_INT_INPUTS        = 0xE04,
+            PL350_SMC_INT_OUTPUTS       = 0xE08,
+
+            PL350_SMC_PERIPH_ID_0       = 0xFE0,
+            PL350_SMC_PERIPH_ID_1       = 0xFE4,
+            PL350_SMC_PERIPH_ID_2       = 0xFE8,
+            PL350_SMC_PERIPH_ID_3       = 0xFEC,
+            PL350_SMC_PCELL_ID_0        = 0xFF0,
+            PL350_SMC_PCELL_ID_1        = 0xFF4,
+            PL350_SMC_PCELL_ID_2        = 0xFF8,
+            PL350_SMC_PCELL_ID_3        = 0xFFC
+        };
+
+        #define PL350_MEMC_STATUS_INT1_RAW_STATUS   (1<<6)
+        #define PL350_MEMC_STATUS_INT0_RAW_STATUS   (1<<5)
+        #define PL350_MEMC_STATUS_INT1_STATUS       (1<<4)
+        #define PL350_MEMC_STATUS_INT0_STATUS       (1<<3)
+        #define PL350_MEMC_STATUS_INT1_EN           (1<<2)
+        #define PL350_MEMC_STATUS_INT0_EN           (1<<1)
+    }
+
+    slave  port<PVBus> apb_interface;      //This is where we expect to receive all the APB data which is used to read/write the device regs
+
+    slave  port<PVBus> axi_chip_if0_in[4]; //This is where we expect to receive all the AXI data which is used to read/wrie NAND/RAM mem
+    slave  port<PVBus> axi_chip_if1_in[4]; //This is where we expect to receive all the AXI data which is used to read/wrie NAND/RAM mem
+
+    slave  port<PVBus> axi_remap;          //This is the remap port that the designer needs to connect to zero.
+
+    master port<Signal> irq_out;           // what gets connected to the interrupt controller
+
+    //out going connections
+    master port<PVBus> axi_chip_if0_out[4];
+    master port<PVBus> axi_chip_if1_out[4];
+
+    //internal ports and contained components
+    internal master port <PVTransactionMaster> tm_if0_control[4];  //Transaction control port. this is used to generate new trnsactions in remap mode
+    internal master port <PVTransactionMaster> tm_if1_control[4];  //Transaction control port. this is used to generate new trnsactions in remap mode
+
+
+    composition
+    {
+        apb_slave : PVBusSlave(size  = 0x1000);
+        addr_remapper : TZSwitch;
+        master_if0_0   : PVBusMaster;
+        master_if0_1   : PVBusMaster;
+        master_if0_2   : PVBusMaster;
+        master_if0_3   : PVBusMaster;
+
+        master_if1_0   : PVBusMaster;
+        master_if1_1   : PVBusMaster;
+        master_if1_2   : PVBusMaster;
+        master_if1_3   : PVBusMaster;
+    }
+
+    connection
+    {
+        //The APB interface connections
+        self.apb_interface => apb_slave.pvbus_s;
+        apb_slave.device   => self.register_model;
+
+        // what comes in goes out..
+        self.axi_chip_if0_in[0]    => self.axi_chip_if0_out[0];
+        self.axi_chip_if0_in[1]    => self.axi_chip_if0_out[1];
+        self.axi_chip_if0_in[2]    => self.axi_chip_if0_out[2];
+        self.axi_chip_if0_in[3]    => self.axi_chip_if0_out[3];
+
+        self.axi_chip_if1_in[0]    => self.axi_chip_if1_out[0];
+        self.axi_chip_if1_in[1]    => self.axi_chip_if1_out[1];
+        self.axi_chip_if1_in[2]    => self.axi_chip_if1_out[2];
+        self.axi_chip_if1_in[3]    => self.axi_chip_if1_out[3];
+
+        // set up the controllers for the pvbus masters.
+        self.tm_if0_control[0]     =>  master_if0_0.control;
+        self.tm_if0_control[1]     =>  master_if0_1.control;
+        self.tm_if0_control[2]     =>  master_if0_2.control;
+        self.tm_if0_control[3]     =>  master_if0_3.control;
+
+        self.tm_if1_control[0]     =>  master_if1_0.control;
+        self.tm_if1_control[1]     =>  master_if1_1.control;
+        self.tm_if1_control[2]     =>  master_if1_2.control;
+        self.tm_if1_control[3]     =>  master_if1_3.control;
+
+        //connect the out pvbus_m to the output
+        master_if0_0.pvbus_m       => self.axi_chip_if0_out[0];
+        master_if0_1.pvbus_m       => self.axi_chip_if0_out[1];
+        master_if0_2.pvbus_m       => self.axi_chip_if0_out[2];
+        master_if0_3.pvbus_m       => self.axi_chip_if0_out[3];
+
+        master_if1_0.pvbus_m       => self.axi_chip_if1_out[0];
+        master_if1_1.pvbus_m       => self.axi_chip_if1_out[1];
+        master_if1_2.pvbus_m       => self.axi_chip_if1_out[2];
+        master_if1_3.pvbus_m       => self.axi_chip_if1_out[3];
+
+        // remap connections
+        self.axi_remap    =>  addr_remapper.pvbus_input;
+
+        addr_remapper.pvbus_port_a => self.nand_remap_port;
+    }
+
+    slave  port<Signal> irq_in_if0         // interrupt signals from devices connected on interface 0
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            switch (state)
+            {
+            case sg::Signal::Clear:
+                memc_status &= ~PL350_MEMC_STATUS_INT0_RAW_STATUS;
+                break;
+
+            case sg::Signal::Set:
+                memc_status |= PL350_MEMC_STATUS_INT0_RAW_STATUS;
+                if ( memc_status & PL350_MEMC_STATUS_INT0_EN )
+                {
+                    memc_status |= PL350_MEMC_STATUS_INT0_STATUS;
+                    update_int(sg::Signal::Set);
+                }
+                break;
+
+            default:
+                message(PL350_MSG_ERROR, "PL350: Wrong signal status!\n");
+            }
+
+            PL350_TRACE(printf("irq_in_if0:setValue  memc_status = %08X\n", memc_status));
+        }
+    }
+
+    slave  port<Signal> irq_in_if1         // interrupt signals from device connected on interface 1
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            switch (state)
+            {
+            case sg::Signal::Clear:
+                memc_status &= ~PL350_MEMC_STATUS_INT1_RAW_STATUS;
+                break;
+
+            case sg::Signal::Set:
+                memc_status |= PL350_MEMC_STATUS_INT1_RAW_STATUS;
+                if ( memc_status & PL350_MEMC_STATUS_INT1_EN )
+                {
+                    memc_status |= PL350_MEMC_STATUS_INT1_STATUS;
+                    update_int(sg::Signal::Set);
+                }
+                break;
+
+            default:
+                message(PL350_MSG_ERROR, "PL350: Wrong signal status!\n");
+            }
+
+            PL350_TRACE(printf("irq_in_if1:setValue  memc_status = %08X\n", memc_status));
+        }
+    }
+
+    behavior update_int(sg::Signal::State val)
+    {
+        if(irq_out.setValue.implemented())
+        {
+            irq_out.setValue(val);
+        }
+    }
+
+
+    /* Here we expect to do the read of the NAND so that it can read out the first sector when it has been remapped */
+    slave port <PVBus> nand_remap_port
+    {
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            uint32_t addr  = tx.getAddress();
+            uint32_t data  = 0x0 ;
+            uint32_t width = tx.getAccessByteWidth();
+            bool  success;
+
+
+
+            if(REMAP ==  -1)
+            {
+                message(PL350_MSG_ERROR, "PL350: No devices are remapped!! We are not supposed to be here if we are not remapped !! \n"
+                        "Please check the system setting!! \n");
+                return tx.generateAbort();;
+            }
+
+            if( (chips_connected[REMAP] == PL350_RAM) && (tobj) )
+            {
+                PL350_TRACE( cout << "nand_remap_port:read ::  Looks like ram had been remapped !! \n");
+
+                tobj->setPrivileged(tx.isPrivileged());
+                tobj->setInstruction(tx.isInstruction());
+                tobj->setNonSecure(tx.isNonSecure());
+                tobj->setLocked(tx.isLocked());
+                tobj->setExclusive(tx.isExclusive());
+                success = tobj->read(tx.getAddress(), tx.getAccessWidth(), &data);
+
+                return success ? tx.readComplete() : tx.generateAbort();          // return from here.. after we have done the read
+            }
+
+
+            if( chips_connected[REMAP] == PL350_NAND && addr < (PL350_SMC_NAND_PAGE_SIZE - 1) )
+            {
+                PL350_TRACE(cout << "nand_remap_port:read :: Looks like nand has been remapped \n");
+                switch(width)
+                {
+                    case 1: data = ((char*)first_nand_page)[addr]; break;
+                    case 2: data = ((unsigned short*)first_nand_page)[addr/2]; break;
+                    case 4: data = first_nand_page[addr/4]; break;
+                }
+            } else {
+                PL350_TRACE(cout << "expecting only the first 0 - " <<  PL350_SMC_NAND_PAGE_SIZE << " byte reads \n"
+                     << "should have remapped after the first page read addr = " << addr << "\n");
+                return tx.generateAbort();
+            }
+
+            PL350_TRACE(cout << "nand_remap_port : read addr = " << addr
+                 << " data = "                       << data
+                 << ", width = "                     << width
+                 << "\n");
+
+            return tx.setReturnData32(data);
+        }
+
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            uint32_t data  = tx.getData32();
+            uint32_t addr  = tx.getAddress();
+            uint32_t width = tx.getAccessByteWidth();
+
+            PL350_TRACE(cout << "nand_remap_port : write has been  called addr = " << addr << " data = " << data << " width = " << width << "\n");
+
+            if(REMAP ==  -1)
+            {
+                message(PL350_MSG_ERROR, "PL350: No devices are remapped!! We are not supposed to be here if we are not remapped !! \n"
+                        "PLease check the system setting!!\n");
+                return tx.generateAbort();
+
+            }
+
+            if( (chips_connected[REMAP] == PL350_RAM) && (tobj) )
+            {
+                PL350_TRACE(cout << "nand_remap_port:write :: Looks like ram has bee remapped \n");
+
+                tobj->setPrivileged(tx.isPrivileged());
+                tobj->setInstruction(tx.isInstruction());
+                tobj->setNonSecure(tx.isNonSecure());
+                tobj->setLocked(tx.isLocked());
+                tobj->setExclusive(tx.isExclusive());
+                bool success = tobj->write(tx.getAddress(), tx.getAccessWidth(), &data);
+                return success ? tx.writeComplete() : tx.generateAbort();
+            }
+
+            // if we are in remapped mode and are with in the 0x0 to page size range.. then we are ok.
+            if(  chips_connected[REMAP] == PL350_NAND && addr < (PL350_SMC_NAND_PAGE_SIZE - 1))
+            {
+                PL350_TRACE(cout << "nand_remap_port:write :: Looks like nand has bee remapped \n");
+                switch(width)
+                {
+                    case 1: ((char*)first_nand_page)[addr] = 0xff & data;;break;
+                    case 2: ((unsigned short*)first_nand_page)[addr/2] = 0xffff & data; break;
+                    case 4: first_nand_page[addr/4] = data;
+                }
+            } else {
+                message(PL350_MSG_ERROR, "PL350: expecting only the first 0 - 0x%08X byte writes \n"
+                        "Should have remapped after the first page write \n",  PL350_SMC_NAND_PAGE_SIZE);
+
+                return tx.generateAbort();
+            }
+
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return nand_remap_port.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return nand_remap_port.write(tx);
+        }
+    }
+
+    internal slave port<PVDevice> register_model
+    {
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            uint32_t data = 0;
+            do_reg_read(tx.getAddress(), tx.getAccessByteWidth(), &data, false);
+            return tx.setReturnData32(data);
+        }
+
+
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            uint32_t data = tx.getData32();
+            do_reg_write(tx.getAddress(), tx.getAccessByteWidth(), &data, false);
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return register_model.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return register_model.write(tx);
+        }
+    }
+
+    behavior do_reg_write(pv::bus_addr_t address, int width, uint32_t *data, bool debug)
+    {
+        PL350_TRACE(cout<< "do_reg_write: called \n");
+
+        unsigned int offset = address & 0xFFF;
+
+        switch(offset)
+        {
+                        // Write only registers, partial implementation
+
+        case PL350_SMC_MEMC_CFG_SET:
+            memc_cfg_set = *data & 0x00000067;
+                       // ECC and low power request ignored
+            if ( memc_cfg_set & (1<<1) )
+            {
+               memc_status |= PL350_MEMC_STATUS_INT1_EN;
+            }
+            if ( memc_cfg_set & (1<<0) )
+            {
+               memc_status |= PL350_MEMC_STATUS_INT0_EN;
+            }
+            break;
+
+        case PL350_SMC_MEMC_CFG_CLR:
+            memc_cfg_clr = *data & 0x0000007F;
+
+                       // ECC and low power request ignored
+            if ( memc_cfg_clr & (1<<4) )
+            {
+               memc_status &= ~PL350_MEMC_STATUS_INT1_STATUS;
+            }
+            if ( memc_cfg_clr & (1<<3) )
+            {
+               memc_status &= ~PL350_MEMC_STATUS_INT0_STATUS;
+            }
+            if ( memc_cfg_clr & (1<<1) )
+            {
+               memc_status &= ~PL350_MEMC_STATUS_INT1_EN;
+            }
+            if ( memc_cfg_clr & (1<<0) )
+            {
+               memc_status &= ~PL350_MEMC_STATUS_INT0_EN;
+            }
+            if ( ( memc_status & ( PL350_MEMC_STATUS_INT0_STATUS | PL350_MEMC_STATUS_INT0_STATUS ) ) == 0 )
+            {
+               update_int(sg::Signal::Clear);
+            }
+            break;
+
+                       // Write only registers, functions not implemented
+
+        case PL350_SMC_DIRECT_CMD:        direct_cmd       = *data & 0x03FFFFFF;  break;
+        case PL350_SMC_SET_CYCLES:        set_cycles       = *data & 0x007FFFFF;  break;
+        case PL350_SMC_SET_OPMODE:        set_opmode       = *data & 0x0000FFFF;  break;
+        case PL350_SMC_USER_CONFIG:       user_config      = *data & 0x000000FF;  break;
+        case PL350_SMC_INT_OUTPUTS:       int_outputs      = *data & 0x000001FF;  break;
+
+
+                       // Read/Write registers
+
+        case PL350_SMC_REFRESH_PERIOD_0:  refresh_period_0 = *data & 0x0000000F;  break;
+        case PL350_SMC_REFRESH_PERIOD_1:  refresh_period_1 = *data & 0x0000000F;  break;
+        case PL350_SMC_INT_CFG:           int_cfg          = *data & 0x00000001;  break;
+
+
+                       // Read only registers containing debug writable state
+
+        case PL350_SMC_MEMC_STATUS:
+            if ( debug )
+            {
+                switch(offset)
+                {
+                case PL350_SMC_MEMC_STATUS: memc_status = *data & 0x000001FF; break;
+                default: break;
+                }
+            }
+            else
+            {
+                message(PL350_MSG_ERROR, "PL350: register write: read only register: 0x%03X\n", offset);
+            }
+            break;
+
+                       // Read only registers
+
+        case PL350_SMC_MEMIF_CFG:
+        case PL350_SMC_DEV_CYCLE_0_0:
+        case PL350_SMC_OPMODE_0_0:
+        case PL350_SMC_DEV_CYCLE_0_1:
+        case PL350_SMC_OPMODE_0_1:
+        case PL350_SMC_DEV_CYCLE_0_2:
+        case PL350_SMC_OPMODE_0_2:
+        case PL350_SMC_DEV_CYCLE_0_3:
+        case PL350_SMC_OPMODE_0_3:
+        case PL350_SMC_DEV_CYCLE_1_0:
+        case PL350_SMC_OPMODE_1_0:
+        case PL350_SMC_DEV_CYCLE_1_1:
+        case PL350_SMC_OPMODE_1_1:
+        case PL350_SMC_DEV_CYCLE_1_2:
+        case PL350_SMC_OPMODE_1_2:
+        case PL350_SMC_DEV_CYCLE_1_3:
+        case PL350_SMC_OPMODE_1_3:
+        case PL350_SMC_USER_STATUS:
+        case PL350_SMC_INT_INPUTS:
+        case PL350_SMC_PERIPH_ID_0:
+        case PL350_SMC_PERIPH_ID_1:
+        case PL350_SMC_PERIPH_ID_2:
+        case PL350_SMC_PERIPH_ID_3:
+        case PL350_SMC_PCELL_ID_0:
+        case PL350_SMC_PCELL_ID_1:
+        case PL350_SMC_PCELL_ID_2:
+        case PL350_SMC_PCELL_ID_3:
+            message(PL350_MSG_ERROR, "PL350: register write: read only register: 0x%03X\n", offset);
+            break;
+
+        default:
+            message(PL350_MSG_ERROR, "PL350: register write: unknown register: 0x%03X\n", offset);
+            break;
+        }
+    }
+
+
+    behavior do_reg_read(pv::bus_addr_t address, int width, uint32_t *data, bool debug)
+    {
+        PL350_TRACE(cout <<"do_reg_read called \n ");
+
+        unsigned int offset = address & 0xFFF;
+
+        switch(offset)
+        {
+                        // Read only and read/write registers
+
+        case PL350_SMC_MEMC_STATUS :      *data = memc_status;        break;
+        case PL350_SMC_MEMIF_CFG:         *data = memif_cfg;          break;
+        case PL350_SMC_REFRESH_PERIOD_0:  *data = refresh_period_0;   break;
+        case PL350_SMC_REFRESH_PERIOD_1:  *data = refresh_period_1;   break;
+        case PL350_SMC_DEV_CYCLE_0_0:     *data = device_cycles0_0;   break;
+        case PL350_SMC_OPMODE_0_0:        *data = opmode0_0;          break;
+        case PL350_SMC_DEV_CYCLE_0_1:     *data = device_cycles0_1;   break;
+        case PL350_SMC_OPMODE_0_1:        *data = opmode0_1;          break;
+        case PL350_SMC_DEV_CYCLE_0_2:     *data = device_cycles0_2;   break;
+        case PL350_SMC_OPMODE_0_2:        *data = opmode0_2;          break;
+        case PL350_SMC_DEV_CYCLE_0_3:     *data = device_cycles0_3;   break;
+        case PL350_SMC_OPMODE_0_3:        *data = opmode0_3;          break;
+        case PL350_SMC_DEV_CYCLE_1_0:     *data = device_cycles1_0;   break;
+        case PL350_SMC_OPMODE_1_0:        *data = opmode1_0;          break;
+        case PL350_SMC_DEV_CYCLE_1_1:     *data = device_cycles1_1;   break;
+        case PL350_SMC_OPMODE_1_1:        *data = opmode1_1;          break;
+        case PL350_SMC_DEV_CYCLE_1_2:     *data = device_cycles1_2;   break;
+        case PL350_SMC_OPMODE_1_2:        *data = opmode1_2;          break;
+        case PL350_SMC_DEV_CYCLE_1_3:     *data = device_cycles1_3;   break;
+        case PL350_SMC_OPMODE_1_3:        *data = opmode1_3;          break;
+        case PL350_SMC_USER_STATUS:       *data = user_status;        break;
+        case PL350_SMC_INT_CFG:           *data = int_cfg;            break;
+        case PL350_SMC_INT_INPUTS:        *data = int_inputs;         break;
+        case PL350_SMC_PERIPH_ID_0:       *data = periph_id_0;        break;
+        case PL350_SMC_PERIPH_ID_1:       *data = periph_id_1;        break;
+        case PL350_SMC_PERIPH_ID_2:       *data = periph_id_2;        break;
+        case PL350_SMC_PERIPH_ID_3:       *data = periph_id_3;        break;
+        case PL350_SMC_PCELL_ID_0:        *data = pcell_id_0;         break;
+        case PL350_SMC_PCELL_ID_1:        *data = pcell_id_1;         break;
+        case PL350_SMC_PCELL_ID_2:        *data = pcell_id_2;         break;
+        case PL350_SMC_PCELL_ID_3:        *data = pcell_id_3;         break;
+
+
+                        // Write only registers  (no associated state, or state visible else where)
+
+        case PL350_SMC_MEMC_CFG_SET:
+        case PL350_SMC_MEMC_CFG_CLR:
+        case PL350_SMC_DIRECT_CMD:
+        case PL350_SMC_SET_CYCLES:
+        case PL350_SMC_SET_OPMODE:
+            message(PL350_MSG_ERROR, "PL350: register read: register is write only: 0x%03X\n", offset);
+            *data = 0x0;
+            break;
+
+
+                        // Write only registers (state exposed to debugger)
+
+        case PL350_SMC_USER_CONFIG:
+        case PL350_SMC_INT_OUTPUTS:
+            if ( debug )
+            {
+                switch(offset)
+                {
+                case PL350_SMC_USER_CONFIG: *data = user_config; break;
+                case PL350_SMC_INT_OUTPUTS: *data = int_outputs; break;
+                default:                                         break;
+                }
+            }
+            else
+            {
+               message(PL350_MSG_ERROR, "PL350: register read: register is write only: 0x%03X\n", offset);
+               *data = 0x0;
+            }
+            break;
+
+        default:
+           message(PL350_MSG_ERROR, "PL350: register read: unknown register: 0x%03X\n", offset);
+           *data = 0x0;
+           break;
+        }
+    }
+
+    resources
+    {
+        /* Parameters required for the instantiation of the PL350 SMC component */
+        PARAMETER { description("Remap the device "), min(-1), max(7), type(int), default(-1) }  REMAP; // takes values from 0 to 7. -1 indicates no remap
+
+        PARAMETER { description("Interface 0 Mem type"), min(0), max(1), type(uint32_t), default(0) }  IF0_MEM_TYPE_PARAMETER; // default is PL350_RAM
+        PARAMETER { description("Interface 1 Mem type"), min(0), max(1), type(uint32_t), default(0) }  IF1_MEM_TYPE_PARAMETER; // default is PL350_RAM
+
+        PARAMETER { description("Interface 0 chip 0 connected"), type(bool), default(false) }  IF0_CHIP0;
+        PARAMETER { description("Interface 0 chip 1 connected"), type(bool), default(false) }  IF0_CHIP1;
+        PARAMETER { description("Interface 0 chip 2 connected"), type(bool), default(false) }  IF0_CHIP2;
+        PARAMETER { description("Interface 0 chip 3 connected"), type(bool), default(false) }  IF0_CHIP3;
+
+        PARAMETER { description("Interface 1 chip 0 connected"), type(bool), default(false) }  IF1_CHIP0;
+        PARAMETER { description("Interface 1 chip 1 connected"), type(bool), default(false) }  IF1_CHIP1;
+        PARAMETER { description("Interface 1 chip 2 connected"), type(bool), default(false) }  IF1_CHIP2;
+        PARAMETER { description("Interface 1 chip 3 connected"), type(bool), default(false) }  IF1_CHIP3;
+
+
+        // these are used to generate the match/mask values in opmode. They are IGNORED for the actual
+        // bus accesses as this is currently done with an external bus decoder.
+
+        PARAMETER { description("Interface 0 chip 0 Base address"), type(int), default(0) }  IF0_CHIP0_BASE;
+        PARAMETER { description("Interface 0 chip 1 Base address"), type(int), default(0) }  IF0_CHIP1_BASE;
+        PARAMETER { description("Interface 0 chip 2 Base address"), type(int), default(0) }  IF0_CHIP2_BASE;
+        PARAMETER { description("Interface 0 chip 3 Base address"), type(int), default(0) }  IF0_CHIP3_BASE;
+
+        PARAMETER { description("Interface 1 chip 0 Base address"), type(int), default(0) }  IF1_CHIP0_BASE;
+        PARAMETER { description("Interface 1 chip 1 Base address"), type(int), default(0) }  IF1_CHIP1_BASE;
+        PARAMETER { description("Interface 1 chip 2 Base address"), type(int), default(0) }  IF1_CHIP2_BASE;
+        PARAMETER { description("Interface 1 chip 3 Base address"), type(int), default(0) }  IF1_CHIP3_BASE;
+
+        PARAMETER { description("Interface 0 chip 0 Size"), type(int), default(0) }  IF0_CHIP0_SIZE;
+        PARAMETER { description("Interface 0 chip 1 Size"), type(int), default(0) }  IF0_CHIP1_SIZE;
+        PARAMETER { description("Interface 0 chip 2 Size"), type(int), default(0) }  IF0_CHIP2_SIZE;
+        PARAMETER { description("Interface 0 chip 3 Size"), type(int), default(0) }  IF0_CHIP3_SIZE;
+
+        PARAMETER { description("Interface 1 chip 0 Size"), type(int), default(0) }  IF1_CHIP0_SIZE;
+        PARAMETER { description("Interface 1 chip 1 Size"), type(int), default(0) }  IF1_CHIP1_SIZE;
+        PARAMETER { description("Interface 1 chip 2 Size"), type(int), default(0) }  IF1_CHIP2_SIZE;
+        PARAMETER { description("Interface 1 chip 3 Size"), type(int), default(0) }  IF1_CHIP3_SIZE;
+
+        PARAMETER { description("Revision"), type(string), default("r1p2") } revision;
+        PARAMETER { description("Periph_ID_0 value"), min(0x51), max(0x54), type(int), default(0x52) } PERIPH_ID_0;
+
+        PL350_SMC_MEMORY_TYPES chips_connected[8];      // used to maintain the things that are connected
+        pv::TransactionGenerator *tobj;
+
+        bool     if0_remapped;            // if0 remapped
+        bool     if1_remapped;            // if1 remapped .. these 2 vars are used for : 1. to decide the remap 2. return reg status
+        uint8_t  first_nand_page[PL350_SMC_NAND_PAGE_SIZE];     // let us cache the first 256 bytes of data for the nand flash.
+
+
+            // these are the registers that are present in SMC family, accessible through APB bus
+            // the registers offsets are from 0x000 to 0xFFF on the APB
+
+            // Memory controller
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x000) } memc_status;                           //0x000 - memory controller status
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x004), attribute(read_only), reset_value(UNINITIALIZED) } memif_cfg; //0x004 - memory interface config
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x008), attribute(write_only) } memc_cfg_set;   //0x008 - set command
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x00C), attribute(write_only) } memc_cfg_clr;   //0x00C - clr command
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x010), attribute(write_only) } direct_cmd;     //0x010 - direct command
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x014), attribute(write_only) } set_cycles;     //0x014 - set cycles
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x018), attribute(write_only) } set_opmode;     //0x018 - set opmode
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x020) } refresh_period_0;                      //0x020 - refresh 0 period
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x024) } refresh_period_1;                      //0x024 - refresh 1 period
+
+
+           // Chip configuration - interface 0
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x100), attribute(read_only), reset_value(0x2B3CC)       } device_cycles0_0; //0x100 - chip 0
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x104), attribute(read_only), reset_value(UNINITIALIZED) } opmode0_0;        //0x104 - chip 0
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x120), attribute(read_only), reset_value(0x2B3CC)       } device_cycles0_1; //0x120 - chip 1
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x124), attribute(read_only), reset_value(UNINITIALIZED) } opmode0_1;        //0x124 - chip 1
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x140), attribute(read_only), reset_value(0x2B3CC)       } device_cycles0_2; //0x140 - chip 2
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x144), attribute(read_only), reset_value(UNINITIALIZED) } opmode0_2;        //0x144 - chip 2
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x160), attribute(read_only), reset_value(0x2B3CC)       } device_cycles0_3; //0x160 - chip 3
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x164), attribute(read_only), reset_value(UNINITIALIZED) } opmode0_3;        //0x164 - chip 3
+
+
+           // Chip configuration - interface 1
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x180), attribute(read_only), reset_value(0x2B3CC)       } device_cycles1_0; //0x180 - chip 0
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x184), attribute(read_only), reset_value(UNINITIALIZED) } opmode1_0;        //0x184 - chip 0
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x1A0), attribute(read_only), reset_value(0x2B3CC)       } device_cycles1_1; //0x1A0 - chip 1
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x1A4), attribute(read_only), reset_value(UNINITIALIZED) } opmode1_1;        //0x1A4 - chip 1
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x1C0), attribute(read_only), reset_value(0x2B3CC)       } device_cycles1_2; //0x1C0 - chip 2
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x1C4), attribute(read_only), reset_value(UNINITIALIZED) } opmode1_2;        //0x1C4 - chip 2
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x1E0), attribute(read_only), reset_value(0x2B3CC)       } device_cycles1_3; //0x1E0 - chip 3
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x1E4), attribute(read_only), reset_value(UNINITIALIZED) } opmode1_3;        //0x1E4 - chip 3
+
+
+           // User configuration
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x200), attribute(read_only) } user_status;     //0x200 - user status
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x204)                       } user_config;     //0x204 - user config
+
+
+           // Integration test
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xE00)                       } int_cfg;         //0xE00 - integration test config
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xE04), attribute(read_only) } int_inputs;      //0xE04 - integration test inputs
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xE08)                       } int_outputs;     //0xE08 - integration test outputs
+
+
+           // PrimeCell configuration
+
+        uint32_t periph_id_0;                 //0xFE0  -- peripheral identification register 0
+        uint32_t periph_id_1;                 //0xFE4  -- peripheral identification register 1
+        uint32_t periph_id_2;                 //0xFE8  -- peripheral identification register 2
+        uint32_t periph_id_3;                 //0xFEC  -- peripheral identification register 3
+
+        uint32_t pcell_id_0;                  //0xFF0  -- primecell identification register 0
+        uint32_t pcell_id_1;                  //0xFF4  -- primecell identification register 1
+        uint32_t pcell_id_2;                  //0xFF8  -- primecell identification register 2
+        uint32_t pcell_id_3;                  //0xFFC  -- primecell identification register 3
+    }
+
+    behavior init()
+    {
+        composition.init();
+
+        string known_revisions[]={"r1p2","r2p2"};
+        bool revision_recognised = false;
+
+        for (size_t i=0; i<sizeof(known_revisions)/sizeof(string); i++)
+            if (known_revisions[i]==revision) revision_recognised=true;
+
+        if (!revision_recognised)
+        {
+            message(getInstancePath()+": revision '"+revision+"' not supported: only r1p2 and r2p2 are", MSG_FATAL_ERROR);
+        }
+
+        uint32_t i = 0x0;
+        int remap = REMAP; // temp use
+        int if0_chip_count = 0x0, if1_chip_count = 0x0;
+        int if0_mem_width = 0x0, if1_mem_width = 0x0;
+
+        enum PL350_SMC_MEMORY_TYPES if0_mem_type = (PL350_SMC_MEMORY_TYPES) IF0_MEM_TYPE_PARAMETER;
+        enum PL350_SMC_MEMORY_TYPES if1_mem_type = (PL350_SMC_MEMORY_TYPES) IF1_MEM_TYPE_PARAMETER;
+
+        tobj = 0;
+
+        cout.setf(std::ios::hex, std::ios::basefield);
+
+        PL350_TRACE(cout << "REMAP = " << REMAP << "\n");
+
+        PL350_TRACE(cout << " IF0_CHIP0 = " << IF0_CHIP0 << "\n");
+        PL350_TRACE(cout << " IF0_CHIP1 = " << IF0_CHIP1 << "\n");
+        PL350_TRACE(cout << " IF0_CHIP2 = " << IF0_CHIP2 << "\n");
+        PL350_TRACE(cout << " IF0_CHIP3 = " << IF0_CHIP3 << "\n");
+        PL350_TRACE(cout << " IF1_CHIP0 = " << IF1_CHIP0 << "\n");
+        PL350_TRACE(cout << " IF1_CHIP1 = " << IF1_CHIP1 << "\n");
+        PL350_TRACE(cout << " IF1_CHIP2 = " << IF1_CHIP2 << "\n");
+        PL350_TRACE(cout << " IF1_CHIP3 = " << IF1_CHIP3 << "\n");
+
+        PL350_TRACE(cout << " IF0_CHIP0_BASE = " << IF0_CHIP0_BASE << "IF0_CHIP0_SIZE = " << IF0_CHIP0_SIZE << "\n");
+        PL350_TRACE(cout << " IF0_CHIP1_BASE = " << IF0_CHIP1_BASE << "IF0_CHIP1_SIZE = " << IF0_CHIP1_SIZE << "\n");
+        PL350_TRACE(cout << " IF0_CHIP2_BASE = " << IF0_CHIP2_BASE << "IF0_CHIP2_SIZE = " << IF0_CHIP2_SIZE << "\n");
+        PL350_TRACE(cout << " IF0_CHIP3_BASE = " << IF0_CHIP3_BASE << "IF0_CHIP3_SIZE = " << IF0_CHIP3_SIZE << "\n");
+        PL350_TRACE(cout << " IF1_CHIP0_BASE = " << IF1_CHIP0_BASE << "IF1_CHIP0_SIZE = " << IF1_CHIP0_SIZE << "\n");
+        PL350_TRACE(cout << " IF1_CHIP1_BASE = " << IF1_CHIP1_BASE << "IF1_CHIP1_SIZE = " << IF1_CHIP1_SIZE << "\n");
+        PL350_TRACE(cout << " IF1_CHIP2_BASE = " << IF1_CHIP2_BASE << "IF1_CHIP2_SIZE = " << IF1_CHIP2_SIZE << "\n");
+        PL350_TRACE(cout << " IF1_CHIP3_BASE = " << IF1_CHIP3_BASE << "IF1_CHIP3_SIZE = " << IF1_CHIP3_SIZE << "\n");
+        PL350_TRACE(cout << " PERIPH_ID_0 = 0x" << PERIPH_ID_0 << "\n");
+        chips_connected[0] = IF0_CHIP0 ? if0_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[1] = IF0_CHIP1 ? if0_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[2] = IF0_CHIP2 ? if0_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[3] = IF0_CHIP3 ? if0_mem_type : PL350_NOT_CONNECTED;
+
+        chips_connected[4] = IF1_CHIP0 ? if1_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[5] = IF1_CHIP1 ? if1_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[6] = IF1_CHIP2 ? if1_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[7] = IF1_CHIP3 ? if1_mem_type : PL350_NOT_CONNECTED;
+
+        if0_remapped = false;    //set the remapped variables to false initially.
+        if1_remapped = false;
+
+        if0_chip_count = 0;
+        if1_chip_count = 0;
+
+        for (i = 0; i < 4; i++) if (PL350_NOT_CONNECTED != chips_connected[i]) if0_chip_count++;
+        for (i = 4; i < 8; i++) if (PL350_NOT_CONNECTED != chips_connected[i]) if1_chip_count++;
+
+        if0_mem_width = (if0_mem_type == PL350_NAND) ? 1 : 2;
+        if1_mem_width = (if1_mem_type == PL350_NAND) ? 1 : 2;
+
+        if(REMAP >= 0 && REMAP < 4 )
+        {
+            if( chips_connected[REMAP] == PL350_RAM)
+            {
+
+                PL350_TRACE(cout << "1:  ram remapped REMAP=  " << REMAP << "\n");
+                tobj = tm_if0_control[REMAP].createTransactionGenerator();
+
+            } else if( chips_connected[REMAP] == PL350_NAND) { // is it a NAND?
+
+                PL350_TRACE(cout << "2:  nand remapped REMAP=  " << REMAP << "\n");
+//                tobj = tm_if0_control[REMAP].createTransactionGenerator();
+            }
+
+            if0_remapped = true;
+
+        } else if( REMAP >= 4 && REMAP < 8 )
+        {
+            assert(!"Cannot Remap");
+        } else {
+            PL350_TRACE(cout << "Nothing to remap \n");
+            remap = -1;
+        }
+
+        if( remap != -1 )
+        {
+            PL350_TRACE(cout << "Remap enabled .. redirect the input to  port A \n");
+            addr_remapper.control.routeAccesses( TZINPUT_ANY, TZROUTE_TO_PORT_A);  // if remap is enabled .. route it to port A by default.
+        }
+
+        // do some clearing of the memory.
+        memset((void*)first_nand_page, 0x0, PL350_SMC_NAND_PAGE_SIZE);
+
+
+            // Initialise uninitialised registers
+
+            // Memory controller
+
+        memif_cfg = (if1_remapped << 14)  | (if1_mem_width << 12) | (if0_chip_count << 10) | ((if1_mem_type + 1 ) << 8)|
+                    (if0_remapped <<  6)  | (if0_mem_width <<  4) | (if0_chip_count <<  2) | ((if0_mem_type + 1 ) << 0);
+
+
+            // Chip configuration - interface 0
+
+        // there are other bits to these that might need to be set
+        opmode0_0 = generateOpmode(IF0_CHIP0_BASE, IF0_CHIP0_SIZE);
+        opmode0_1 = generateOpmode(IF0_CHIP1_BASE, IF0_CHIP1_SIZE);
+        opmode0_2 = generateOpmode(IF0_CHIP2_BASE, IF0_CHIP2_SIZE);
+        opmode0_3 = generateOpmode(IF0_CHIP3_BASE, IF0_CHIP3_SIZE);
+
+        PL350_TRACE(cout << " opmode0_0 = " << opmode0_0 << "\n");
+        PL350_TRACE(cout << " opmode0_1 = " << opmode0_1 << "\n");
+        PL350_TRACE(cout << " opmode0_2 = " << opmode0_2 << "\n");
+        PL350_TRACE(cout << " opmode0_3 = " << opmode0_3 << "\n");
+
+
+            // Chip configuration - interface 1
+
+        opmode1_0 = generateOpmode(IF1_CHIP0_BASE, IF1_CHIP0_SIZE);
+        opmode1_1 = generateOpmode(IF1_CHIP1_BASE, IF1_CHIP1_SIZE);
+        opmode1_2 = generateOpmode(IF1_CHIP2_BASE, IF1_CHIP2_SIZE);
+        opmode1_3 = generateOpmode(IF1_CHIP3_BASE, IF1_CHIP3_SIZE);
+
+        PL350_TRACE(cout << " opmode1_0 = " << opmode1_0 << "\n");
+        PL350_TRACE(cout << " opmode1_1 = " << opmode1_1 << "\n");
+        PL350_TRACE(cout << " opmode1_2 = " << opmode1_2 << "\n");
+        PL350_TRACE(cout << " opmode1_3 = " << opmode1_3 << "\n");
+
+
+            // PrimeCell configuration
+
+        periph_id_0       = PERIPH_ID_0;    // Device[7:0]
+        periph_id_1       = 0x13;           // mmmmdddd mmmm=Manufacturer[3:0] dddd=Device[11:8]
+        if (revision=="r1p2")
+            periph_id_2   = 0x34;
+        if (revision=="r2p2")
+            periph_id_2   = 0x64;
+        periph_id_3       = 0x00;           // Reserved
+
+        pcell_id_0        = 0x0D;
+        pcell_id_1        = 0xF0;
+        pcell_id_2        = 0x05;
+        pcell_id_3        = 0xB1;
+
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        uint32_t i = 0x0;
+        int remap = REMAP; // temp use
+        int if0_chip_count = 0x0, if1_chip_count = 0x0;
+        int if0_mem_width = 0x0, if1_mem_width = 0x0;
+
+        enum PL350_SMC_MEMORY_TYPES if0_mem_type = (PL350_SMC_MEMORY_TYPES) IF0_MEM_TYPE_PARAMETER;
+        enum PL350_SMC_MEMORY_TYPES if1_mem_type = (PL350_SMC_MEMORY_TYPES) IF1_MEM_TYPE_PARAMETER;
+
+        tobj = 0;
+
+        cout.setf(std::ios::hex, std::ios::basefield);
+
+        PL350_TRACE(cout << "REMAP = " << REMAP << "\n");
+
+        PL350_TRACE(cout << " IF0_CHIP0 = " << IF0_CHIP0 << "\n");
+        PL350_TRACE(cout << " IF0_CHIP1 = " << IF0_CHIP1 << "\n");
+        PL350_TRACE(cout << " IF0_CHIP2 = " << IF0_CHIP2 << "\n");
+        PL350_TRACE(cout << " IF0_CHIP3 = " << IF0_CHIP3 << "\n");
+        PL350_TRACE(cout << " IF1_CHIP0 = " << IF1_CHIP0 << "\n");
+        PL350_TRACE(cout << " IF1_CHIP1 = " << IF1_CHIP1 << "\n");
+        PL350_TRACE(cout << " IF1_CHIP2 = " << IF1_CHIP2 << "\n");
+        PL350_TRACE(cout << " IF1_CHIP3 = " << IF1_CHIP3 << "\n");
+
+        PL350_TRACE(cout << " IF0_CHIP0_BASE = " << IF0_CHIP0_BASE << "IF0_CHIP0_SIZE = " << IF0_CHIP0_SIZE << "\n");
+        PL350_TRACE(cout << " IF0_CHIP1_BASE = " << IF0_CHIP1_BASE << "IF0_CHIP1_SIZE = " << IF0_CHIP1_SIZE << "\n");
+        PL350_TRACE(cout << " IF0_CHIP2_BASE = " << IF0_CHIP2_BASE << "IF0_CHIP2_SIZE = " << IF0_CHIP2_SIZE << "\n");
+        PL350_TRACE(cout << " IF0_CHIP3_BASE = " << IF0_CHIP3_BASE << "IF0_CHIP3_SIZE = " << IF0_CHIP3_SIZE << "\n");
+        PL350_TRACE(cout << " IF1_CHIP0_BASE = " << IF1_CHIP0_BASE << "IF1_CHIP0_SIZE = " << IF1_CHIP0_SIZE << "\n");
+        PL350_TRACE(cout << " IF1_CHIP1_BASE = " << IF1_CHIP1_BASE << "IF1_CHIP1_SIZE = " << IF1_CHIP1_SIZE << "\n");
+        PL350_TRACE(cout << " IF1_CHIP2_BASE = " << IF1_CHIP2_BASE << "IF1_CHIP2_SIZE = " << IF1_CHIP2_SIZE << "\n");
+        PL350_TRACE(cout << " IF1_CHIP3_BASE = " << IF1_CHIP3_BASE << "IF1_CHIP3_SIZE = " << IF1_CHIP3_SIZE << "\n");
+        PL350_TRACE(cout << " PERIPH_ID_0 = 0x" << PERIPH_ID_0 << "\n");
+        chips_connected[0] = IF0_CHIP0 ? if0_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[1] = IF0_CHIP1 ? if0_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[2] = IF0_CHIP2 ? if0_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[3] = IF0_CHIP3 ? if0_mem_type : PL350_NOT_CONNECTED;
+
+        chips_connected[4] = IF1_CHIP0 ? if1_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[5] = IF1_CHIP1 ? if1_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[6] = IF1_CHIP2 ? if1_mem_type : PL350_NOT_CONNECTED;
+        chips_connected[7] = IF1_CHIP3 ? if1_mem_type : PL350_NOT_CONNECTED;
+
+        if0_remapped = false;    //set the remapped variables to false initially.
+        if1_remapped = false;
+
+        if0_chip_count = 0;
+        if1_chip_count = 0;
+
+        for (i = 0; i < 4; i++) if (PL350_NOT_CONNECTED != chips_connected[i]) if0_chip_count++;
+        for (i = 4; i < 8; i++) if (PL350_NOT_CONNECTED != chips_connected[i]) if1_chip_count++;
+
+        if0_mem_width = (if0_mem_type == PL350_NAND) ? 1 : 2;
+        if1_mem_width = (if1_mem_type == PL350_NAND) ? 1 : 2;
+
+        if(REMAP >= 0 && REMAP < 4 )
+        {
+            if( chips_connected[REMAP] == PL350_RAM)
+            {
+
+                PL350_TRACE(cout << "1:  ram remapped REMAP=  " << REMAP << "\n");
+                tobj = tm_if0_control[REMAP].createTransactionGenerator();
+
+            } else if( chips_connected[REMAP] == PL350_NAND) { // is it a NAND?
+
+                PL350_TRACE(cout << "2:  nand remapped REMAP=  " << REMAP << "\n");
+//                tobj = tm_if0_control[REMAP].createTransactionGenerator();
+            }
+
+            if0_remapped = true;
+
+        } else if( REMAP >= 4 && REMAP < 8 )
+        {
+            assert(!"Cannot Remap");
+        } else {
+            PL350_TRACE(cout << "Nothing to remap \n");
+            remap = -1;
+        }
+
+        if( remap != -1 )
+        {
+            PL350_TRACE(cout << "Remap enabled .. redirect the input to  port A \n");
+            addr_remapper.control.routeAccesses( TZINPUT_ANY, TZROUTE_TO_PORT_A);  // if remap is enabled .. route it to port A by default.
+        }
+
+        // do some clearing of the memory.
+        memset((void*)first_nand_page, 0x0, PL350_SMC_NAND_PAGE_SIZE);
+
+
+            // Initialise uninitialised registers
+
+            // Memory controller
+
+        memif_cfg = (if1_remapped << 14)  | (if1_mem_width << 12) | (if0_chip_count << 10) | ((if1_mem_type + 1 ) << 8)|
+                    (if0_remapped <<  6)  | (if0_mem_width <<  4) | (if0_chip_count <<  2) | ((if0_mem_type + 1 ) << 0);
+
+
+            // Chip configuration - interface 0
+
+        // there are other bits to these that might need to be set
+        opmode0_0 = generateOpmode(IF0_CHIP0_BASE, IF0_CHIP0_SIZE);
+        opmode0_1 = generateOpmode(IF0_CHIP1_BASE, IF0_CHIP1_SIZE);
+        opmode0_2 = generateOpmode(IF0_CHIP2_BASE, IF0_CHIP2_SIZE);
+        opmode0_3 = generateOpmode(IF0_CHIP3_BASE, IF0_CHIP3_SIZE);
+
+        PL350_TRACE(cout << " opmode0_0 = " << opmode0_0 << "\n");
+        PL350_TRACE(cout << " opmode0_1 = " << opmode0_1 << "\n");
+        PL350_TRACE(cout << " opmode0_2 = " << opmode0_2 << "\n");
+        PL350_TRACE(cout << " opmode0_3 = " << opmode0_3 << "\n");
+
+
+            // Chip configuration - interface 1
+
+        opmode1_0 = generateOpmode(IF1_CHIP0_BASE, IF1_CHIP0_SIZE);
+        opmode1_1 = generateOpmode(IF1_CHIP1_BASE, IF1_CHIP1_SIZE);
+        opmode1_2 = generateOpmode(IF1_CHIP2_BASE, IF1_CHIP2_SIZE);
+        opmode1_3 = generateOpmode(IF1_CHIP3_BASE, IF1_CHIP3_SIZE);
+
+        PL350_TRACE(cout << " opmode1_0 = " << opmode1_0 << "\n");
+        PL350_TRACE(cout << " opmode1_1 = " << opmode1_1 << "\n");
+        PL350_TRACE(cout << " opmode1_2 = " << opmode1_2 << "\n");
+        PL350_TRACE(cout << " opmode1_3 = " << opmode1_3 << "\n");
+
+
+            // PrimeCell configuration
+
+        periph_id_0       = PERIPH_ID_0;    // Device[7:0]
+        periph_id_1       = 0x13;           // mmmmdddd mmmm=Manufacturer[3:0] dddd=Device[11:8]
+        if (revision=="r1p2")
+            periph_id_2   = 0x34;
+        if (revision=="r2p2")
+            periph_id_2   = 0x64;
+        periph_id_3       = 0x00;           // Reserved
+
+        pcell_id_0        = 0x0D;
+        pcell_id_1        = 0xF0;
+        pcell_id_2        = 0x05;
+        pcell_id_3        = 0xB1;
+
+    }
+
+
+    behavior terminate
+    {
+        // Explicitly invoke subcomponent's terminate() behavior.
+        composition.terminate();
+        if (tobj)
+            delete tobj;
+    }
+
+    behavior generateOpmode(uint32_t base, uint32_t size) : uint32_t
+    {
+        // base should be naturally aligned wrt size or this wont work
+
+        uint32_t mask  = (~(size-1))   >> 24;
+        uint32_t match = (base >> 24) & mask;
+        return (match << 24) | (mask << 16);
+    }
+
+    // debugger register access support
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        do_reg_read(reg_id, 4, (uint32_t*)datap, true);
+
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        do_reg_write( reg_id, 4, (uint32_t *)datap, true );
+
+        return ACCESS_FUNC_OK;
+    }
+}

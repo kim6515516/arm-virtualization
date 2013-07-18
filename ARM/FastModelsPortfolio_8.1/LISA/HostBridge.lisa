@@ -1,0 +1,111 @@
+/*!
+ * \file  HostBridge.lisa
+ * \brief LISA Implementation of an Ethernet host bridge.
+ * \date  Copyright 2009-2010 ARM Limited. All rights reserved.
+ *
+ */
+
+component HostBridge
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Host Socket Interface Component";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes {
+        // Common headers
+        #include <iostream>
+        #include "components/VirtualEthernet/Protocol/VirtualEthernetProtocol.h"
+        #include "components/VirtualEthernet/Protocol/EthernetFrame.h"
+        #include "components/VirtualEthernet/AsyncReader.h"
+        #include "components/VirtualEthernet/VEPBackendFactories.h"
+        #include "sg/SGScheduler.h"
+
+        #define HB_TRACE if (!0) ; else fprintf
+    }
+    
+    resources {
+        PARAMETER { description("Host Interface"), type(string), default("ARM0") } interfaceName;
+        PARAMETER { description("Enable user-mode networking"), type(bool), default(false) } userNetworking;
+        PARAMETER { description("Virtual subnet for user-mode networking"), type(string), default("172.20.51.0/24") } userNetSubnet;
+        PARAMETER { description("Listening ports to expose in user-mode networking"), type(string), default("") } userNetPorts;
+
+        // This might point to a VEPTun instance or a UserNet instance
+        AsyncReader* vt;
+    }
+
+    behaviour init {
+        if (userNetworking) {
+            vt = sg::createVEPUserNetDevice(getSimulationContext(), userNetSubnet, userNetPorts, eth.getAbstractInterface()); 
+        } else {
+            vt = sg::createVEPTunDevice(getSimulationContext(), interfaceName, eth.getAbstractInterface()); 
+        }
+        if(!vt->init()) {
+            // Failed to initialise Tap interface.
+            delete vt;
+            vt = NULL;
+        }
+    }
+
+    behaviour terminate {
+        if(vt != NULL)
+            delete vt;
+    }
+    
+    // Main i/o port
+    master port<VirtualEthernet> eth {
+        // Data received
+        behaviour sendToMaster(EthernetFrame* frame) {
+            if(vt != NULL) {
+                if(!vt->doWrite(frame->buf, frame->buflen)) {
+                    HB_TRACE(stderr, "Write ethernet frame to TAP device failed\n");
+                }
+            } 
+        }
+    }
+
+    /* Useful function for debugging. Prints packets as 8 octets, space, 8 octets, tab, ASCII, then a newline.
+     */
+    /*
+    behavior printPacket(unsigned char* data, unsigned int len) {
+        // Print as 8 hex chars, tab, 8 hex chars, newline (like in
+        // wireshark)
+        unsigned int n = 0;
+        while(n < len) {
+            for(int j = 0; (j < 8) && ((j + n) < len); j++) {
+                unsigned char c = data[j+n];
+                printf("%s%0X ", (c < 0xF) ? "0" : "\0", c);
+            } 
+            std::cout << " ";
+            for(int j = 8; (j < 16) && ((j + n) < len); j++) {
+                unsigned char c = data[j+n];
+                printf("%s%0X ", (c <= 0xF) ? "0" : "\0", c);
+            }
+            std::cout << "\t";
+            // Printable chars are from 33 to 255
+            for(int i = 0; (i < 8) && ((i + n) < len); i++) {
+                unsigned char c = data[i + n];
+                if(c > 33) {
+                    std::cout << c;
+                } else {
+                    std::cout << ".";
+                } 
+            }
+            std::cout << " ";
+            for(int j = 8; (j < 16) && ((j + n) < len); j++) {
+                unsigned char c = data[j + n];
+                if(c > 33) {
+                    std::cout << c;
+                } else {
+                    std::cout << ".";
+                }
+            }
+            n += 16;
+            std::cout << std::endl;
+        }
+    }
+    */
+}
+

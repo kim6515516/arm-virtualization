@@ -1,0 +1,1100 @@
+/*
+ * Copyright 2011-2012 ARM Limited. All rights reserved.
+ */
+
+
+
+component PL370_HDLCD
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell HD Color LCD Controller(Nominal Designation PL370)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #include "pv/PVBusMaster.h"
+
+        // the major/minor revision and product ID values that are 
+        // exposed in the VERSION register
+        #define HDLCD_MAJOR 0x00
+        #define HDLCD_MINOR 0x00
+        #define HDLCD_PRODID 0x1cdc
+
+        // create a mask of bits in a word
+        #define hdlcd_mask(s, e) (0xffffffff>>(31-(s)) & (0xffffffff << (e)))
+        #define hdlcd_bit(b) (1<<(b))
+
+        #include <sstream>
+        #include <iomanip>
+    }
+
+
+    resources
+    {
+        PARAMETER { description("Diagnostic level"), type(uint32_t), default(0), min(0), max(4) } diagnostic;
+
+        // I'm following CLCD reg name notation - which appends the RW/RO/WO attribute of a
+        // register to the Long Name
+        REGISTER { description("Version(RO)"),          bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x000) } HDLCD_VERSION;
+
+        REGISTER { description("Int Raw Status(RW)"),   bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x010) } HDLCD_INT_RAWSTAT;
+        REGISTER { description("Int Clear(WO)"),        bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x014) } HDLCD_INT_CLEAR;
+        REGISTER { description("Int Mask(RW)"),         bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x018) } HDLCD_INT_MASK;
+        REGISTER { description("Int Status(RW)"),       bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x01c) } HDLCD_INT_STATUS;
+
+        REGISTER { description("Frame Buffer Base Address(RW)"),    bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x100) } HDLCD_FB_BASE;
+        REGISTER { description("Frame Buffer Line Length(RW)"),     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x104) } HDLCD_FB_LINE_LENGTH;
+        REGISTER { description("Frame Buffer Line Count(RW)"),      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x108) } HDLCD_FB_LINE_COUNT;
+        REGISTER { description("Frame Buffer Line Pitch(RW)"),      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x10c) } HDLCD_FB_LINE_PITCH;
+
+        REGISTER { description("Bus Options(RW)"),  bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x110) } HDLCD_BUS_OPTIONS;
+
+        REGISTER { description("Vertical Synch Width(RW)"),     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x200) } HDLCD_V_SYNC;
+        REGISTER { description("Vertical Back Porch(RW)"),      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x204) } HDLCD_V_BACK_PORCH;
+        REGISTER { description("Vertical Data Width(RW)"),      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x208) } HDLCD_V_DATA;
+        REGISTER { description("Vertical Front Porch(RW)"),     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x20c) } HDLCD_V_FRONT_PORCH;
+
+        REGISTER { description("Horizontal Synch Width(RW)"),   bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x210) } HDLCD_H_SYNC;
+        REGISTER { description("Horizontal Back Porch(RW)"),    bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x214) } HDLCD_H_BACK_PORCH;
+        REGISTER { description("Horizontal Data Width(RW)"),    bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x218) } HDLCD_H_DATA;
+        REGISTER { description("Horizontal Front Porch(RW)"),   bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x21c) } HDLCD_H_FRONT_PORCH;
+
+        REGISTER { description("Polarities(RW)"),       bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x220) } HDLCD_POLARITIES;
+        REGISTER { description("Command(RW)"),          bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x230) } HDLCD_COMMAND;
+        REGISTER { description("Pixel Format(RW)"),     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x240) } HDLCD_PIXELFORMAT;
+        REGISTER { description("Red Select(RW)"),       bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x244) } HDLCD_REDSELECT;
+        REGISTER { description("Green Select(RW)"),     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x248) } HDLCD_GREENSELECT;
+        REGISTER { description("Blue Select(RW)"),      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x24c) } HDLCD_BLUESELECT;
+
+        // PrimeCell registers (HDLCD is a nominal PrimeCell of ID PL370)
+        REGISTER { description("Peripheral identification register bits [7:0](RO)"),    bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFE0) } HDLCDPERIPHID0;
+        REGISTER { description("Peripheral identification register bits [15:8](RO)"),   bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFE4) } HDLCDPERIPHID1;
+        REGISTER { description("Peripheral identification register bits [23:16](RO)"),  bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFE8) } HDLCDPERIPHID2;
+        REGISTER { description("Peripheral identification register bits [31:23](RO)"),  bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFEC) } HDLCDPERIPHID3;
+
+        REGISTER { description("PrimeCell identification register bits [7:0](RO)"),     bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFF0) } HDLCDPCELLID0;
+        REGISTER { description("PrimeCell identification register bits [15:8](RO)"),    bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFF4) } HDLCDPCELLID1;
+        REGISTER { description("PrimeCell identification register bits [23:16](RO)"),   bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFF8) } HDLCDPCELLID2;
+        REGISTER { description("PrimeCell identification register bits [31:23](RO)"),   bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFFC) } HDLCDPCELLID3;
+
+        class HDLCD_Blit_Line {
+        public:
+            HDLCD_Blit_Line()
+            {
+            }
+
+            uint32_t *pixels_per_line;
+            bool bgr;           // swap b+r channels
+            
+            // passed in from LISA
+            uint32_t *default_red;
+            uint32_t *default_green;
+            uint32_t *default_blue;
+            uint32_t *offset_red;
+            uint32_t *offset_green;
+            uint32_t *offset_blue;
+            uint32_t *size_red;
+            uint32_t *size_green;
+            uint32_t *size_blue;
+            uint32_t *bytes_per_pixel;
+
+            // templated fast version for known sizes
+
+            template<class T> uint32_t* blit_line(uint32_t* dst, const T* src, uint32_t render_len)
+            {
+                T t_src = 0;
+
+                uint32_t v_default_red = *default_red;
+                uint32_t v_default_green = *default_green;
+                uint32_t v_default_blue = *default_blue;
+                uint32_t v_offset_red = *offset_red;
+                uint32_t v_offset_green = *offset_green;
+                uint32_t v_offset_blue = *offset_blue;
+                uint32_t v_size_red = *size_red;
+                uint32_t v_size_green = *size_green;
+                uint32_t v_size_blue = *size_blue;
+
+                uint32_t mask_red = ~(0xFFFFFFFF << (v_offset_red + v_size_red));
+                uint32_t mask_green = ~(0xFFFFFFFF << (v_offset_green + v_size_green));
+                uint32_t mask_blue = ~(0xFFFFFFFF << (v_offset_blue + v_size_blue));
+                
+                uint8_t channel_red = 0;
+                uint8_t channel_green = 0;
+                uint8_t channel_blue = 0;
+                
+                while((int32_t)render_len > 0)
+                {
+                    t_src = *src++;
+                    // TODO - if it's big_endian, then switch the bytes
+
+                    if(v_size_red == 0)
+                    {
+                        channel_red = (uint8_t) v_default_red;
+                    }
+                    else
+                    {
+                        channel_red = (t_src & mask_red) >> v_offset_red;
+                        channel_red = channel_red << (8 - v_size_red);
+                        channel_red |= (channel_red & (0xFF<<v_size_red)) >> v_size_red;
+                    }
+
+                    if(v_size_green == 0)
+                    {
+                        channel_green = (uint8_t) v_default_green;
+                    }
+                    else
+                    {
+                        channel_green = (t_src & mask_green) >> v_offset_green;
+                        channel_green = channel_green << (8 - v_size_green);
+                        channel_green |= (channel_green & (0xFF<<v_size_green)) >> v_size_green;
+                    }
+
+                    if(v_size_blue == 0)
+                    {
+                        channel_blue = (uint8_t) v_default_blue;
+                    }
+                    else
+                    {
+                        channel_blue = (t_src & mask_blue) >> v_offset_blue;
+                        channel_blue = channel_blue << (8 - v_size_blue);
+                        channel_blue |= (channel_blue & (0xFF<<v_size_blue)) >> v_size_blue;
+                    }
+                    
+                    *dst++ = (uint32_t) (channel_red << 0) | (channel_green << 8) | (channel_blue << 16);
+
+                    render_len -= 4;
+                }
+
+                return dst;
+            }
+        };
+
+        // mask for int_raw and int_mask
+        enum {
+            INT_UNDERRUN = hdlcd_bit(3),
+            INT_VSYNC    = hdlcd_bit(2),
+            INT_BUS      = hdlcd_bit(1),
+            INT_DMA      = hdlcd_bit(0),
+            HDLCD_ALL_INT_MASK    = (INT_UNDERRUN|INT_VSYNC|INT_BUS|INT_DMA)
+        };
+        
+        // byte aligned mask for fb_base, fb_line_len, fb_line_pitch
+        enum {
+            BYTE_ALIENGED_MASK  = hdlcd_mask(31,3),
+            BYTE_ALIENGED_SHIFT = 3
+        };
+
+        // length mask for fb_line_count, v_sync, v_back_porch, v_data, v_front_porch, h_sync, 
+        // h_back_porch, h_data, h_front_porch
+        enum {
+            LENGTH_MASK = hdlcd_mask(11,0),
+            LENGTH_SHIFT = 0
+        };
+        
+        enum {
+            POLARITY_PXLCK      = hdlcd_bit(4),
+            POLARITY_DATA       = hdlcd_bit(3),
+            POLARITY_DATAEN     = hdlcd_bit(2),
+            POLARITY_HSYNC      = hdlcd_bit(1),
+            POLARITY_VSYNC      = hdlcd_bit(0),
+            HDLCD_POLARITY_MASK = (POLARITY_PXLCK|POLARITY_DATA|POLARITY_DATAEN|POLARITY_HSYNC|POLARITY_VSYNC)
+        };
+
+        // pixel format mask for PIXEL_FORMAT
+        enum {
+            BIG_ENDIAN_MASK         = hdlcd_bit(31),
+            BYTES_PER_PIXEL_MASK    = hdlcd_mask(4,3),
+            BYTES_PER_PIXEL_SHIFT   = 3,
+            HDLCD_PIXEL_FMT_MASK    = (BIG_ENDIAN_MASK|BYTES_PER_PIXEL_MASK)
+        };
+        
+        // color select
+        enum {
+            COLOR_DEFAULT_MASK      = hdlcd_mask(23,16),
+            COLOR_DEFAULT_SHIFT     = 16,
+            COLOR_SIZE_MASK         = hdlcd_mask(11,8),
+            COLOR_SIZE_SHIFT        = 8,
+            COLOR_OFFSET_MASK       = hdlcd_mask(4,0),
+            COLOR_OFFSET_SHIFT      = 0,
+            HDLCD_COLOR_MASK        = (COLOR_OFFSET_MASK|COLOR_SIZE_MASK|COLOR_DEFAULT_MASK)
+        };
+
+        enum {
+            HDLCD_ENABLE = hdlcd_bit(0)
+        };
+
+        pv::StreamingTransactionGenerator* dma;
+        bool fbuffer_changed;   // true if any changes were detected in the fbuffer
+        bool force_redraw;      // force redraw even if source data hasn't changed
+
+        /* Registers variables */
+
+        /* INT_RAWSTAT
+         *   Unmasked status of the interrupt sources. Write 1 set the bit and 
+         *   trigger an interrupt 
+         * [3] UNDERRUN - No data was available to display while DATAEN was active
+         * [2] VSYNC - Vertical sync is active
+         * [1] BUS_ERROR - The DMA module received a bus error while reading data
+         * [0] DMA_END - The DMA module has finished reading a frame
+         */
+        uint32_t int_raw;
+        /* INT_MASK
+         *   Hold the bit mask that enables an interrupt source if the 
+         *   corresponding mask bit is set to 1.
+         * [3] UNDERRUN
+         * [2] VSYNC
+         * [1] BUS_ERROR
+         * [0] DMA_END
+         */
+        uint32_t int_mask;
+        /* USER_OUT
+         *   Allow the system integrator to control external modules from LCD controller 
+         *   user interface. This register is system-dependant.
+         * [31:0] USER_OUT
+         */
+        uint32_t user_out;
+        /* FB_BASE
+         *   Hold the address of the first pixel of the first line in the frame buffer
+         * [31:3] FB_BASE_ADDR
+         * [2:0] RESERVED
+         */
+        uint32_t fb_base;
+        /* FB_LINE_LENGTH
+         *   Hold the length of each frame buffer line in bytes
+         * [31:3] FB_LINE_LENGTH 4294967288 bits/8 = 536870911 bytes
+         * [2:0] RESERVED
+         */
+        uint32_t fb_line_len;
+        /* FB_LINE_COUNT
+         *   Hold the number of lines to read from the frame buffer
+         * [31:12] RESERVED
+         * [11:0] FB_LINE_COUNT 4095 + 1
+         */
+        uint32_t fb_line_count;
+        /* FB_LINE_PITCH
+         *   Hold the number of bytes between the start of one line in the frame buffer 
+         *   and the start of the next line. This value is treated as a signed 2's 
+         *   complement number, enabling negative pitch if required.
+         * [31:3] FB_LINE_PITCH
+         * [2:0] RESERVED
+         */
+        uint32_t fb_line_pitch;
+        /* BUS_OPTIONS
+         *   Control aspects of how the LCD controller accesses the bus.
+         * [31:12] RESERVED
+         * [11:8] MAX_OUTSTANDING - CAUTION: A value of zero disables all bus transfers
+         * [7:5] RESERVED
+         * [4] BURST_16
+         * [3] BURST_8
+         * [2] BURST_4
+         * [1] BURST_2
+         * [0] BURST_1
+         *
+         * Bus behaviors, won't implement
+         */ 
+        uint32_t bus_opts;
+        /* V_SYNC
+         *   Hold the width of the vertical sync signal, counted in number of horizontal scan lines
+         * [31:12] RESERVED
+         * [11:0] V_SYNC - Vertical sync width-1 (4096-1)
+         */
+        uint32_t v_sync;
+        /* V_BACK_PORCH
+         *   Hold the width of the interval between the vertical sync and the first visible line,
+         *   counted in number of horizontal scan lines.
+         * [31:12] RESERVED
+         * [11:0] Vertical back porch width-1
+         */
+        uint32_t v_back_porch;
+        /* V_DATA
+         *   Hold the width of the vertical data area, that is, the number of visible lines,
+         *   counted in the number of horizontal scan lines.
+         * [31:12] RESERVED
+         * [11:0] V_DATA - Vertical data width-1
+         */
+        uint32_t v_data;
+        /* V_FRONT_PORCH
+         *   Hold the width of the interval between the last visible line and the next vertical 
+         *   synchronization, counted in number of horizontal scan lines
+         * [31:12] RESERVED
+         * [11:0] V_FRONT_PORCH - Vertical front porch width-1
+         */
+        uint32_t v_front_porch;
+        /* H_SYNC
+         *   Hold the width of the horizontal sync signal, counted in pixel clocks
+         * [31:12] RESERVED
+         * [11:0] H_SYNC - Horizontal sync width-1
+         */
+        uint32_t h_sync;
+        /* H_BACK_PORCH
+         *   Hold the width of the interval between the horizontal sync and the first visible 
+         *   column, counted in pixel clocks.
+         * [31:12] RESERVED
+         * [11:0] H_BACK_PORCH - Horizontal back porch width-1
+         */
+        uint32_t h_back_porch;
+        /* H_DATA
+         *   Hold the width of the horizontal data area, that is, the number of visible columns 
+         *   counted in pixel clocks.
+         * [31:12] RESERVED
+         * [11:0] H_DATA
+         */
+        uint32_t h_data;
+        /* H_FRONT_PORCH
+         *   Hold the width of the interval between the last visible column and the next
+         *   horizontal synchronization, counted in pixel clocks.
+         * [31:12] RESERVED
+         * [11:0] H_FRONT_PORCH - Horizontal front porch width-1
+         */
+        uint32_t h_front_porch;
+        /* POLARITIES
+         *   Control the polarities of the synchronization signals and PXLCLK
+         * [31:5] RESERVED
+         * [4] PXLCLK_POLARITY
+         * [3] DATA_POLARITY
+         * [2] DATAEN_POLARITY
+         * [1] HSYNC_POLARITY
+         * [0] VSYNC_POLARITY
+         *
+         * Too low level, won't implement
+         */
+        uint32_t polarities;
+        /* COMMAND
+         *   Start and stop the LCD controller
+         * [31:1] RESERVED
+         * [0] ENABLE - Enable the LCD controller
+         */
+        uint32_t command;
+        /* PIXEL_FORMAT
+         *   BYTES_PER_PIXEL plus on bytes are extracted from the internal buffer.
+         * [31] BIG_ENDIAN
+         * [30:5] RESERVED
+         * [4:3] BYTES_PER_PIXEL
+         * [2:0] RESERVED
+         */
+        uint32_t pixel_fmt;
+        /* RED/GREEN/BLUE_SELECT
+         *   The bytes extracted from the internal buffer are presented as a 32-bit value.
+         *   These registers select how many bits at which position are used to extract
+         *   and use as the red, green, and blue color components. If no bits are extracted or
+         *   no data is available, the default color is used.
+         * [31:24] RESERVED
+         * [23:16] DEFAULT
+         * [15:12] RESERVED
+         * [11:8] SIZE
+         * [7:5] RESERVED
+         * [4:0] OFFSET
+         */
+        uint32_t red_select;
+        uint32_t green_select;
+        uint32_t blue_select;
+
+        uint32_t reg_changed;  // which of the above registers changed
+
+        enum HDLCDRegisters
+        {
+            HDLCDIntRaw = 0,
+            HDLCDIntMask,
+            HDLCDUserOut,
+            HDLCDFBBase,
+            HDLCDFBLineLen,
+            HDLCDFBLineCount,
+            HDLCDFBLinePitch,
+            HDLCDBusOpts,
+            HDLCDVSync,
+            HDLCDVBackPorch,
+            HDLCDVData,
+            HDLCDVFrontPorch,
+            HDLCDHSync,
+            HDLCDHBackPorch,
+            HDLCDHData,
+            HDLCDHFrontPorch,
+            HDLCDPolarities,
+            HDLCDCommand,
+            HDLCDPixelFmt,
+            HDLCDRedSelect,
+            HDLCDGreenSelect,
+            HDLCDBlueSelect
+        };
+
+        // derived flags/variables
+        /* Is big endian? bit[31] in PIXEL_FORMAT */
+        bool big_endian;
+        /* Bytes per pixel, [4:3] in PIXEL_FORMAT */
+        uint32_t bytes_per_pixel;
+        uint32_t pixels_per_line;
+        /* Is LCD enabled? bit[0] in COMMAND */
+        bool enabled;
+        /* [23:16] in red/green/blue_select */
+        uint32_t default_red;
+        uint32_t default_green;
+        uint32_t default_blue;
+
+        uint32_t size_red;
+        uint32_t size_green;
+        uint32_t size_blue;
+
+        uint32_t offset_red;
+        uint32_t offset_green;
+        uint32_t offset_blue;
+        
+        // pixel colour layout
+        bool be_pixel_order;                    // little/big endian pixel order
+        bool be_byte_order;                     // little/big endian byte order (<16bpp only)
+        uint32_t bits_per_pixel;                // Bits per pixel
+        bool bgr;                               // swap b+r channels
+        
+        const VisRasterLayout * fdata;          // frame buffer data when locked
+        
+        bool palette_changed;                   // true if the palette changed
+        bool colour_format_changed;             // true if any of the colour related registers changed
+        HDLCD_Blit_Line blit;
+
+        uint32_t palette[128]; // messy representation, decode when it changes
+    }
+
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            return tx.setReturnData32((uint32_t)registerRead(tx.getAddress()));
+        }
+        
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(),tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+        busmaster : PVBusMaster();
+        timer : ClockTimer();
+    }
+
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        self.clk_in => timer.clk_in;
+        timer.timer_callback => self.timer_callback_handler;
+        busmaster.pvbus_m => self.pvbus_m;
+    }
+
+
+    // external ports
+
+    slave port<ClockSignal> clk_in;
+    slave port<PVBus> pvbus;
+    master port<LCD> display;
+    master port<Signal> intr;
+    // master port used to access framebuffer
+    master port<PVBus> pvbus_m;
+
+    behavior timer_callback() : uint32_t
+    {
+        if (diagnostic==4)
+        {
+            ostringstream W;
+            W << getInstancePath() << ": timer fired; enabled=" << enabled << endl;
+            message(W.str(), MSG_INFO);
+        }
+
+        // if the lcd is disabled, stop the clock and return immediately
+        if (!enabled)
+        {
+            return 0;
+        }
+        
+        // take account of all changes made to registers during the previous frame
+        update_registers(); 
+        
+        // now blit the frame to the framebuffer
+        blit_frame();
+        
+        return 10000;
+    }
+
+
+    internal slave port<TimerCallback> timer_callback_handler
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            return timer_callback();
+        }
+    }
+
+    
+    behavior init()
+    {
+        fdata = NULL;
+        pv::TransactionMasterControl t_control;
+        t_control >> busmaster->findPort("control");
+        dma = t_control.createStreamingTransactionGenerator();
+        fbuffer_changed = true;
+        force_redraw = true;
+        bits_per_pixel = 16; // Work around
+        blit.pixels_per_line = &pixels_per_line;
+        blit.default_red = &default_red;
+        blit.default_green = &default_green;
+        blit.default_blue = &default_blue;
+        blit.offset_red = &offset_red;
+        blit.offset_green = &offset_green;
+        blit.offset_blue = &offset_blue;
+        blit.size_red = &size_red;
+        blit.size_green = &size_green;
+        blit.size_blue = &size_blue;
+        blit.bytes_per_pixel = &bytes_per_pixel;
+        composition.init();
+
+    }
+
+    behaviour reset(int level)
+    {
+        composition.reset(level);
+
+        timer.timer_control.cancel();
+        dma->setRange(0, 0);
+
+        // Reigster reset
+        int_raw = 0x0;
+        int_mask = 0x0;
+        user_out = 0x0;
+        fb_base = 0x0;
+        fb_line_len = 0x0;
+        fb_line_count = 0x0;
+        fb_line_pitch = 0x0;
+        bus_opts = 0x408;
+        v_sync = 0x0;
+        v_back_porch = 0x0;
+        v_data = 0x0;
+        v_front_porch = 0x0;
+        h_sync = 0x0;
+        h_back_porch = 0x0;
+        h_data = 0x0;
+        h_front_porch = 0x0;
+        polarities = 0x7;
+        command = 0x0;
+        pixel_fmt = 0x0;
+        red_select = 0x0;
+        green_select = 0x0;
+        blue_select = 0x0;
+
+        // Registers related variables
+        reg_changed = false;
+        big_endian = false;
+        bytes_per_pixel = 1;  // sensible default, otherwise driver divides-by-zero
+        enabled = false;
+        default_red = 0x0;
+        default_green = 0x0;
+        default_blue = 0x0;
+        size_red = 0x0;
+        size_green = 0x0;
+        size_blue = 0x0;
+        offset_red = 0x0;
+        offset_green = 0x0;
+        offset_blue = 0x0;
+
+        // pixel colour layout
+        be_pixel_order = false;
+        big_endian = false;
+        bgr = false;
+
+        colour_format_changed = false;
+
+        update_registers();
+
+        if(display.lock.implemented())
+            fdata = display.lock();
+        else
+            fdata = NULL;
+
+        if(fdata != NULL)
+        {
+            if (fdata->changed)
+            {
+                update_palette();
+            }
+        }
+        if(display.unlock.implemented())
+            display.unlock();
+    }
+
+    behavior terminate()
+    {
+        delete dma;
+        composition.terminate();
+    }
+
+    behavior update_registers()
+    {
+        if (reg_changed) {
+            fbuffer_changed = true;
+        }
+        if(reg_changed & (1<<HDLCDPixelFmt))
+        {
+            big_endian = (pixel_fmt & BIG_ENDIAN_MASK) != 0;
+            bytes_per_pixel = ((pixel_fmt & BYTES_PER_PIXEL_MASK) >> BYTES_PER_PIXEL_SHIFT) + 1;
+            
+            colour_format_changed = true;
+            pixels_per_line = (fb_line_len/4) * bytes_per_pixel;
+            bits_per_pixel = bytes_per_pixel * 8;
+        }
+        if(reg_changed & (1<<HDLCDRedSelect))
+        {
+            default_red = (red_select & COLOR_DEFAULT_MASK) >> COLOR_DEFAULT_SHIFT;
+            offset_red = (red_select & COLOR_OFFSET_MASK) >> COLOR_OFFSET_SHIFT;
+            size_red = (red_select & COLOR_SIZE_MASK) >> COLOR_SIZE_SHIFT;
+            colour_format_changed = true;
+        }
+        if(reg_changed & (1<<HDLCDGreenSelect))
+        {
+            default_green = (green_select & COLOR_DEFAULT_MASK) >> COLOR_DEFAULT_SHIFT;
+            offset_green = (green_select & COLOR_OFFSET_MASK) >> COLOR_OFFSET_SHIFT;
+            size_green = (green_select & COLOR_SIZE_MASK) >> COLOR_SIZE_SHIFT;
+            colour_format_changed = true;
+        }
+        if(reg_changed & (1<<HDLCDBlueSelect))
+        {
+            default_blue = (blue_select & COLOR_DEFAULT_MASK) >> COLOR_DEFAULT_SHIFT;
+            offset_blue = (blue_select & COLOR_OFFSET_MASK) >> COLOR_OFFSET_SHIFT;
+            size_blue = (blue_select & COLOR_SIZE_MASK) >> COLOR_SIZE_SHIFT;
+            colour_format_changed = true;
+        }
+        if(colour_format_changed)
+        {
+            bgr = offset_blue > offset_red;
+        }
+
+        if(reg_changed & (1<<HDLCDFBBase))  // No action required
+        {
+            uint32_t fbuffer_bytes = v_data * h_data * bytes_per_pixel;
+            if (diagnostic==4)
+            {
+                ostringstream W;
+                W << getInstancePath() << ": engaging DMA for range " << hex << setw(10) << setfill('0') << hex << fb_base << ":" << setw(10) << setfill('0') << (fb_base + fbuffer_bytes) << endl;
+                W << "buffer is " << dec << v_data << " by " << h_data << " by " << (bytes_per_pixel*8) << "bpp\n";
+                message(W.str(), MSG_INFO);
+            }
+            dma->setRange(fb_base, fbuffer_bytes);
+        }
+
+        if((reg_changed & (1<<HDLCDIntRaw)) || (reg_changed & (1<<HDLCDIntMask))) // Update interrupt
+        {
+            update_interrupts();            
+        }
+
+        reg_changed = false;
+    }
+
+    behavior update_interrupts()
+    {
+        if (int_raw & int_mask) {
+            if (intr.setValue.implemented())
+            {
+                intr.setValue(sg::Signal::Set);
+            }
+        } else {
+            if (intr.setValue.implemented())
+            {
+                intr.setValue(sg::Signal::Clear);
+            }
+        }
+    }
+
+    behavior update_palette()
+    {
+        force_redraw = true;
+        
+        palette_changed = false;
+    }
+
+    // returns the new dst ptr
+    behavior blit_line(uint8_t* dst, const uint8_t* src, uint32_t len) : uint8_t* 
+    {
+        if(src)
+        {
+            switch(bytes_per_pixel)
+            {
+            case 1:
+                dst = (uint8_t*)blit.blit_line((uint32_t*)dst, src, len); break;
+            case 2:
+                dst = (uint8_t*)blit.blit_line((uint32_t*)dst, (uint16_t*)src, len); break;
+            case 3:
+            case 4:
+                dst = (uint8_t*)blit.blit_line((uint32_t*)dst, (uint32_t*)src, len); break;
+            }
+        } else {
+            dst += 4*len; // always 32 bits per pixel
+        }
+
+        return dst;
+    }
+    
+
+    behavior blit_frame() 
+    {
+        if (diagnostic==4)
+        {
+            ostringstream W;
+            W << getInstancePath() << ": blit frame" << endl;
+            message(W.str(), MSG_INFO);
+        }
+
+        unsigned int src_len = (bytes_per_pixel == 3? 4 : bytes_per_pixel);        
+        if(display.setPreferredLayout.implemented())
+            display.setPreferredLayout(h_data/*/src_len*/, v_data, 24); 
+
+        if(display.lock.implemented())
+            fdata = display.lock();
+        else
+            fdata = NULL;
+        
+        if (fdata == NULL)
+        {
+            return;
+        }
+
+        unsigned int render_bytes_per_line = fdata->width * 4;
+        unsigned int render_height = fdata->height;
+        unsigned int bytes_per_line = h_data * bytes_per_pixel;
+
+        if (render_bytes_per_line/4 > bytes_per_line/src_len) {
+            render_bytes_per_line = (bytes_per_line/src_len)*4;
+        }
+        if (render_height > fb_line_count) {
+            render_height = fb_line_count;
+        }
+        
+        fbuffer_changed |= force_redraw;
+
+        dma->startDma(fb_base);
+        
+        const uint8_t* src_ptr;
+
+        for (uint32_t line = 0; line < render_height; ++line)
+        {
+            uint32_t line_offset = 0;
+            
+            uint8_t* dest_ptr = fdata->buffer + line * fdata->pitch;
+            
+            while (line_offset < bytes_per_line)
+            {
+                uint32_t len = bytes_per_line - line_offset;
+                bool changed = dma->getDmaData(&src_ptr, &len);
+                
+                fbuffer_changed |= changed;
+                
+                if (line_offset/src_len < render_bytes_per_line/4) {
+                    uint32_t render_len = (render_bytes_per_line/4 - line_offset/src_len)*4;
+                    if (render_len/4 > len/src_len) render_len = (len/src_len)*4;
+                    
+                    dest_ptr = blit_line(dest_ptr, src_ptr, render_len);
+                }
+                line_offset += len;
+            }
+        }
+
+        if(display.unlock.implemented())
+            display.unlock();
+        
+        if (fbuffer_changed)
+        {
+            if(display.update.implemented())
+                display.update(0,0, h_data/*/src_len*/, v_data);
+        }
+
+        fbuffer_changed = false;
+        force_redraw = false;
+
+        // this always occurs here as we can't yet generate interrupts on a particular line
+        int_raw |= INT_VSYNC|INT_DMA;
+        update_interrupts();
+        
+    }
+    
+    behavior registerRead(uint32_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+        uint32_t peri_id = 0x000bb370;
+
+        switch (device_addr) {
+
+        case 0x000:
+            // version
+            data |= (HDLCD_PRODID & 0xffff) << 16;
+            data |= (HDLCD_MAJOR & 0xff) << 8;
+            data |= (HDLCD_MINOR & 0xff) << 0;
+            break;
+        case 0x010:
+            // raw int status
+            data = int_raw;
+            break;
+        case 0x018:
+            data = int_mask;
+            break;
+        case 0x01c: // Interrupt Status Register
+            data = int_raw & int_mask;
+            break;
+        case 0x020: // User output register
+            data = user_out;
+            break;
+        case 0x100:
+            data = fb_base;
+            break;
+        case 0x104:
+            data = fb_line_len;
+            break;
+        case 0x108:
+            data = fb_line_count - 1;
+            break;
+        case 0x10c:
+            data = fb_line_pitch;
+            break;
+        case 0x110:
+            data = bus_opts;
+            break;
+        case 0x200:
+            data = v_sync;
+            break;
+        case 0x204:
+            data = v_back_porch;
+            break;
+        case 0x208:
+            data = v_data;
+            break;
+        case 0x20c:
+            data = v_front_porch;
+            break;
+
+        case 0x210:
+            data = h_sync;
+            break;
+        case 0x214:
+            data = h_back_porch;
+            break;
+        case 0x218:
+            data = h_data;
+            break;
+        case 0x21c:
+            data = h_front_porch;
+            break;
+        case 0x220:
+            data = polarities;
+            break;
+        case 0x230:
+            data = command;
+            break;
+        case 0x240:
+            data = pixel_fmt;
+            break;
+        case 0x244:
+            data = red_select;
+            break;
+        case 0x248:
+            data = green_select;
+            break;
+        case 0x24c:
+            data = blue_select;
+            break;
+        //TODO - Find out the correct ids
+        case 0xFE0: data = (peri_id >> 0)  & 0xff; break; 
+        case 0xFE4: data = (peri_id >> 8)  & 0xff; break;
+        case 0xFE8: data = (peri_id >> 16) & 0xff; break;
+        case 0xFEC: data = (peri_id >> 24) & 0xff; break;
+        case 0xFF0: data = 0x0D; break; 
+        case 0xFF4: data = 0xF0; break;
+        case 0xFF8: data = 0x05; break;
+        case 0xFFC: data = 0xB1; break;
+
+        }
+        if (diagnostic==4)
+        {
+            ostringstream W;
+            W << getInstancePath() << ": HDLCD register read " << setw(3)<<setfill('0')<<hex<<(uint32_t)device_addr<<" -> "<<setw(8)<<data<<endl;
+            message(W.str(), MSG_INFO);
+        }
+        return data;
+    }    
+
+    behavior registerWrite(uint32_t device_addr, uint32_t data)
+    {
+        if (diagnostic==4)
+        {
+            ostringstream W;
+            W << getInstancePath() << ": HDLCD register write " << setw(3)<<setfill('0')<<hex<<(uint32_t)device_addr<<" -> "<<setw(8)<<data<<endl;
+            message(W.str(), MSG_INFO);
+        }
+
+        switch (device_addr) {
+        case 0x010: // INT_RAWSTAT
+            int_raw = data & HDLCD_ALL_INT_MASK;
+
+            reg_changed |= (1<<HDLCDIntRaw);
+            break;
+        case 0x014:
+            // clear int
+            int_raw &= ~(data & HDLCD_ALL_INT_MASK);
+            update_interrupts();
+//            reg_changed |= (1<<HDLCD_ALL_INT_MASK);
+            break;
+        case 0x018:
+            int_mask = data & HDLCD_ALL_INT_MASK;
+            reg_changed |= (1<<HDLCDIntMask);
+            break;
+        case 0x020:
+            user_out = data;
+            reg_changed |= (1<<HDLCDUserOut);
+            break;
+        case 0x100:
+            fb_base = data & BYTE_ALIENGED_MASK;
+            reg_changed |= (1<<HDLCDFBBase);
+            break;
+        case 0x104:
+            fb_line_len = data & BYTE_ALIENGED_MASK;
+            reg_changed |= (1<<HDLCDFBLineLen);
+            break;
+        case 0x108:
+            fb_line_count = (data & LENGTH_MASK) + 1;
+            reg_changed |= (1<<HDLCDFBLineCount);
+            break;
+        case 0x10c:
+            fb_line_pitch = data & BYTE_ALIENGED_MASK;
+            reg_changed |= (1<<HDLCDFBLinePitch);
+            break;
+        case 0x110:
+            bus_opts = data & 0xfff;
+            // This should have no effect on the model
+            reg_changed |= (1<<HDLCDBusOpts);
+            break;
+        case 0x200:
+            v_sync = data & LENGTH_MASK;
+            reg_changed |= (1<<HDLCDVSync);
+            break;
+        case 0x204:
+            v_back_porch = data & LENGTH_MASK;
+            reg_changed |= (1<<HDLCDVBackPorch);
+            break;
+        case 0x208:
+            v_data = (data & LENGTH_MASK) + 1;
+            reg_changed |= (1<<HDLCDVData);
+            break;
+        case 0x20c:
+            v_front_porch = data & LENGTH_MASK;
+            reg_changed |= (1<<HDLCDVFrontPorch);
+            break;
+        case 0x210:
+            h_sync = data & LENGTH_MASK;
+            reg_changed |= (1<<HDLCDHSync);
+            break;
+        case 0x214:
+            h_back_porch = data & LENGTH_MASK;
+            reg_changed |= (1<<HDLCDHBackPorch);
+            break;
+        case 0x218:
+            h_data = (data & LENGTH_MASK) + 1;
+            reg_changed |= (1<<HDLCDHData);
+            break;
+        case 0x21c:
+            h_front_porch = data & LENGTH_MASK;
+            reg_changed |= (1<<HDLCDHFrontPorch);
+            break;
+        case 0x220:
+            polarities = data & HDLCD_POLARITY_MASK;
+            reg_changed |= (1<<HDLCDPolarities);
+            break;
+        case 0x230:
+            command = data & HDLCD_ENABLE;
+
+            enabled = (command & HDLCD_ENABLE) != 0;
+            // the model explodes in a number of ways if it's enabled before the frame size is initialised
+            if (enabled)
+            {
+                if (v_data==0)
+                {
+                    enabled=false;
+                    message(getInstancePath()+": HDLCD_ENABLE: not enabling because v_data uninitialised\n",MSG_ERROR);
+                }
+                
+                if (h_data==0)
+                {
+                    enabled=false;
+                    message(getInstancePath()+": HDLCD_ENABLE: not enabling because h_data uninitialised\n",MSG_ERROR);
+                }
+            }
+        
+            if (enabled)// && !lcd_event)
+            {
+                // schedule a single event to get the timing running
+                timer.timer_control.set(1);
+            }
+            else// if (!enabled && lcd_event)
+            {
+                // disable timing
+                timer.timer_control.cancel();
+            }
+            reg_changed |= (1<<HDLCDCommand);
+            break;
+        case 0x240:
+            pixel_fmt = data & HDLCD_PIXEL_FMT_MASK;
+
+            reg_changed |= (1<<HDLCDPixelFmt);
+            break;
+        case 0x244:
+            red_select = data & HDLCD_COLOR_MASK;
+
+            reg_changed |= (1<<HDLCDRedSelect);
+            break;
+        case 0x248:
+            green_select = data & HDLCD_COLOR_MASK;
+
+            reg_changed |= (1<<HDLCDGreenSelect);
+            break;
+        case 0x24c:
+            blue_select = data & HDLCD_COLOR_MASK;
+
+            reg_changed |= (1<<HDLCDBlueSelect);
+            break;
+
+        // ignore ID reg writes
+
+        }
+            
+    }
+    
+    // debugger register access support - currently ignores the side_effects arg
+    
+    behavior debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+        return ACCESS_FUNC_OK;
+    }
+    
+    behavior debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+        return ACCESS_FUNC_OK;
+    }
+}
+                                                                     

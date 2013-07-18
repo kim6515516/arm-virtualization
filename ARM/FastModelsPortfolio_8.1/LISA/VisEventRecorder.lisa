@@ -1,0 +1,619 @@
+/*
+ * Copyright 2009 ARM Limited. All rights reserved.
+ */
+
+// Event recorder component for visualisation component (allows to playback and record interactive GUI sessions)
+// 
+// End user usage: 
+// 
+// Recording:
+// ----------
+//    ./model_shell cadi.so image.axf -Cvisualisation.recorder.recordingFileName=rec.txt
+//    
+// This will create an ASCII file 'rec.txt' and enable recording. This file can directly be used for playback.
+// 
+// You can select the time base for the time stamps of the recorded events. The default is a 100MHz counter
+// (10ns simulated time resolution) which is usually OK for all systems. To be able to correlate timestamps to 
+// the instruction counter it makes sense to set the time base to the clock frequency of the CPU, but this is 
+// not necessary for an exact recording or playback. The time base should be higher than CPU frequency / 100 
+// (typical quantum size). To set the recording time base set the 'recordingTimeBase' parameter.
+// 
+// Playback:
+// ---------
+//    ./model_shell cadi.so image.axf -Cvisualisation.recorder.playbackFileName=rec.txt
+// 
+// This will enable the playback of all GUI input events previously recorded in file 'rec.txt'. The time base
+// of the timestamps is always taken from the file (see T record). Interactive user input is still possible and
+// interactive evenets and recorded events are mixed.
+// 
+// Notes:
+// ------
+// It is possible to enable recording and playback at the same time. This makes it possible to check whether 
+// a playback session is reproducible or to extend a previously recorded session by appending events (just 
+// remove the QUIT event at the end). This is also useful to check the timing accuracy of the playback/recording
+// timestamps.
+// 
+//    ./model_shell cadi.so image.axf -Cvisualisation.recorder.playbackFileName=rec.txt -Cvisualisation.recorder.playbackFileName=rec.txt
+//    
+// To enable verbose messages use the 'verbose' parameter: 1=print all events while they are recorded/played back, 
+// 2=print also maintenance information of the internal ClockTimers. Default: disabled (0).
+// 
+// To disable the instruction count checking (message 'instruction count differs') set parameter 
+// 'checkInstructionCount' to 0 (default enabled).
+//
+//
+// Integration notes:
+// ------------------
+// This component is intended to be a subcomponent of a visualisation component, e.g. a component which 
+// instantiates a Visualisation object suing 'createVisualisation()'. See EBVisualisation on how to wire it up and
+// use it. The integration is pretty light weight:
+// 
+// - wire up the control and ticks port
+// - use control.registerVisRegion(regionPointer, regionName) to register all relevant VisRegion pointers:
+//   You only need to register the regsions which are used in the processMessages() function to identify a region 
+//   by pointer.
+// - call control.putEvent() for all VisEvents as they come in (regardless where they come from) (usually from 
+//   processMessages())
+// - call control.getEvent() to retrieve recorded events (always called directly or indirectly by the callback 
+//   (master) behavior control.processEvents()
+//
+component VisEventRecorder
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Event recorder component for visualisation component (allows to playback and record interactive GUI sessions).";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #include <map>
+        #include <vector>
+        #include <time.h>
+        #include <cstdlib>
+        #include "components/Visualisation.h"
+        #include "sg/MSCFixes.h"
+        #include "hostconf/zinttypes.h"
+    }
+
+    resources
+    {
+        PARAMETER { runtime(false), default(""), type(string), description("recording filename (empty string disables recording)") }
+        recordingFileName;
+        PARAMETER { runtime(false), default(""), type(string), description("playback filename (empty string disables playback)") }
+        playbackFileName;
+        PARAMETER { runtime(false), default(100000000), type(uint64_t), description("timebase in 1/s (relative to the master clock (e.g. 100000000 means 10 nanoseconds resultion simulated time for a 1Hz master clock)) to be used for recording (higher values -> higher time resolution, playback time base is always taken from the playback file)") }
+        recordingTimeBase;
+        PARAMETER { runtime(true), default(0), type(uint32_t), description("enable verbose messages (1=normal, 2=even more)") }
+        verbose;
+        PARAMETER { runtime(true), default(true), type(bool), description("check instruction count in recording file against actual instruction count during playback") }
+        checkInstructionCount;
+        
+        // associate VisRegions with names to be able to store pointers to them in an ASCII file
+        std::map<std::string, VisRegion *> name2region;
+        std::map<VisRegion *, std::string> region2name;
+        
+        // timers
+        uint64_t currentRecordingTimeHigh;
+        uint64_t currentRecordingTime;
+        
+        // ClockTimers are only 32 bit, wrap arond at this value
+        uint32_t timerTop;
+        
+        // enable/disable recording/playback
+        bool recordingEnabled;
+        bool playbackEnabled;
+        
+        // playback data
+        struct Event
+        {
+            uint64_t time;
+            uint64_t instructionCount;
+            VisEvent visEvent;
+        };
+        std::vector<Event> playbackData;
+        uint32_t playbackPC;
+        uint64_t playbackCurrentTimeStamp; // set only during 'processesEvents()' callback: timestamp of events which are to be processed now
+        uint64_t playbackNextTimeStamp; // timestamp which are to be processed in the next timer callback (the one following after the current one)
+        uint64_t playbackLongWait; // != 0 when we need to wait more than 0x40000000 ticks
+        enum { INITIAL_DIFF_MESSAGE_THRESHOLD = 300 }; // print a message when a playback event is emitted more than 1000 instructions before or after the instruction count in the recording
+        int64_t diffMessageThresholdLower; // print 'differing instruction count' messages only for even lower/higher values
+        int64_t diffMessageThresholdUpper;
+    }
+
+    composition
+    {
+        // playback time base
+        playbackTimer : ClockTimer;
+        playbackDivider : ClockDivider(mul=1); // rate set later
+        // recording time base
+        recordingTimer : ClockTimer;
+        recordingDivider : ClockDivider(mul=recordingTimeBase); // rate set later
+        masterClock : MasterClock();
+    }
+    
+    connection
+    {
+        // wire up clocks and callbacks to timers
+        masterClock.clk_out      => playbackDivider.clk_in;
+        playbackDivider.clk_out  => playbackTimer.clk_in;
+        playbackTimer.timer_callback => self.playbackTimerCallback;
+        masterClock.clk_out      => recordingDivider.clk_in;
+        recordingDivider.clk_out => recordingTimer.clk_in;
+        recordingTimer.timer_callback => self.recordingTimerCallback;
+    }
+    
+    behavior init
+    {
+        composition.init();
+        // maximum timer value for long running timers (recoding timer and playback timer in big pauses between events)
+        // ideally this would be set to infinity, but ClockTimer is limited to 32 bit which is not sufficient
+        // the exact value of this is not important: high values are better because they result in less callbacks
+        timerTop = 0x40000000; 
+        initRecording();
+        name2region["NULL"] = 0;
+        region2name[0] = "NULL";
+        diffMessageThresholdLower = -INITIAL_DIFF_MESSAGE_THRESHOLD;
+        diffMessageThresholdUpper = +INITIAL_DIFF_MESSAGE_THRESHOLD;
+    }
+    
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        initPlayback(); // initialize in reset because control.registerVisRegion is called in init()
+
+        // start recording timer
+        if (recordingEnabled)
+            recordingTimer.timer_control.set(timerTop);
+        
+        // start playback timer
+        if (playbackEnabled) {            
+            uint32_t delay = getNextPlaybackTimerInterval();
+            if ((delay == 0) && playbackEnabled)
+                delay = playbackTimerCallback.signal();
+            if (delay && playbackEnabled)
+            {
+                if (verbose >= 2)
+                    message(sg::message::MSG_INFO, "%s: starting playback timer (interval=%u)\n", getInstanceName().c_str(), delay);
+                playbackTimer.timer_control.set(delay);
+            }
+        }
+    }
+
+    behavior terminate
+    {
+        composition.terminate();
+        // emit Z record as 'vaid end' marker
+        if (recordingEnabled)
+        {
+            uint64_t currentTime = getCurrentRecordingTime();
+            char buf[4096];
+            snprintf(buf, sizeof(buf), "Z %10"PRIu64" # simulation terminated\n", currentTime);
+            appendToFile(recordingFileName.c_str(), buf);
+        }
+    }
+    
+    slave port<InstructionCount> ticks;
+
+    // the visualisation component controls the recoder through this port
+    slave port<VisEventRecorderProtocol> control
+    {
+        // get next available event
+        // (intended to be called from within processEvents())
+        slave behavior getEvent(VisEvent *event): bool
+        {
+            // clear event data
+            memset(event, 0, sizeof(VisEvent));
+            if (!playbackEnabled)
+                return false;
+            if (playbackPC >= playbackData.size())
+                return false;
+            if (playbackCurrentTimeStamp != playbackData[playbackPC].time)
+                return false;
+            // return next event
+            *event = playbackData[playbackPC].visEvent;
+            if (verbose)
+                message(sg::message::MSG_INFO, "%s: PLAY[%3d]: i=%10"PRIu64" %s\n", 
+                        getInstanceName().c_str(), playbackPC, ticks.getValue(), formatEventRecord(playbackCurrentTimeStamp, playbackData[playbackPC].instructionCount, event, "").c_str());
+            // check instruction count for consistency during playback
+            if (checkInstructionCount)
+            {
+                int64_t diff = playbackData[playbackPC].instructionCount - ticks.getValue();
+                if ((diff < diffMessageThresholdLower) || (diff > diffMessageThresholdUpper))
+                {
+                    message(sg::message::MSG_INFO, "%s: PLAY[%3d]: recorded/playback instruction counts differ by %"PRId64" instructions: increase recordingTimeBase value and re-record: (i=%10"PRIu64" %s)\n",
+                            getInstanceName().c_str(), playbackPC, diff, ticks.getValue(),
+                            formatEventRecord(playbackCurrentTimeStamp, playbackData[playbackPC].instructionCount, event, "").c_str());
+                    if (diff < diffMessageThresholdLower)
+                        diffMessageThresholdLower = diff;
+                    if (diff > diffMessageThresholdUpper)
+                        diffMessageThresholdUpper = diff;
+                }
+            }
+            playbackPC++;
+            return true;
+        }
+
+        // record an event
+        slave behavior putEvent(const VisEvent *event)
+        {
+            if (!recordingEnabled)
+                return;
+            if (!event)
+                return;
+            if (event->type == VisEvent::None) // ignore 'None' events
+                return;
+            uint64_t currentTime = getCurrentRecordingTime();
+            string eventStr = formatEventRecord(currentTime, ticks.getValue(), event, "\n");
+            appendToFile(recordingFileName.c_str(), eventStr.c_str());
+        }
+
+        // called on initialisation: associate names with VisRegion pointers
+        slave behavior registerVisRegion(VisRegion *region, const char *regionName)
+        {
+            name2region[regionName] = region;
+            region2name[region] = regionName;
+        }
+    }
+    
+    internal slave port<TimerCallback> playbackTimerCallback
+    {
+        behaviour signal() : uint32_t {
+            // first check whether we did not yet wait long enough (timer limited to 32 bit)
+            if (playbackLongWait) {
+                uint32_t delay = timerTop;
+                if (playbackLongWait < timerTop) 
+                    delay = uint32_t(playbackLongWait);
+                playbackLongWait -= delay;
+                if (verbose >= 2)
+                    message(sg::message::MSG_INFO, "%s: playbackTimerCallback: restarting timer (interval=%u, long wait, no event)\n", getInstanceName().c_str(), delay);
+                return delay;
+            }
+            // process messages for this timestamp
+            playbackCurrentTimeStamp = playbackNextTimeStamp;
+            if (verbose >= 2)
+                message(sg::message::MSG_INFO, "%s: playbackTimerCallback: emitting messages for timestamp %"PRIu64"\n", getInstanceName().c_str(), playbackCurrentTimeStamp);
+            control.processEvents();
+            playbackCurrentTimeStamp = uint64_t(-1);
+            uint32_t delay = getNextPlaybackTimerInterval();
+            if (verbose >= 2)
+                message(sg::message::MSG_INFO, "%s: playbackTimerCallback: restarting timer (interval=%u)\n", getInstanceName().c_str(), delay);
+            return delay;
+        }
+    }
+
+    internal slave port<TimerCallback> recordingTimerCallback
+    {
+        behaviour signal() : uint32_t
+        {
+            // just adjust the high part of the 64 bit timer value
+            // (for the fine grain time we use remaining())
+            currentRecordingTimeHigh += timerTop;
+            return timerTop;
+        }
+    }
+
+    // get a fomatted event record
+    behavior formatEventRecord(uint64_t time, uint64_t instructionCount, const VisEvent *event, const char *lineEnd): std::string
+    {
+        // get type string
+        const char *typeStr = getTypeStr(unsigned(event->type));
+        if (!typeStr)
+        {
+            message(sg::message::MSG_ERROR, "%s: formatEventRecord(): unknown type %d\n", getInstanceName().c_str(), int(event->type));
+            typeStr = getTypeStr(0);
+        }
+        
+        // get region string
+        const char *regionStr = "NULL";
+        std::map<VisRegion*, std::string>::const_iterator i = region2name.find(event->region);
+        if (i != region2name.end())
+            regionStr = i->second.c_str();
+        
+        // format record
+        char buf[4096];
+        snprintf(buf, sizeof(buf), "E %10"PRIu64" %10"PRIu64" %-15s 0x%02x %4d %4d %4d %4d %d %s%s",
+                 time, instructionCount, typeStr, event->keysym, event->rel_x, event->rel_y, event->abs_x, event->abs_y, event->button, regionStr, lineEnd);
+        return buf;
+    }
+    
+    // get type string for VisEvent::type
+    behavior getTypeStr(unsigned type): const char *
+    {
+        static const char *type2str[] = {"None", "KEYDOWN", "KEYUP", "MOUSEBUTTONDOWN", "MOUSEBUTTONUP", "MOUSEMOTION", "QUIT"};
+        if (type >= (sizeof(type2str) / sizeof(type2str[0])))
+            return 0;
+        return type2str[type];
+    }
+    
+    // get event type for string
+    behavior getEventType(const char *fileName, int linenr, const char *str):  VisEvent::VisEventType
+    {
+        for (int type = 0;; type++)
+        {
+            const char *typeStr = getTypeStr(type);
+            if (typeStr == 0)
+                break;
+            if (strcmp(str, typeStr) == 0)
+                return (VisEvent::VisEventType)type;
+        }
+        message(sg::message::MSG_ERROR, "%s:%d: unknown event type '%s' in E record\n", fileName, linenr, str);
+        return VisEvent::None; // unknown events get mapped onto None
+    }
+
+    // append a string to the end of a file
+    behavior appendToFile(const char *fileName, const char *str)
+    {
+        writeToFile(fileName, str, "ab");
+    }
+    
+    // write string to file with a certain mode
+    behavior writeToFile(const char *fileName, const char *str, const char *mode)
+    {
+        // recoding GUI events is low data volume
+        // we can afford to open, append and close the file for each single line
+        // this is usually faster than doing an fflush() after every line to make sure the file is flushed to disk
+        FILE *f = fopen(fileName, mode);
+        if (f == 0)
+        {
+            message(sg::message::MSG_ERROR, "%s: appendToFile(): error while opening file '%s' for mode '%s', disabling recording\n",
+                    getInstanceName().c_str(), fileName, mode);
+            recordingEnabled = false; // disable recording, we cannot open the file
+            return;
+        }
+        fputs(str, f);
+        fclose(f);
+        if (verbose)
+            message(sg::message::MSG_INFO, "%s: REC: %s", getInstanceName().c_str(), str); // LF is in str
+    }
+
+    // get current recording time
+    behavior getCurrentRecordingTime(): uint64_t
+    {
+        uint32_t timeLow = timerTop - recordingTimer.timer_control.remaining();
+        // remaining is in [0..timerTop] (both inclusive), but timerTop is a rare event and we map it onto timerTop-1
+        // - subtract one to make low time correct for remaining() in [0..timerTop-1]
+        // - map lowTime -1 onto 0
+        if (timeLow)
+            timeLow--;
+        uint64_t time = currentRecordingTimeHigh + timeLow;
+        if (time < currentRecordingTime)
+            message(sg::message::MSG_ERROR, "%s: reverse timeflow: %"PRIu64" < %"PRIu64" (but should be >=)\n",
+                    getInstanceName().c_str(), time, currentRecordingTime);
+        currentRecordingTime = time;
+        return currentRecordingTime;
+    }
+
+    // init recording file (write header etc)
+    behavior initRecording()
+    {
+        currentRecordingTimeHigh = 0;
+        currentRecordingTime = 0;
+        recordingEnabled = !recordingFileName.empty();
+        if (!recordingEnabled)
+            return;
+        message(sg::message::MSG_INFO, "%s: recording to file '%s' enabled\n", getInstanceName().c_str(), recordingFileName.c_str());
+        writeToFile(recordingFileName.c_str(), "# This is a VisEventRecording recording file. See VisEventRecorder.lisa for details. This line is a comment. Feel free to edit this file.\n", "wb");
+        appendToFile(recordingFileName.c_str(), "# E record: E eventType, keysym, rel_x, rel_y, abs_x, abs_y, button, region_name\n");
+        char buf[4096];
+        time_t dateTmp = 0;
+        time(&dateTmp);
+        const char *dateStr = ctime(&dateTmp);
+        int dateLen = (int)strlen(dateStr) - 1; // strip trailing linefeed from ctime() result (ARGH!)
+        if (dateLen < 0)
+            dateLen = 0;
+        uint32_t version = 0;
+        snprintf(buf, sizeof(buf), "H 0x%08x, %s, %*.*s, %s # version, instance, date, original_filename\n", version, getInstancePath().c_str(), dateLen, dateLen, dateStr, recordingFileName.c_str());
+        appendToFile(recordingFileName.c_str(), buf);
+        snprintf(buf, sizeof(buf), "T %"PRIu64" # timebase 1/N seconds for 1Hz master clock\n", recordingTimeBase);
+        appendToFile(recordingFileName.c_str(), buf);
+    }
+
+    // init playback and read playback file
+    behavior initPlayback()
+    {
+        playbackEnabled = !playbackFileName.empty();
+        if (!playbackEnabled)
+            return;
+        message(sg::message::MSG_INFO, "%s: playback from file '%s' enabled\n", getInstanceName().c_str(), playbackFileName.c_str());
+        playbackPC = 0;
+        playbackCurrentTimeStamp = 0;
+        playbackNextTimeStamp = 0;
+        playbackLongWait = 0;
+        
+        // read and parse recording file
+        FILE *f = fopen(playbackFileName.c_str(), "rb");
+        if (f == 0)
+        {
+            message(sg::message::MSG_ERROR, "%s: initPlayback(): error while opening file '%s' for reading, disabling playback\n",
+                    getInstanceName().c_str(), playbackFileName.c_str());
+            playbackEnabled = false; // disable playback, we cannot open the file
+            return;
+        }
+        char buf[4096];
+        int linenr = 0;
+        for (;;)
+        {
+            // read line
+            linenr++;
+            buf[0] = 0;
+            if (fgets(buf, sizeof(buf), f) == 0)
+                break;
+            buf[sizeof(buf) - 1] = 0;            
+            
+            // strip comments
+            char *p = buf;
+            while((*p != '#') && (*p != '\n') && (*p != 0))
+                p++;
+            *p = 0;
+            
+            // strip trailing spaces
+            while((p > buf) && isspace((unsigned int)p[-1]))
+                p--;
+            *p = 0;
+
+            // strip leading spaces
+            p = buf;
+            while(isspace((unsigned int)(*p)))
+                p++;
+            
+            // parse data
+            switch(*p)
+            {
+            case 'E':
+                parseAndAppendEventRecord(playbackFileName.c_str(), linenr, p + 1);
+                break;
+            case 'T':
+                parseTimeBaseRecord(playbackFileName.c_str(), linenr, p + 1);
+                break; 
+            case 'Z':
+                // not really interested at the moment
+                break;
+            case 'H':
+                // not really interested at the moment
+                break;                
+            case 0:
+                // ignore empty lines
+                break;
+            default:
+                {
+                    char type = *p;
+                    if (!isprint(*p))
+                        type = '?';
+                    message(sg::message::MSG_ERROR, "%s:%d: unknown '%c'-record (ASCII 0x%02X) in VisEventRecorder recording file (see VisEventRecord.lisa for details)\n",
+                            playbackFileName.c_str(), linenr, type, type);
+                }
+                break;
+            }            
+        }
+        fclose(f);
+        
+        // print playback events
+        if (verbose >= 2)
+        {
+            for (size_t i = 0; i < playbackData.size(); i++)
+            {
+                message(sg::message::MSG_INFO, "%s: PLAYINIT[%3d]: %s\n", 
+                        getInstanceName().c_str(), (int)i, formatEventRecord(playbackData[i].time, playbackData[i].instructionCount, &playbackData[i].visEvent, "").c_str());
+            }
+        }
+    }
+        
+    // parse E record data and add an event to playbackData
+    behavior parseAndAppendEventRecord(const char *fileName, int linenr, const char *str)
+    {
+        Event event;
+        memset(&event, 0, sizeof(event));
+        // str: "  415845536 MOUSEMOTION     0x00   22  -18  455  138 0 render_lcd"
+        char *p = (char*)str;
+        
+        // timestamp
+        event.time = strtoull(p, (char**)&p, 0);
+        event.instructionCount = strtoull(p, (char**)&p, 0);
+        
+        // check timestamp for consistency
+        if (!playbackData.empty())
+        {
+            if (event.time < playbackData.back().time)
+            {
+                message(sg::message::MSG_ERROR, "%s:%d: timestamp goes backwards in time in event (E) record '%s'\n",
+                        fileName, linenr, str);
+            }
+        }
+        
+        // skip spaces
+        while (isspace((unsigned int)*p))
+            p++;
+        
+        // get event type
+        const char *eventTypeStr = p;
+        while (isalnum((unsigned int)*p))
+            p++;
+        char saved = *p;
+        *p = 0;
+        event.visEvent.type = getEventType(fileName, linenr, eventTypeStr);
+        *p = saved;
+
+        // get keysym and mouse data
+        event.visEvent.keysym = strtol(p, (char**)&p, 0);
+        event.visEvent.rel_x  = strtol(p, (char**)&p, 0);
+        event.visEvent.rel_y  = strtol(p, (char**)&p, 0);
+        event.visEvent.abs_x  = strtol(p, (char**)&p, 0);
+        event.visEvent.abs_y  = strtol(p, (char**)&p, 0);
+        event.visEvent.button = strtol(p, (char**)&p, 0);
+
+        // skip spaces
+        while (isspace((unsigned int)*p))
+            p++;
+
+        // get region name
+        const char *regionNameStart = p;
+        while (isalnum((unsigned int)*p) || (*p == '_'))
+            p++;
+        // now we must be at the end of the string
+        // otherwise some values were broken (we are stuck on that invalid char) or missing (we are stuck at 0 even before coming to the region name)
+        if ((*p != 0) || (p == regionNameStart))
+        {
+            message(sg::message::MSG_ERROR, "%s:%d: syntax error in event (E) record '%s'\n",
+                    fileName, linenr, str);
+            return;
+        }
+        saved = *p;
+        *p = 0;
+        std::string regionName = regionNameStart;
+        *p = saved;
+
+        // get region
+        std::map<std::string, VisRegion*>::const_iterator i = name2region.find(regionName);
+        if (i != name2region.end()) {
+            event.visEvent.region = i->second;
+        }
+        else {
+            message(sg::message::MSG_ERROR, "%s:%d: unknown region name '%s' in E record\n",
+                    fileName, linenr, regionName.c_str());
+        }                
+        
+        // add event data
+        playbackData.push_back(event);
+    }
+
+    // parse line in str and set the playback time base
+    behavior parseTimeBaseRecord(const char *fileName, int linenr, const char *str)
+    {
+        const char *p = str;
+        uint32_t playbackTimeBase = strtoul(p, (char**)&p, 0);        
+        if (*p != 0)
+        {
+            message(sg::message::MSG_ERROR, "%s:%d: syntax error in time base (T) record '%s'\n",
+                    fileName, linenr, str);
+            return;
+        }
+        playbackDivider.rate.set(playbackTimeBase, 1);
+        if (verbose)
+            message(sg::message::MSG_INFO, "%s:%d: setting playback time base to %u\n",
+                    fileName, linenr, playbackTimeBase);
+    }
+    
+    // return number of ticks for the playback timer to wait next
+    behavior getNextPlaybackTimerInterval(): uint32_t
+    {
+        if (playbackPC >= playbackData.size())
+        {
+            playbackEnabled = false;
+            return 0;
+        }
+        uint64_t currentTime = playbackNextTimeStamp;
+        playbackNextTimeStamp = playbackData[playbackPC].time;
+        uint64_t delta = playbackNextTimeStamp - currentTime;
+        if (delta > timerTop) {
+            playbackLongWait = delta - timerTop;
+            delta = timerTop;
+        }
+        else {
+            playbackLongWait = 0;
+        }
+        return (uint32_t)delta;
+    }
+}
+

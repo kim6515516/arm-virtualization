@@ -1,0 +1,472 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// PL016 GPIO.  Works only in software mode, requires external loopback from
+// GPIO_Out to GPIO_In
+
+component PL061_GPIO
+{
+    properties 
+    {
+        version = "8.1.37"; 
+        component_type = "Peripheral";
+        description = "ARM PrimeCell General Purpose Input/Output(PL061)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #define PL061_TRACE if (!0) ; else printf
+        #define PL061_ERROR if (!1) ; else printf
+    }
+
+    resources
+    {
+        // main state and debugger visible registers
+        
+        REGISTER { description("Data (all bits)"),          read_function(debug_read), write_function(debug_write), reg_number(0x3fc) } GPIODATA;
+        REGISTER { description("Direction"),                read_function(debug_read), write_function(debug_write), reg_number(0x400) } GPIODIR;
+        REGISTER { description("Interrupt Sense"),          read_function(debug_read), write_function(debug_write), reg_number(0x404) } GPIOIS;
+        REGISTER { description("Interrupt Both Edges"),     read_function(debug_read), write_function(debug_write), reg_number(0x408) } GPIOIBE;
+        REGISTER { description("Interrupt Event"),          read_function(debug_read), write_function(debug_write), reg_number(0x40c) } GPIOIEV;
+        REGISTER { description("Interrupt Mask"),           read_function(debug_read), write_function(debug_write), reg_number(0x410) } GPIOIE;
+        REGISTER { description("Raw Interrupt Status"),     read_function(debug_read), write_function(debug_write), reg_number(0x414),
+                   attribute(read_only) } GPIORIS;
+        REGISTER { description("Masked Interrupt Status"),  read_function(debug_read), write_function(debug_write), reg_number(0x418),
+                   attribute( read_only) } GPIOMIS;
+        REGISTER { description("Interrupt Clear"),          read_function(debug_read), write_function(debug_write), reg_number(0x41c) } GPIOIC;
+        REGISTER { description("Mode Control Select"),      read_function(debug_read), write_function(debug_write), reg_number(0x420) } GPIOAFSEL;                
+
+        // ID registers
+        REGISTER { description("Peripheral ID bits 7:0"),    read_function(debug_read), write_function(debug_write), 
+                   reg_number(0xFE0), display_format("hex"), bitwidth( 8), attribute(read_only) } GPIOPeriphID0;
+        REGISTER { description("Peripheral ID bits 8:15"),   read_function(debug_read), write_function(debug_write),
+                   reg_number(0xFE4), display_format("hex"), bitwidth( 8), attribute(read_only) } GPIOPeriphID1;
+        REGISTER { description("Peripheral ID bits 23:16"),  read_function(debug_read), write_function(debug_write),
+                   reg_number(0xFE8), display_format("hex"), bitwidth( 8), attribute(read_only) } GPIOPeriphID2;
+        REGISTER { description("Peripheral ID bits 31:24"),  read_function(debug_read), write_function(debug_write),
+                   reg_number(0xFEC), display_format("hex"), bitwidth( 8), attribute(read_only) } GPIOPeriphID3;
+        REGISTER { description("PrimeCell ID bits 7:0"),     read_function(debug_read), write_function(debug_write),
+                   reg_number(0xFF0), display_format("hex"), bitwidth( 8), attribute(read_only) } GPIOPCellID0;
+        REGISTER { description("PrimeCell ID bits 8:15"),    read_function(debug_read), write_function(debug_write),
+                   reg_number(0xFF4), display_format("hex"), bitwidth( 8), attribute(read_only) } GPIOPCellID1;
+        REGISTER { description("PrimeCell ID bits 23:16"),   read_function(debug_read), write_function(debug_write),
+                   reg_number(0xFF8), display_format("hex"), bitwidth( 8), attribute(read_only) } GPIOPCellID2;
+        REGISTER { description("PrimeCell ID bits 31:24"),   read_function(debug_read), write_function(debug_write),
+                   reg_number(0xFFC), display_format("hex"), bitwidth( 8), attribute(read_only) } GPIOPCellID3;
+
+        // Parameter to set default values for inputs -- reset only
+        PARAMETER { description("Default input values [7:0]"), type(uint32_t), default(0x0) } init_inputs;
+
+        // internal state
+
+        uint32_t GPIO_Mask;         // 8bits mask to read and write from address GPIODATA, controlled by the GPIO PADDR[11:2]
+        uint32_t GPIN;              // store the states of the GPIN pin[7:0]
+        uint32_t Intr_temp;         // a temporary register to store the status of interrupts source prior all the conditions
+        uint32_t Last_pins_stats;   // keep the previous interrupt raw status for edge/level trigger
+    }
+    
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+    }
+
+    slave port<Value> GPIO_In   //32-bit data in, only [7:0] is used   
+    {
+        behavior setValue(uint32_t value)
+        {
+            GPIN = (value & 0x00ff); // only [7:0] pins are used
+            Intr_temp = GPIN;        // Raw interrupt status prior masking, the GPIN (value) includes the GPIO_Out loopback
+            UpdateIntrOutput();
+        }
+    }
+    
+    slave port<PVBus> pvbus;
+    
+    internal slave port<Signal> PRESETn // hidden it as it is not actually used.... the reset should be implemented by pvbus
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            if (state == sg::Signal::Clear)
+            {
+                reset(0);   
+                /* clear all the register to 0, this realizes several effects:
+                 * (1) input and output pins are  set as input;
+                 * (2) all interrupts are masked as disabled;
+                 * (3) raw interrupt statuses are cleared to 0;
+                 * (4) edge triggered interrupts are selected as source;
+                 */
+                ClearAllIntrs();               
+            }    
+        }   
+    }
+          
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behaviour read(pv::ReadTransaction tx)
+                    : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32((uint32_t)registerRead(tx.getAddress() & ~3));
+        }
+        
+        behaviour write(pv::WriteTransaction tx)
+                    : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || (tx.getAddress() & 3) != 0) return tx.generateAbort();
+            registerWrite(tx.getAddress(),
+                          tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }        
+    
+    master port<Value> GPIO_Out;//32-bit data out, only [7:0] is used 
+    
+    master port<Signal> GPIO_Intr;  // single interrupt output --connect to the interrupt controller
+    
+    master port<Value> GPIO_MIS;//32-bit data out , only [7:0] is used  --- NOT necessary, as the GPIOMIS can be read from address0x418
+    
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+    }
+        
+    behavior init_id_registers()
+    {
+        GPIOPCellID0    = 0x61;
+        GPIOPCellID1    = 0x10;
+        GPIOPCellID2    = 0x04;
+        GPIOPCellID3    = 0x00;
+
+        GPIOPeriphID0   = 0x0d;
+        GPIOPeriphID1   = 0xF0;
+        GPIOPeriphID2   = 0x05;
+        GPIOPeriphID3   = 0xB1;
+    }
+
+    behavior init() 
+    {
+        composition.init();
+
+        init_id_registers();
+        GPIO_Mask =0;
+        GPIODATA = 0;           
+        GPIODIR = 0;
+        GPIOIS = 0;
+        GPIOIBE = 0;
+        GPIOIEV = 0;
+        GPIOIE = 0;
+        GPIORIS = 0;
+        GPIOMIS = 0;
+        GPIOIC = 0;
+
+        GPIN = init_inputs;
+        Intr_temp = 0;
+        Last_pins_stats =0;
+    }
+    
+    behavior reset(int level) 
+    {
+        composition.reset(level);
+        init_id_registers();
+        GPIO_Mask =0;
+        GPIODIR = 0;
+        GPIODATA = 0;           
+        GPIOIS = 0;
+        GPIOIBE = 0;
+        GPIOIEV = 0;
+        GPIOIE = 0;
+        GPIORIS = 0;
+        GPIOMIS = 0;
+        GPIOIC = 0;               
+        Last_pins_stats =0;
+    }
+    
+    behavior registerRead(pv::bus_addr_t device_addr) : uint32_t
+    {
+        uint32_t data = 0; // default
+
+        if (device_addr <= 0x3FC) // data register - cover 256 location in the address space
+        {
+            // on read, the data register - GPIODATA contains the current status of the GPIO pins, 
+            // whether they are configured as input or output.
+            data = ReadGPIOData(device_addr);
+            PL061_TRACE("%s: r 0x%08x <- %s[%03x]\n", getInstanceName().c_str(),
+                        data, register_name(device_addr), (uint32_t)device_addr);
+            return data;
+        }
+        
+        switch(device_addr)
+        {
+        case 0x400: data = GPIODIR;
+                    break;
+        case 0x404: data = GPIOIS;   // interrupt sense register
+                    break;
+        case 0x408: data = GPIOIBE;  // interrupt both edges register
+                    break;
+        case 0x40C: data = GPIOIEV;  // interrupt event register
+                    break;
+        case 0x410: data = GPIOIE;   // interrupt mask
+                    break;
+        case 0x414: data = GPIORIS;  // raw interrupt status 
+                    break;
+        case 0x418: data = GPIOMIS;  // masked interrupt status
+                    break;
+        case 0x420: data = GPIOAFSEL;// mode control select -- function NOT implemented
+                    break;
+        // ID registers
+        case 0xFE0: data = GPIOPCellID0;
+                    break;
+        case 0xFE4: data = GPIOPCellID1;
+                    break;
+        case 0xFE8: data = GPIOPCellID2;
+                    break;
+        case 0xFEC: data = GPIOPCellID3;
+                    break;
+        case 0xFF0: data = GPIOPeriphID0;
+                    break;
+        case 0xFF4: data = GPIOPeriphID1;
+                    break;
+        case 0xFF8: data = GPIOPeriphID2;
+                    break;
+        case 0xFFC: data = GPIOPeriphID3;
+                    break;
+        }
+        
+        PL061_TRACE("%s: r 0x%08x <- %s[%03x]\n", getInstanceName().c_str(), 
+                    data, register_name(device_addr), (uint32_t)device_addr);
+        return data;
+    } // end of registerRead()
+ 
+    behavior registerWrite(pv::bus_addr_t device_addr, uint32_t data)
+    {
+        PL061_TRACE("%s w 0x%08x -> %s[%03x]\n", getInstanceName().c_str(), 
+                    data, register_name(device_addr), (uint32_t)device_addr);
+
+        if (device_addr <= 0x3FC) // data register - cover 256 location in the address space
+        {
+            WriteGPIOData(device_addr, data);
+            //Writing to the data register only affects the pins that configured as outputs.
+            UpdateGPOUT();
+            return;
+        }        
+        
+        switch (device_addr)
+        {
+        case 0x400: GPIODIR = (data & 0xff); return;
+        case 0x404:                                  // interrupt sense register
+                    GPIOIS =  (data & 0xff); 
+                    UpdateIntrOutput();
+                    return;  
+        case 0x408:                                  // interrupt both edges register
+                    GPIOIBE = (data & 0xff); 
+                    UpdateIntrOutput();
+                    return; 
+        case 0x40C:                                  // interrupt event register
+                    GPIOIEV = (data & 0xff); 
+                    UpdateIntrOutput();
+                    return;
+        case 0x410:                                  // interrupt mask
+                    GPIOIE =  (data & 0xff); 
+                    UpdateIntrOutput();
+                    return;
+                    
+        case 0x41C: 
+                    GPIOIC =  (data & 0xff); 
+                    UpdateIntrOutput();
+                    return;  // interrupt clear
+        
+        case 0x420: GPIOAFSEL = (data & 0xff); return;  // mode control select -- its function NOT implemented
+        // ID registers
+        case 0xFE0:
+        case 0xFE4:
+        case 0xFE8:
+        case 0xFEC:
+        case 0xFF0:
+        case 0xFF4:
+        case 0xFF8:
+        case 0xFFC:
+            PL061_ERROR("%s Write to read only register 0x%x.\n", 
+                        getInstanceName().c_str(), (uint32_t)device_addr);
+            return;
+        default:
+            PL061_ERROR("%s Write register: Invalid address 0x%x\n", 
+                        getInstanceName().c_str(), (uint32_t)device_addr);
+            return;
+        }
+    }
+    
+    
+    
+    // As on read, the data register contains the current status of the GPIO pins, whether they are configured as input or output.
+    // as in this implementation of GPIO, the GPIO pins are separated into 8 input and 8 output pins, 
+    // while the output pins are controlled by the content of GPIODATA
+    // thus reading the data register should reflect both --- the GPIN and GPIODATA
+
+    behavior  ReadGPIOData(pv::bus_addr_t device_addr) : uint32_t
+    {
+        GPIO_Mask = ((device_addr >>2) & 0x0ff);  // bits [11:2]
+       
+        uint32_t The_GPIN = ( GPIN & (~GPIODIR));   // find valid GPIN (input pins set by GPIODIR)
+        
+        uint32_t TheData = (GPIODATA & GPIODIR);    // find valid GPOUT --the data of GPIODATA --also see UpdateGPOUT()
+        
+        uint32_t ReturnRawData = (TheData | The_GPIN) & 0xff;
+        
+        return (ReturnRawData & GPIO_Mask);
+    }
+    
+    behavior WriteGPIOData(pv::bus_addr_t device_addr, uint32_t data)
+    {
+        GPIO_Mask = (  (device_addr >>2) & 0xff);  //only bits [11:2] are valid
+        
+        GPIODATA &= (~GPIO_Mask);   // set the certain pins in GPIO_Mask to  'High' , to enable writing.
+        
+        GPIODATA |= (data & GPIO_Mask);    // otherwise, the bit values in GPIODATA remain unchanged by the write.
+    }
+    
+    behavior UpdateGPOUT()
+    {
+        uint32_t output = (uint32_t)(GPIODATA & GPIODIR);// GPIODIR set for pins output
+        
+        GPIO_Out.setValue(output);
+    }
+    
+    behavior ClearAllIntrs()   
+    {
+        GPIOIC = 0xff;   //however it will NOT clear the level triggerred interrupt!
+        
+        ClearIntruptOutput();
+    }
+    
+    behavior ClearIntruptOutput()
+    {
+        // now update output GPIO_MIS (internal value port)
+        if(GPIO_MIS.setValue.implemented())
+            GPIO_MIS.setValue(GPIOMIS);
+         
+        // now update output GPIO_Intr (signal port)
+        sg::Signal::State new_output;
+        new_output = (GPIOMIS == 0) ? sg::Signal::Clear : sg::Signal::Set;
+        if(GPIO_Intr.setValue.implemented())
+            GPIO_Intr.setValue(new_output);
+    }    
+    
+    // define what should the GPIO do to update the interrupt outputs
+    behavior UpdateIntrOutput()
+    {
+        
+        uint32_t level_high_mask = GPIOIS & GPIOIEV;  // mask for high level trigger interrupt, set 0 for disable
+        
+        uint32_t level_low_mask = GPIOIS & (~GPIOIEV);// mask for low level trigger interrupt, set 0 for disable
+        
+        uint32_t edge_both_mask = (~GPIOIS) & GPIOIBE; // mask for both edges trigger interrupt, set 0 for disable
+        
+        uint32_t edge_rising_mask = (~GPIOIS) & (~GPIOIBE) & GPIOIEV;// mask for rising edge trigger interrupt, set 0 for disable
+        
+        uint32_t edge_falling_mask = (~GPIOIS) & (~GPIOIBE) & (~GPIOIEV);// mask for falling edge trigger interrupt, set 0 for disable
+        
+        //compare the current interrupt raw status with the previous one to yield the final interrupt in GPIOMIS
+        //NOTE that the five masks above will only detect the bits that match to '1' in the masks
+        
+        // (1) decide high level interrupts (change from low to high)
+        // find the '1's in the current interrupt
+        uint32_t HighLev_Int = ( Intr_temp & level_high_mask );
+        
+        // (2) decide low level interrupts (change from high to low)
+        // find the '0's in the current interrupt
+        uint32_t LowLev_Int = ( ( ~Intr_temp) & level_low_mask  );
+                                
+        // (3) decide both edge interrupts          
+        uint32_t BothEdge_Int = ( (Intr_temp ^ Last_pins_stats) & edge_both_mask );  //find CHANGE
+        
+        // (4) decide rising edge interrupts  (change from low to high -- thus same as (1)) 
+        uint32_t RiseEdge_Int = ( ( (~Last_pins_stats) & edge_rising_mask) & ( Intr_temp & edge_rising_mask) );
+                                // find the '0's in the previous interrupt    find the '1's in the current interrupt
+                                
+        RiseEdge_Int &= (~GPIOIC);   //clear the corresponding edge triggered interrupts
+                                  
+        // (5) decide falling edge interrupts  (change from high to low -- thus same as (2)) 
+        uint32_t FallingEdge_Int = ( ( (~Intr_temp) & edge_falling_mask ) & ( Last_pins_stats & edge_falling_mask) );
+                                   // find the '0's in the current interrupt    find the '1's in the previous interrupt                                  
+                              
+        FallingEdge_Int &= (~GPIOIC); //clear the corresponding edge triggered interrupts
+
+        // now sum (1) - (5) together and set GPIORIS
+        // GPIORIS is a read only register, with its value only changed here
+        // GPIORIS reflects the status of interrupts trigger conditions prior masking by GPIOIE!!!!!
+        
+        GPIORIS = (HighLev_Int | LowLev_Int |  BothEdge_Int | RiseEdge_Int | FallingEdge_Int)  & 0x0ff;   
+        
+        GPIOMIS =   GPIORIS & GPIOIE  & 0x0ff; // GPIORIS intrrupt status masked by the GPIOIE (set 0 for disablle in GPIOIE)
+        //now any bit equal to '1' in GPIOMIS is an antivated interrupt, which will affect the output GPIO_MIS and GPIO_Intr
+        
+        // output interrupt 
+        ClearIntruptOutput();
+        
+        // not store the current status of the pins into Last_pins_stats
+        Last_pins_stats = Intr_temp  & 0x0ff;  // NOT GPIORIS as it is the masked one!
+        
+    }  // end of UpdateIntrOutput()
+    
+    // debugger support
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+        
+        return ACCESS_FUNC_OK;
+    }
+    
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+        
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour register_name(uint32_t off) : const char *
+    {
+        if (off <= 0x3FC) // data register - cover 256 location in the address space
+        {
+            return("GPIODATA");
+        }
+
+        switch(off)
+        {
+          case 0x400: return("GPIODIR");
+          case 0x404: return("GPIOIS");
+          case 0x408: return("GPIOIBE");
+          case 0x40C: return("GPIOIEV");
+          case 0x410: return("GPIOIE");
+          case 0x414: return("GPIORIS");
+          case 0x418: return("GPIOMIS");
+          case 0x420: return("GPIOAFSEL");
+          case 0xFE0: return("GPIOPeriphID0");
+          case 0xFE4: return("GPIOPeriphID1");
+          case 0xFE8: return("GPIOPeriphID2");
+          case 0xFEC: return("GPIOPeriphID3");
+          case 0xFF0: return("GPIOPCellID0");
+          case 0xFF4: return("GPIOPCellID1");
+          case 0xFF8: return("GPIOPCellID2");
+          case 0xFFC: return("GPIOPCellID3");
+          default:    return("Unknown");
+        } // end switch
+
+    }
+}  // end of the component

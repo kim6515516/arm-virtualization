@@ -1,0 +1,910 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    EBCortexA8CoreTile.sgcanvas
+#//  Created: Tue Jun  3 16:49:28 2008
+#//  By: ARM RealView System Generator Canvas 3.2.034 (Feb 26 2008 / 11:08:33) - Linux
+#//
+# *  Do NOT modify this file. It is for internal use by System Generator Canvas only.
+#//
+#//  Copyright (c) 2004-2007 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "clockdivider"
+        (
+            x = 280;
+            y = 210;
+            width = 101;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = -20;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 220;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "connector"
+        (
+            x = 60;
+            y = 90;
+            width = 151;
+            height = 99;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_bus"
+                (
+                x = 150;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "connector"
+                (
+                x = 140;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 10;
+                y = 43;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "intr_num"
+                (
+                x = 0;
+                y = 23;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 63;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "core"
+        (
+            x = 280;
+            y = 280;
+            width = 171;
+            height = 199;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "cfgend0"
+                (
+                x = 10;
+                y = 92;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "cfgnmfi"
+                (
+                x = 0;
+                y = 72;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "cfgte"
+                (
+                x = 170;
+                y = 162;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "dmaexterrirq"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "dmairq"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "dmasirq"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "fiq"
+                (
+                x = 0;
+                y = 52;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "irq"
+                (
+                x = 0;
+                y = 32;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pmuirq"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 152;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "reset"
+                (
+                x = 170;
+                y = 82;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ticks"
+                (
+                x = 0;
+                y = 102;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "vic_ack"
+                (
+                x = 0;
+                y = 122;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "vic_addr"
+                (
+                x = 0;
+                y = 112;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "vinithi"
+                (
+                x = 160;
+                y = 142;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "pvbusdecoder"
+        (
+            x = 60;
+            y = 420;
+            width = 151;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m_range"
+                (
+                x = 0;
+                y = 12;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 140;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "fvp_gic_fiq"
+        (
+            x = 60;
+            y = 310;
+            width = 151;
+            height = 99;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "fiq"
+                (
+                x = 140;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "int_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_num"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_core"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_distributor"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "fvp_gic_irq"
+        (
+            x = 60;
+            y = 200;
+            width = 151;
+            height = 99;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "fiq"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "int_num"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq"
+                (
+                x = 150;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_core"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_distributor"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+    )
+    ports
+    (
+        define "hdr"
+        (
+            x = 230;
+            y = 150;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "ticks"
+        (
+            x = 390;
+            y = 250;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+    )
+    connections
+    (
+        define "clockdivider.clk_out=>core.clk_in"
+        (
+            point
+            (
+                x = 270;
+                y = 260;
+                automatic = true;
+            )
+            point
+            (
+                x = 270;
+                y = 310;
+                automatic = true;
+            )
+        )
+        define "connector.clk_bus=>clockdivider.clk_in"
+        (
+            point
+            (
+                x = 250;
+                y = 180;
+                automatic = true;
+            )
+            point
+            (
+                x = 250;
+                y = 240;
+                automatic = true;
+            )
+        )
+        define "connector.intr=>fvp_gic_irq.int_in"
+        (
+            point
+            (
+                x = 50;
+                y = 161;
+                automatic = false;
+            )
+            point
+            (
+                x = 50;
+                y = 230;
+                automatic = false;
+            )
+        )
+        define "connector.intr_num=>fvp_gic_irq.int_num"
+        (
+            point
+            (
+                x = 50;
+                y = 141;
+                automatic = false;
+            )
+            point
+            (
+                x = 50;
+                y = 250;
+                automatic = false;
+            )
+        )
+        define "core.pvbus_m=>pvbusdecoder.pvbus_s"
+        (
+        )
+        define "pvbusdecoder.pvbus_m_range=>connector.pvbus"
+        (
+            point
+            (
+                x = 50;
+                y = 460;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 350;
+                automatic = false;
+            )
+            point
+            (
+                x = 50;
+                y = 180;
+                automatic = false;
+            )
+            point
+            (
+                x = 50;
+                y = 181;
+                automatic = true;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>fvp_gic_fiq.pvbus_core"
+        (
+            point
+            (
+                x = 50;
+                y = 460;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 380;
+                automatic = true;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>fvp_gic_fiq.pvbus_distributor"
+        (
+            point
+            (
+                x = 50;
+                y = 460;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 400;
+                automatic = true;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>fvp_gic_irq.pvbus_core"
+        (
+            point
+            (
+                x = 50;
+                y = 460;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 270;
+                automatic = true;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>fvp_gic_irq.pvbus_distributor"
+        (
+            point
+            (
+                x = 50;
+                y = 460;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 290;
+                automatic = true;
+            )
+        )
+        define "fvp_gic_fiq.fiq=>core.fiq"
+        (
+        )
+        define "fvp_gic_irq.irq=>core.irq"
+        (
+            point
+            (
+                x = 250;
+                y = 290;
+                automatic = true;
+            )
+            point
+            (
+                x = 250;
+                y = 340;
+                automatic = true;
+            )
+        )
+    )
+    portmaps
+    (
+        define "connector.connector=>self.hdr"
+        (
+        )
+        define "core.ticks=>self.ticks"
+        (
+            point
+            (
+                x = 460;
+                y = 410;
+                automatic = true;
+            )
+            point
+            (
+                x = 460;
+                y = 260;
+                automatic = true;
+            )
+        )
+    )
+    labels
+    (
+        instance "Label 0"
+        (
+            text  = "The Core: ARMCortexA8";
+            x = 270;
+            y = 180;
+            width = 161;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -1;
+            background_color = -12760746;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 1"
+        (
+            text  = "";
+            x = 270;
+            y = 200;
+            width = 191;
+            height = 291;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -10851457;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 2"
+        (
+            text  = "Core Tile Connector";
+            x = 40;
+            y = 50;
+            width = 131;
+            height = 21;
+            font_family  = "Helvetica";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8876118;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 3"
+        (
+            text  = "";
+            x = 40;
+            y = 70;
+            width = 181;
+            height = 431;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 4"
+        (
+            text  = "";
+            x = 230;
+            y = 50;
+            width = 231;
+            height = 91;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 5"
+        (
+            text  = "Cortex-A8 Core Tile\10This subsystem is included in the FVP_EB_Cortex-A8.lisa top-level system.";
+            x = 240;
+            y = 60;
+            width = 211;
+            height = 71;
+            font_family  = "Helvetica [Adobe]";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -5254664;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 4;
+            draw_below = true;
+        )
+    )
+)

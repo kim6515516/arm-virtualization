@@ -1,0 +1,144 @@
+component "PVBusDecoder"
+{
+        path="../LISA/PVBusDecoder.lisa";
+}
+component "PVBusCache"
+{
+        path="../LISA/PVBusCache.lisa";
+}
+component "PVBusMaster"
+{
+        path="../LISA/PVBusMaster.lisa";
+}
+component "PVBusSlave"
+{
+        path="../LISA/PVBusSlave.lisa";
+}
+component "PVBusRange"
+{
+        path="../LISA/PVBusRange.lisa";
+}
+protocol "PVBus"
+{
+    path="../LISA/PVBusProtocol.lisa";
+}
+protocol "PVBusSlaveControl"
+{
+    path="../LISA/PVBusSlaveControlProtocol.lisa";
+}
+protocol "PVDevice"
+{
+    path="../LISA/PVDeviceProtocol.lisa";
+}
+protocol "PVTransactionMaster"
+{
+    path="../LISA/PVTransactionMasterProtocol.lisa";
+}
+protocol "PVBusCacheDevice"
+{
+        path="../LISA/PVBusCache.lisa";
+}
+protocol "PVBusCacheControl"
+{
+        path="../LISA/PVBusCache.lisa";
+}
+protocol "PVBusRouterControl"
+{
+        path="../LISA/PVBusRouter.lisa";
+}
+component "PVBusRouter"
+{
+        path="../LISA/PVBusRouter.lisa";
+}
+protocol "PVCacheMaintenance"
+{
+        path="../LISA/PVCacheMaintenance.lisa";
+}
+protocol "PVCacheDebugRam"
+{
+        path="../LISA/PVCache_DebugRamProtocol.lisa";
+}
+component "PVCache"
+{
+        path="../LISA/PVCache.lisa";
+}
+component "CCIInterconnect"
+{
+        path="../LISA/PVCache.lisa";
+}
+component "PVBusMapper"
+{
+        path="../LISA/PVBusMapper.lisa";
+}
+protocol "PVBusMapperControl"
+{
+        path="../LISA/PVBusMapper.lisa";
+}
+component "PVBusLogger"
+{
+        path="../LISA/PVBusLogger.lisa";
+}
+protocol "TZSwitchControl"
+{
+        path="../LISA/TZSwitch.lisa";
+}
+component "TZSwitch"
+{
+        path="../LISA/TZSwitch.lisa";
+}
+component "AMBAPV2PVBus"
+{
+        path="../LISA/AMBAPV2PVBus.lisa";
+}
+component "PVBus2AMBAPV"
+{
+        path="../LISA/PVBus2AMBAPV.lisa";
+}
+component "AMBAPVACE2PVBus"
+{
+        path="../LISA/AMBAPVACE2PVBus.lisa";
+}
+component "PVBus2AMBAPVACE"
+{
+        path="../LISA/PVBus2AMBAPVACE.lisa";
+}
+protocol "AMBAPV"
+{
+        path="../LISA/AMBAPVProtocol.lisa";
+}
+protocol "AMBAPVACE"
+{
+        path="../LISA/AMBAPVACEProtocol.lisa";
+}
+protocol "DVMMessage"
+{
+        path="../LISA/DVMProtocol.lisa";
+}
+
+
+files
+(
+    path = "../include/";
+
+    path = "${MAXCORE_HOME}/AMBA-PV/include/";
+
+    path = "../lib/Linux_GCC-4.1/libpvbus.a", platform="linux",compiler="gcc|gcc-4.1";
+    path = "../lib/Linux64_GCC-4.1/libpvbus.a", platform="linux64",compiler="gcc|gcc-4.1";
+    
+    path = "../lib/Linux_GCC-4.4/libpvbus.a", platform="linux",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+    path = "../lib/Linux64_GCC-4.4/libpvbus.a", platform="linux64",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+    
+    path = "../lib/Win32_VC2005/Release/pvbus.lib", platform="win32",compiler="VC2005";
+    path = "../lib/Win32_VC2005/Debug/pvbus.lib", platform="win32d",compiler="VC2005";
+
+    path = "../lib/Win32_VC2008/Release/pvbus.lib", platform="win32",compiler="VC2008";
+    path = "../lib/Win32_VC2008/Debug/pvbus.lib", platform="win32d",compiler="VC2008";
+    path = "../lib/Win64_VC2008/Release/pvbus.lib", platform="win64",compiler="VC2008";
+    path = "../lib/Win64_VC2008/Debug/pvbus.lib", platform="win64d",compiler="VC2008";
+
+    path = "../lib/Win32_VC2010/Release/pvbus.lib", platform="win32",compiler="VC2010";
+    path = "../lib/Win32_VC2010/Debug/pvbus.lib", platform="win32d",compiler="VC2010";
+    path = "../lib/Win64_VC2010/Release/pvbus.lib", platform="win64",compiler="VC2010";
+    path = "../lib/Win64_VC2010/Debug/pvbus.lib", platform="win64d",compiler="VC2010";
+)
+

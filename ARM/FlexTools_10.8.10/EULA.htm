@@ -1,0 +1,896 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+
+<!-- Fast Models Package Description for ESL Installer -->
+
+<!-- PD
+
+globals {
+
+  ProductName = "Fast Models";
+  UnixDefaultBasePath  = "${HOME}/ARM/";
+  Win32DefaultBasePath = "ARM\\";
+  QueryLicenseFileLocation =1;
+  UnixPostInstallCommand = "./global_post_install.sh <~Fast Model Tools.SELECTED~> <~Fast Model Portfolio.SELECTED~>  \"<~Fast Model Tools.PACKAGE_DIR~>\" \"<~Fast Model Portfolio.PACKAGE_DIR~>\"";
+  EnableUnInstall = 1;
+  Personality="AFM";
+
+  defines {
+    SG_MAJMIN = "<~Fast Model Tools.AFC_VER_MAJ~>.<~Fast Model Tools.AFC_VER_MIN~>";
+    MD_MAJMIN = "<~Fast Model Tools.Model Debugger.AFC_VER_MAJ~>.<~Fast Model Tools.Model Debugger.AFC_VER_MIN~>";
+    MS_MAJMIN = "<~Model Shell.AFC_VER_MAJ~>.<~Model Shell.AFC_VER_MIN~>";
+    ML_MAJMIN = "<~Fast Model Portfolio.AFC_VER_MAJ~>.<~Fast Model Portfolio.AFC_VER_MIN~>";   # for the models
+    VARIANT_SG = "FastModelsTools_<~SG_MAJMIN~>";
+    VARIANT_MD = "ModelDebugger_<~MD_MAJMIN~>";
+    VARIANT_MS = "ModelShell_<~MD_MAJMIN~>";
+    VARIANT_ML = "FastModelsPortfolio_<~ML_MAJMIN~>";
+    SG_VERSION = "<~Fast Model Tools.AFC_VERSION~><~FMT_VEREXT~>";
+    MD_VERSION = "<~Fast Model Tools.Model Debugger.AFC_VERSION~><~FMT_VEREXT~>";
+    MS_VERSION = "<~Fast Model Tools.Model Shell.AFC_VERSION~><~FMT_VEREXT~>";
+    ML_VERSION = "<~Fast Model Portfolio.AFC_VERSION~><~FMT_VEREXT~>";
+    COMMON_SUBMENU    = "ARM\\Fast Models <~SG_MAJMIN~>\\";
+    COMMON_SUBMENU_MD = "ARM\\Fast Models <~SG_MAJMIN~>\\";
+
+    COMMON_MENU = "<~COMMON_SUBMENU~>";
+    COMMON_FLEX_MENU = "<~COMMON_MENU~>\\flex licensing tools";
+    COMMON_MTIPDK_MENU = "<~COMMON_MENU~>\\MTI Plugin Development Kit";
+
+    # variable content below is replaced by create_collection.pl when verext option is given
+    FMT_VEREXT = "";
+  }
+}
+
+
+package "Fast Model Tools" {
+  Afc = "SystemGenerator.afc";
+  Dir="<~VARIANT_SG~>";
+  Info="Fast Model Tools: This package contains System Generator <~SG_VERSION~>, System Canvas <~SG_VERSION~> and Model Debugger <~MD_VERSION~>";
+  DefaultSelection=1;
+  UnixPostInstallCommand = "./post_install_scripts.sh \"<~PACKAGE_DIR~>\" \"<~LICENSE_PATH~>\"";
+
+  envvar {
+    Win32Name = "MAXCORE_HOME";
+    Win32Value = "<~PACKAGE_DIR~>";
+  }
+
+  executable {
+    Win32Path="bin\\SGCanvas.exe";
+    Win32Arguments = "";
+    Win32ProgramSubMenu="<~COMMON_SUBMENU~>";
+    Win32ShortCutName = "System Canvas";
+    Win32DesktopShortCut = 1;
+    Win32MenuShortCut = 1;
+    Win32SetVistaWinXPSP2Flag = 1;
+
+    assoc {
+      Win32FileExt = ".sgproj";
+      Win32AssocLabel = "ARMSGproj";
+      Win32AssocIconId = "0";
+      Win32AssocArgs = "\"%1\"";
+    }
+  }
+
+  executable {
+    Win32Path="bin\\SimGen.exe";
+    Win32Arguments = "";
+    Win32DesktopShortCut = 0;
+    Win32MenuShortCut = 0;
+    Win32SetVistaWinXPSP2Flag = 1;
+  }
+
+  executable {
+    Win32Path="doc\\FastModelsTools_ReleaseNotes_<~SG_MAJMIN~>.txt";
+    Win32IconId="ext";
+    Win32ProgramSubMenu="<~COMMON_MENU~>";
+    Win32ShortCutName = "Release Notes for Fast Models Tools";
+    Win32DesktopShortCut = 0;
+    Win32MenuShortCut = 1;
+  }
+
+  # uninstall short cut
+  executable {
+    Win32Path=".inst\\setup.exe";
+    Win32Arguments = "--reloc --uiinf \"<~UIINF~>\"";
+    Win32ProgramSubMenu="<~COMMON_SUBMENU~>";
+    Win32ShortCutName = "Uninstall Fast Models Tools";
+    Win32DesktopShortCut = 0;
+    Win32MenuShortCut = 1;
+    Win32IconId = "1";
+  }
+
+  postinst_files ( "source_me.csh",  "source_me.sh","etc/setup.csh",  "etc/setup.sh" ,
+                   "source_all.csh" , "source_all.sh" , "etc/setup_all.csh", "etc/setup_all.sh" )
+
+  inner_package "Model Shell" {
+    Afc = "ModelShell.afc";
+    Dir="";
+    UnixPostInstallCommand = "";
+
+    executable {
+      Win32Path = "bin\\model_shell.exe";
+      Win32SetVistaWinXPSP2Flag = 1;
+    }
+  }
+
+
+  inner_package "Model Debugger" {
+    Afc = "ModelDebugger.afc";
+    Dir = "";
+    UnixPostInstallCommand = "";
+
+    envvar {
+      Win32Name = "MAXVIEW_HOME";
+      Win32Value = "<~INNER_PACKAGE_DIR~>";
+    }
+    executable {
+      Win32ProgramSubMenu = "<~COMMON_SUBMENU_MD~>";
+      Win32Path = "bin\\ModelDebugger.exe";
+      Win32MenuShortCut = "1";
+      Win32ShortCutName = "Model Debugger";
+      Win32DesktopShortCut = "1";
+      Win32SetVistaWinXPSP2Flag = 1;
+    }
+    postinst_files ( "source_me.csh",  "source_me.sh", "etc/setup.csh",  "etc/setup.sh" )
+  }
+
+}
+
+
+package "Fast Model Portfolio" {
+  AllowDirEdit = "1";
+  Info = "Fast Model Portfolio: This package contains the Fast Model Portfolio <~ML_VERSION~>";
+  UnixPostInstallCommand = "\"<~PACKAGE_DIR~>/etc/install.sh\" \"<~LICENSE_PATH~>\"";
+  Win32PostInstallCommand = "\"\"<~PACKAGE_DIR~>\\etc\\excopy.bat\" \"<~PACKAGE_DIR~>\"\"";
+  DefaultSelection = "1";
+  Afc = "model_library.afc";
+  Dir = "<~VARIANT_ML~>";
+
+  envvar {
+    Win32Name = "PVLIB_HOME";
+    Win32Value = "<~PACKAGE_DIR~>";
+  }
+  executable {
+    Win32ProgramSubMenu = "<~COMMON_MENU~>";
+    Win32Path = "Docs\\FastModelsCollection.pdf";
+    Win32MenuShortCut = "1";
+    Win32ShortCutName = "Fast Models <~ML_MAJMIN~> Documentation Index";
+    Win32DesktopShortCut = 0;
+  }
+  executable {
+    Win32ProgramSubMenu = "<~COMMON_MENU~>";
+    Win32Path = "Docs\\FastModelsPortfolio_ReleaseNotes_<~ML_MAJMIN~>.txt";
+    Win32MenuShortCut = "1";
+    Win32ShortCutName = "Release Notes for the Fast Model Portfolio";
+    Win32DesktopShortCut = 0;
+  }
+  executable {
+    Win32ProgramSubMenu = "<~COMMON_MENU~>";
+    Win32Path = "Docs\\CADIClientIntegrationKit_ReleaseNotes_2.0.txt";
+    Win32MenuShortCut = "1";
+    Win32ShortCutName = "CADI Client Integration Kit Release Notes";
+    Win32DesktopShortCut = 0;
+  }
+  executable {
+    Win32Path=".inst\\Setup.exe";
+    Win32Arguments = "--reloc --uiinf \"<~UIINF~>\"";
+    Win32ProgramSubMenu="<~COMMON_MENU~>";
+    Win32ShortCutName = "Uninstall Fast Model Portfolio";
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32IconId = "1";
+  }
+}
+
+package "MTI Plugin Development Kit" {
+  AllowDirEdit = "1";
+  Info = "This package contains the Model Trace Interface (MTI) headers for trace plugins to Fast models, documentation and examples.";
+  DefaultSelection = "0";
+  Afc = "MTIPDK.afc";
+  Dir = "MTIPDK_1.1";
+
+  executable {
+    Win32ProgramSubMenu = "<~COMMON_MTIPDK_MENU~>";
+    Win32Path = "doc\\ModelTraceInterface-ReferenceManual.pdf";
+    Win32MenuShortCut = "1";
+    Win32ShortCutName = "Model Trace Interface Reference Manual";
+    Win32DesktopShortCut = 0;
+    Win32IconId="ext";
+  }
+  executable {
+    Win32ProgramSubMenu = "<~COMMON_MTIPDK_MENU~>";
+    Win32Path="doc\\TraceSources_Cortex-A8.txt";
+    Win32MenuShortCut = "1";
+    Win32ShortCutName = "ARM_Cortex-A8 model Trace sources";
+    Win32DesktopShortCut = "0";
+    Win32IconId="ext";
+  }
+  executable {
+    Win32ProgramSubMenu = "<~COMMON_MTIPDK_MENU~>";
+    Win32Path = "README.txt";
+    Win32MenuShortCut = "1";
+    Win32ShortCutName = "MTI Plugin Development Kit Release Notes";
+    Win32DesktopShortCut = "0";
+    Win32IconId="ext";
+  }
+
+  executable {
+    Win32Path=".inst\\setup.exe";
+    Win32Arguments = "--reloc --uiinf \"<~UIINF~>\"";
+    Win32ProgramSubMenu="<~COMMON_MTIPDK_MENU~>";
+    Win32ShortCutName = "Uninstall MTI Plugin Development Kit";
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32IconId = "1";
+  }
+
+}
+
+package "Flex Licensing Tools" {
+  AllowDirEdit = "1";
+  Info = "Fast Model Portfolio: This package contains the Flex Licensing tools";
+  DefaultSelection = "0";
+  Afc = "FlexTools.afc";
+  Dir = "FlexTools_10.8.10";
+
+  executable {
+    Win32ProgramSubMenu = "<~COMMON_FLEX_MENU~>";
+    Win32Path = "lmtools.exe";
+    Win32MenuShortCut = "1";
+    Win32ShortCutName = "lmtools";
+    Win32DesktopShortCut = 0;
+  }
+  executable {
+    Win32ProgramSubMenu = "<~COMMON_FLEX_MENU~>";
+    Win32Path = "DUI0209I_flexnet_guide.pdf";
+    Win32MenuShortCut = "1";
+    Win32ShortCutName = "FLEXnet for ARM Tools License Management Guide";
+    Win32DesktopShortCut = 0;
+  }
+}
+
+
+PD -->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<title>END USER LICENCE AGREEMENT FOR THE FAST MODELS</title>
+</head>
+<body>
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">END USER LICENCE AGREEMENT FOR THE FAST MODELS
+</FONT></P>
+
+<!-- para from line 3 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+THIS END USER LICENCE AGREEMENT (&ldquo;LICENCE&rdquo;) IS A LEGAL AGREEMENT BETWEEN
+YOU (EITHER A SINGLE INDIVIDUAL, OR SINGLE LEGAL ENTITY) AND ARM LIMITED (&ldquo;ARM&rdquo;)
+FOR THE USE OF THE SOFTWARE ACCOMPANYING THIS LICENCE. ARM IS ONLY WILLING TO LICENSE
+THE SOFTWARE TO YOU ON CONDITION THAT YOU ACCEPT ALL OF THE TERMS IN THIS LICENCE.
+BY CLICKING &ldquo;I AGREE&rdquo; OR BY INSTALLING OR OTHERWISE USING OR COPYING
+THE SOFTWARE YOU INDICATE THAT YOU AGREE TO BE BOUND BY ALL THE TERMS OF THIS LICENCE.
+IF YOU DO NOT AGREE TO THE TERMS OF THIS LICENCE, ARM IS UNWILLING TO LICENSE THE
+SOFTWARE TO YOU AND YOU MAY NOT INSTALL, USE OR COPY THE SOFTWARE, BUT YOU SHOULD
+PROMPTLY RETURN THE MEDIA ON WHICH THE SOFTWARE IS DELIVERED TO YOUR SUPPLIER OR
+DESTROY THE ELECTRONIC COPY OF THE SOFTWARE, AS APPLICABLE, AND ASK FOR A REFUND
+OF ANY LICENCE FEE PAID (IF ANY).
+</FONT></P>
+
+
+<!-- para from line 5 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+&ldquo;Exported Virtual Subsystem&rdquo; means a subsystem created by you using either
+or both components from the Fast Model Portfolio (defined in the definition of Software
+below) and your own component models and processed by the Fast Model Tools (defined
+in the definition of Software below) such that it can be integrated into the OSCI
+SystemC proof of concept simulator including the OSCI TLM-2.0 transaction-level modeling
+interface.
+</FONT></P>
+
+
+<!-- para from line 7 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+&ldquo;Licence Key&rdquo; means; (i) in respect of the Fast Model Tools (defined
+below), an electronic licence key issued to you to enable the use of the Fast Model
+Tools; and (ii) in respect of each processor core model and each ARM architecture
+envelope model, an electronic licence key issued to you to enable the use of the
+relevant model.  
+</FONT></P>
+
+
+<!-- para from line 9 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+&ldquo;Seat&rdquo; means the authorisation from ARM to use and run certain components
+of the Software, in the quantities stated in the sales order and delivery confirmation
+email and for the time periods enabled by the Licence Key.
+</FONT></P>
+
+
+<!-- para from line 11 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+&ldquo;Separate Files&rdquo; means the separate files identified in Schedule 1 Section
+2. 
+</FONT></P>
+
+
+<!-- para from line 13 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+&ldquo;Software&rdquo; means any software and data accompanying this Licence, any
+printed, electronic or online documentation supplied with it, and any updates, upgrades,
+patches and modifications ARM may agree to make available to you under the terms
+of this Licence for the fast models.  The fast models consists of; (i) the system
+canvas, system generator, model debugger tools, and CADI Client Intergration Kit
+(&ldquo;Fast Model Tools&rdquo;); (ii) a collection of fast code translation models
+for processors, memories and peripheral devices; and (iii) fast code translation
+ARM architecture envelope models, (together (ii) and (iii) make up the &ldquo;Fast
+Model Portfolio&rdquo;); and (iv) the header files identified in Schedule 1 Section
+1 (&ldquo;Header Files&rdquo;).
+</FONT></P>
+
+
+<!-- para from line 15 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+&ldquo;Virtual Platform&rdquo; means a composite model created by you using either
+or both components from the Fast Model Portfolio and your own component models generated
+by the Fast Model Tools such that it can be executed as a self contained simulator
+and cannot be further extended.
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">1. LICENCE GRANTS.
+</FONT></P>
+<!-- para from line 18 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+1.1 ARM hereby grants to you, subject to the terms and conditions of this Licence,
+a non-exclusive, non-transferable licence, only for the Seats, to: 
+</FONT></P>
+
+
+<!-- letter list; first item on line 20 -->
+<table width="85%">
+<tr><td width="7%">&nbsp;</td><td><P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+(i) use and copy the binary form of the Software (excluding the Header Files) for
+the purpose of; (a) creating, analysing and debugging either or both, as applicable,
+the Exported Virtual Subsystem and Virtual Platform; and (b) running applications
+on either or both, as applicable, the Exported Virtual Subsystem and Virtual Platform;
+</FONT></P>
+</td></tr>
+<!-- next item on line 22 -->
+<tr><td>&nbsp;</td><td><P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+(ii) use, copy and modify the source code included with the Software (excluding the
+Header Files) for the purpose of creating either or both, as applicable, the Exported
+Virtual Subsystem and Virtual Platform;
+</FONT></P>
+</td></tr>
+<!-- next item on line 24 -->
+<tr><td>&nbsp;</td><td><P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+(iii) (a) use and copy the Header Files identified in Schedule 1 Section 1 subsection
+(i); and (b) use copy and modify the Header Files identified in Schedule 1 Section
+1 subsection (ii), for the purpose of; (i) creating, analysing and debugging either
+or both, as applicable, the Exported Virtual Subsystem and Virtual Platform; and
+(ii) running applications on either or both, as applicable, the Exported Virtual
+Subsystem and Virtual Platform;
+</FONT></P>
+</td></tr>
+<!-- next item on line 26 -->
+<tr><td>&nbsp;</td><td><P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+(iv) use and copy any documentation accompanying the Software, for the purpose of
+creating either or both, as applicable, the Exported Virtual Subsystem and Virtual
+Platform;
+</FONT></P>
+</td></tr>
+<!-- next item on line 28 -->
+<tr><td>&nbsp;</td><td><P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+(v) use the binary form of either or both, as applicable, the Exported Virtual Subsystem
+and Virtual Platform created under the licences granted in Clauses 1.1(i) - (iv)
+above internally;
+</FONT></P>
+</td></tr>
+<!-- next item on line 29 -->
+<tr><td>&nbsp;</td><td><P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+(vi) subject to Clause 1.2 below, distribute and sublicense to third parties the
+right to use, either or both, as applicable;
+</FONT></P>
+</td></tr>
+<!-- next item on line 31 -->
+<tr><td>&nbsp;</td><td><P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+(a) the binary form of the Virtual Platform created under the licence granted in
+Clauses 1.1(i) - (iv) above and the Header Files, for the purpose of debugging applications
+running on Virtual Platforms; and
+</FONT></P>
+</td></tr>
+</table>
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif"> 
+</FONT></P>
+<!-- para from line 33 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+(b) the binary form of the Exported Virtual Subsystem created under the licence granted
+in Clauses 1.1(i) - (iv) above and the Header Files, for the purpose of; (i) integrating
+the Exported Virtual Subsytem with a virtual platform, and (ii) running and debugging
+applications running on the resulting virtual platform.
+</FONT></P>
+
+
+<!-- para from line 35 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+Except as expressly permitted above, you shall not modify, sub-license or redistribute
+any of the Software.
+</FONT></P>
+
+
+<!-- para from line 37 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+1.2 FURTHER CONDITIONS APPLICABLE TO DISTRIBUTION AND SUB-LICENSING: If you redistribute
+and sublicense any or all, as applicable, the binary form of any Exported Virtual
+Subsystem, the binary form of the Virtual Platform and the Header Files, then you
+agree; (i) not to use ARM's or any of its licensors names, logo or trademarks to
+market them; (ii) to include valid copyright notices on them, and preserve any copyright
+notices and other notices which are included with, or in, them; and (iii) to ensure
+that either or both, as applicable, any Exported Virtual Subsystem and Virtual Platform
+that contains a model from the Fast Model Portfolio are only made available to third
+parties with notice from you that each third party will be required to contact ARM
+directly at support-esl@arm.com to obtain a Licence Key from ARM on terms to be mutually
+agreed to enable such third parties to use either or both, as applicable, any Exported
+Virtual Subsystem and Virtual Platform.
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">2. OTHER RESTRICTIONS ON USE OF THE SOFTWARE.
+</FONT></P>
+<!-- para from line 40 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+SEATS, INSTALLATION AND LICENCE KEYS: Your use of the Software is limited to the
+specific number of Seats issued to you by ARM. For each Seat, ARM will make a Licence
+Key available to you to enable use of the Software, or certain components or optional
+functionality in the Software, as applicable. You shall only install and use the
+Software and Licence Keys on computers, or virtual machines running on computers,
+which are owned by you (or which are in your exclusive possession under an equipment
+finance arrangement) and which are either: (i) located at your premises; or (ii)
+portable computers which shall remain in the possession and control of your employees
+when outside such premises. 
+</FONT></P>
+
+
+<!-- para from line 42 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+In respect of; (i) a node locked licence, each Seat and Licence Key shall be restricted
+to use by a single person at any one time and limited or locked to a single item
+of your computer hardware (also known as host ID) on which the Seat or Licence Key
+is initially installed; and (ii) in respect of a floating licence, each Seat and
+Licence Key shall be limited or controlled by a licence server shared by multiple
+computers so that one authorised Licence Key is required for each simulation process
+concurrently using the relevant Software, except where ARM may separately agree to
+authorise the transfer (also known as re-hosting) of a Seat or Licence Key.  
+</FONT></P>
+
+
+<!-- para from line 44 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+COPYING: You shall not use or copy the Software or Licence Keys except as expressly
+authorised in this Licence. You may copy the delivered Software media or image for
+backup or archival purposes. 
+</FONT></P>
+
+
+<!-- para from line 46 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+PERMITTED USERS: The Software and Licence Keys shall be used only by your employees,
+or by your bona fide sub-contractors for whose acts and omissions you hereby agree
+to be responsible to ARM to the same extent as you are for any acts and omissions
+of your employees, and provided always that such sub-contractors; (i) work only onsite
+at your premises; (ii) comply with the terms of this Licence; (iii) are contractually
+obligated to use the Software only for your benefit, and (iv) agree to assign all
+their work product and any rights they create therein in the supply of such work
+to you. Only the single individual, company or other legal entity to whom ARM is
+supplying this Licence may use the Software and Licence Keys. Except as provided
+in this clause, you shall not allow third parties (including but not limited to any
+subsidiary, parent or affiliated companies, or offsite contractors you may have)
+to use the Software or Licence Keys unless ARM specifically agrees otherwise with
+you on a case by case basis.
+</FONT></P>
+
+
+<!-- para from line 48 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+REMOTE USE: The Software and Licence Keys shall only be used onsite at your premises,
+except when used offsite by an employee (but not a sub-contractor) of yours, on a
+portable computer, in accordance with the &ldquo;SEATS, INSTALLATION AND LICENCE
+KEYS&rdquo; paragraph above, as part of his or her normal work activities, and only
+for your benefit.
+</FONT></P>
+
+
+<!-- para from line 50 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+REVERSE ENGINEERING: Except to the extent that such activity is permitted by applicable
+law you shall not reverse engineer, decompile or disassemble any of the Software.
+If the Software was provided to you in Europe you shall not reverse engineer, decompile
+or disassemble any of the Software for the purposes of error correction.
+</FONT></P>
+
+
+<!-- para from line 52 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+MULTIPLE VERSIONS: The media on which the Software resides may contain more than
+one version of the Software, each of which is compatible with a different operating
+system (such as Microsoft Windows XP Professional and Red Hat Linux). Each version
+may only be installed and used by you to the extent that you have valid Seats and
+Licence Keys from ARM. To the extent that certain components of the Software are
+identified for use on a specific operating system, you are only licensed to use such
+components to develop software applications for use with the relevant operating system
+or future compatible versions of such operating system.
+</FONT></P>
+
+
+<!-- para from line 54 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+ACADEMIC OR EDUCATIONAL USE RESTRICTION: If you or your employer or institution paid
+academic or educational pricing for the Software, or the Software is identified as
+an academic or educational version (collectively &ldquo;Academic Software&rdquo;),
+then notwithstanding anything else in this Licence, YOU AGREE TO USE THE ACADEMIC
+SOFTWARE ONLY FOR ACADEMIC, NON-COMMERCIAL PURPOSES, AND ARM DOES NOT GRANT YOU ANY
+RIGHTS TO DISTRIBUTE OR SUB-LICENCE EITHER OR BOTH  AN EXPORTED VIRTUAL SUBSYSTEM
+AND VIRTUAL PLATFORM.  
+</FONT></P>
+
+
+<!-- para from line 56 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+BENCHMARKING: This Licence does not prevent you from using the Software for internal
+benchmarking purposes. However, you shall treat any and all benchmarking data relating
+to the Software, and any other results of your use or testing of the Software which
+are indicative of its performance, efficacy, reliability or quality, as confidential
+information and you shall not disclose such information to any third party without
+the express written permission of ARM. 
+</FONT></P>
+
+
+<!-- para from line 58 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+RESTRICTIONS ON TRANSFER OF LICENSED RIGHTS: The rights granted to you under this
+Licence may not be assigned, sublicensed or otherwise transferred by you to any third
+party without the prior written consent of ARM. An assignment shall be deemed to
+include, without limitation; (i) any transaction or series of transactions whereby
+a third party acquires, directly or indirectly, the power to control the management
+and policies of you, whether through the acquisition of voting securities, by contract
+or otherwise; or (ii) the sale of more than fifty percent (50%) of the your assets
+whether in a single transaction or series of transactions.  You shall not rent or
+lease the Software. Except as provided in the &ldquo;PERMITTED USERS&rdquo; paragraph
+above, you shall not share the Software with contractors or other third parties.
+</FONT></P>
+
+
+<!-- para from line 60 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+COPYRIGHT AND RESERVATION OF RIGHTS: The Software is owned by ARM or its licensors
+and is protected by copyright and other intellectual property laws and international
+treaties. The Software is licensed not sold. You acquire no rights to the Software
+other than as expressly provided by this Licence. You shall not remove from the Software
+any copyright notice or other notice and shall ensure that any such notice is reproduced
+in any copies of the whole or any part of the Software made by you or your permitted
+users.
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">3. SUPPORT AND MAINTENANCE.
+</FONT></P>
+<!-- para from line 63 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+If you purchased the Software directly from ARM, and you are not receiving it as
+Academic Software (defined in clause 2), you are entitled to reasonable support and
+maintenance for the Software, for the shorter period of; (i) the term of your licence
+to the Software (as specified by the Licence Key); and (ii) one (1) year, commencing
+on the date of purchase. If; (i)  the Software was provided free of charge or for
+evaluation; or (iii) it is Academic Software, you are not entitled to support for
+the Software from ARM, but ARM may, at its sole discretion provide limited support
+to you. 
+</FONT></P>
+
+
+<!-- para from line 65 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+The support will be provided on; (i) any version of the Software components defined
+in your Seat which, at the date of your support request, is either; (a) the current
+version made generally available by ARM; or (b) the previous version made generally
+available by ARM at some time during the previous ninety (90) days; and (ii) the
+export of any or all components of the Software as applicable executed in the OSCI
+System C proof of concept simulator.
+</FONT></P>
+
+
+<!-- para from line 67 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+Support will be provided by telephone, email or other written format designated by
+ARM, prioritised at ARM's discretion, and may not be used as a substitute for training
+or as additional resource for your programming projects.  Maintenance will be provided
+in the form of upgrades, updates and patch releases to the Software as and when they
+are made generally available from ARM.  
+</FONT></P>
+
+
+<!-- para from line 69 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+ARM's obligation under this Clause 3 is limited to the provision of support and maintenance
+to you and ARM is under no obligation to provide any support and maintenance to any
+third parties under this Licence. 
+</FONT></P>
+
+
+<!-- para from line 71 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+You agree to provide all front line support services to all third parties that you
+distribute either or both, as applicable, the binary form of the Exported Virtual
+Subsystem and the binary form of the Virtual Platform pursuant to the licences granted
+in Clause 1.1(vi).
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">4. CONFIDENTIALITY AND NON-USE.
+</FONT></P>
+<!-- para from line 74 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+You acknowledge that the Software, Licence Keys and any benchmarking data and related
+information mentioned in clause 2 contains trade secrets and confidential material,
+and you agree to maintain such information in confidence and apply security measures
+no less stringent than the measures which you apply to protect your own like information,
+but not less than a reasonable degree of care, to prevent unauthorised disclosure
+and use of all such information. Subject to any restrictions imposed by applicable
+law, the period of confidentiality shall be indefinite. You agree that you shall
+not use any such information other than in normal use of the Software under the licences
+granted in this Licence.
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">5. LIMITED WARRANTIES.
+</FONT></P>
+<!-- para from line 77 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+Unless you did not purchase the Software, ARM warrants to you that, for the period
+of ninety (90) days from the date of delivery of the Software to you, (i) the media
+on which the Software is provided shall be free from defects in materials and workmanship
+under normal use; and (ii) the Software will perform substantially in accordance
+with its accompanying documentation (if any). ARM's total liability and your exclusive
+remedy for breach of these limited warranties shall be limited to ARM, at ARM's option;
+(a) replacing the defective Software; or (b) using reasonable efforts to correct
+material, documented, reproducible defects in the Software and delivering such corrected
+Software to you. Any replacement Software will be warranted for the remainder of
+the original warranty period or thirty (30) days, whichever is the longer.
+</FONT></P>
+
+
+<!-- para from line 79 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+EXCEPT AS MAY BE PROVIDED ABOVE, YOU AGREE THAT THE SOFTWARE IS LICENSED &ldquo;AS
+IS&rdquo;, AND THAT ARM EXPRESSLY DISCLAIMS ALL REPRESENTATIONS, WARRANTIES, CONDITIONS
+OR OTHER TERMS, EXPRESS, IMPLIED OR STATUTORY, INCLUDING WITHOUT LIMITATION THE IMPLIED
+WARRANTIES OF NON-INFRINGEMENT, SATISFACTORY QUALITY, AND FITNESS FOR A PARTICULAR
+PURPOSE.
+</FONT></P>
+
+
+<!-- para from line 81 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+YOU EXPRESSLY ASSUME ALL LIABILITIES AND RISKS FOR USE OR OPERATION OF ANY MODELS
+AND APPLICATION PROGRAMS YOU MAY CREATE WITH THE SOFTWARE, INCLUDING WITHOUT LIMITATION,
+MATERIALS DESIGNED OR INTENDED FOR MISSION CRITICAL APPLICATIONS, SUCH AS PACEMAKERS,
+WEAPONARY, AIRCRAFT NAVIGATION, FACTORY CONTROL SYSTEMS, ETC.. SHOULD THE SOFTWARE
+PROVE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING, REPAIR OR
+CORRECTION.
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">6. LIMITATION OF LIABILITY.
+</FONT></P>
+<!-- para from line 84 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL ARM BE LIABLE
+FOR ANY INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES (INCLUDING LOSS OF
+PROFITS) ARISING OUT OF THE USE OR INABILITY TO USE THE SOFTWARE WHETHER BASED ON
+A CLAIM UNDER CONTRACT, TORT OR OTHER LEGAL THEORY, EVEN IF ARM WAS ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+</FONT></P>
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif"> 
+</FONT></P>
+<!-- para from line 86 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+ARM does not seek to limit or exclude liability for death or personal injury arising
+from ARM's negligence or ARM's fraud and because some jurisdictions do not permit
+the exclusion or limitation of liability for consequential or incidental damages
+the above limitation relating to liability for consequential or incidental damages
+may not apply to you.
+</FONT></P>
+
+
+<!-- para from line 88 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+NOTWITHSTANDING ANYTHING TO THE CONTRARY CONTAINED IN THIS LICENCE, THE MAXIMUM LIABILITY
+OF ARM TO YOU IN AGGREGATE FOR ALL CLAIMS MADE AGAINST ARM IN CONTRACT TORT OR OTHERWISE
+UNDER OR IN CONNECTION WITH THE SUBJECT MATTER OF THIS LICENCE SHALL NOT EXCEED THE
+TOTAL OF SUMS PAID BY YOU TO ARM (IF ANY) FOR THIS LICENCE. THE EXISTENCE OF MORE
+THAN ONE CLAIM WILL NOT ENLARGE OR EXTEND THE LIMIT.
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">7. THIRD PARTY RIGHTS.
+</FONT></P>
+<!-- para from line 91 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+The Separate Files are delivered and your use is governed by their own separate licence
+agreements. This Licence does not apply to such Separate Files and they are not included
+in the term &ldquo;Software&rdquo; under this Licence. You agree to comply with all
+terms and conditions imposed on you in respect of such Separate Files including those
+identified in the Schedule (&ldquo;Third Party Terms&rdquo;).  
+</FONT></P>
+
+
+<!-- para from line 93 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+ARM HEREBY DISCLAIMS ANY AND ALL WARRANTIES EXPRESS OR IMPLIED FROM ANY THIRD PARTIES
+REGARDING ANY SEPARATE FILES, ANY THIRD PARTY MATERIALS INCLUDED IN THE SOFTWARE,
+ANY THIRD PARTY MATERIALS FROM WHICH THE SOFTWARE IS DERIVED (COLLECTIVELY &ldquo;OTHER
+CODE&rdquo;), AND THE USE OF ANY OR ALL THE OTHER CODE IN CONNECTION WITH THE SOFTWARE,
+INCLUDING (WITHOUT LIMITATION) ANY WARRANTIES OF SATISFACTORY QUALITY OR FITNESS
+FOR A PARTICULAR PURPOSE.
+</FONT></P>
+
+
+<!-- para from line 95 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+NO THIRD PARTY LICENSORS OF OTHER CODE SHALL HAVE ANY LIABILITY FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING WITHOUT LIMITATION
+LOST PROFITS), HOWEVER CAUSED AND WHETHER MADE UNDER CONTRACT, TORT OR OTHER LEGAL
+THEORY, ARISING IN ANY WAY OUT OF THE USE OR DISTRIBUTION OF THE OTHER CODE OR THE
+EXERCISE OF ANY RIGHTS GRANTED UNDER EITHER OR BOTH THIS LICENCE AND THE LEGAL TERMS
+APPLICABLE TO ANY SEPARATE FILES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">8. U.S. GOVERNMENT END USERS.
+</FONT></P>
+<!-- para from line 98 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+US Government Restrictions: Use, duplication, reproduction, release, modification,
+disclosure or transfer of this commercial product and accompanying documentation
+is restricted in accordance with the terms of this Licence.
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">9. TERM AND TERMINATION.
+</FONT></P>
+<!-- para from line 101 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+This Licence shall remain in force until terminated by you, by ARM or by expiry.
+Without prejudice to any of its other rights, if you are in breach of any of the
+terms and conditions of this Licence then ARM may terminate this Licence immediately
+upon giving written notice to you. You may terminate this Licence at any time. Upon
+termination of this Licence by you or by ARM, and on expiry of this Licence, all
+licences granted to you under this Licence and any obligation of ARM to provide support
+shall terminate immediately, and you shall immediately stop using the Software and
+derivatives of the Software in your possession together with all documentation and
+related materials.  Notwithstanding the foregoing, except where ARM has terminated
+this Licence for your breach, you may retain, sub-license and distribute either or
+both, as applicable, any Exported Virtual Subsystem or Virtual Platform generated
+by you prior to termination or expiry of this Licence, subject to the terms and conditions
+of this Licence. The provisions of Clauses 4, 6, 7, 8, 9 and 10 shall survive termination
+or expiry of this Licence.
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">10. GENERAL.
+</FONT></P>
+<!-- para from line 104 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+This Licence is governed by English Law. Except where ARM agrees otherwise in; (i)
+a written contract signed by you and ARM, or (ii) a written contract provided by
+ARM and accepted by you, this is the only agreement between you and ARM relating
+to the Software and it may only be modified by written agreement between you and
+ARM. Except as expressly agreed in writing, this Licence may not be modified by purchase
+orders, advertising or other representation by any person. If any clause or sentence
+in this Licence is held by a court of law to be illegal or unenforceable the remaining
+provisions of this Licence shall not be affected thereby. The failure by ARM to enforce
+any of the provisions of this Licence, unless waived in writing, shall not constitute
+a waiver of ARM's rights to enforce such provision or any other provision of this
+Licence in the future.
+</FONT></P>
+
+
+<!-- para from line 106 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+At ARM's request, you agree to check your computers for installations of the Software,
+copies of Licence Keys, contents of any licence server log files, individual or concurrent
+usage of Seats, and any other information requested by ARM relating to Software installation,
+usage and Licence Key management, and to provide this information to ARM. You agree
+that auditors nominated by ARM may also perform such checking and reporting on behalf
+of ARM by prior appointment during your normal business hours on seven (7) days'
+notice. ARM shall bear the auditors' costs for that audit unless it reveals unlicensed
+usage in which case you shall promptly reimburse ARM for all reasonable costs and
+expenses, including professional fees, relating to such audit. Any information which
+is disclosed to ARM or such auditors during checking or audit shall be treated as
+your confidential information and shall only be used by ARM for licence management,
+compliance and enforcement purposes.
+</FONT></P>
+
+
+<!-- para from line 108 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+The Software provided under this Licence is subject to U.S. export control laws,
+including the U.S. Export Administration Act and its associated regulations, and
+may be subject to export or import regulations in other countries. You agree to comply
+fully with all laws and regulations of the United States and other countries (&ldquo;Export
+Laws&rdquo;) to assure that the Software, is not: (i) exported, directly or indirectly,
+in violation of Export Laws, either to any countries that are subject to U.S. export
+restrictions or to any end user who has been prohibited from participating in the
+U.S.A. export transactions by any federal agency of the U.S. government; or (ii)
+intended to be used for any purpose prohibited by Export Laws, including, without
+limitation, nuclear, chemical, or biological weapons proliferation. 
+</FONT></P>
+
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">SCHEDULE 1 
+</FONT></P>
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">SECTION 1 - HEADER FILES
+</FONT></P>
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">The header file(s); 
+</FONT></P>
+
+<!-- letter list; first item on line 117 -->
+<table width="85%">
+<tr><td width="7%">&nbsp;</td><td><P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+(i) found in your installation at:
+</FONT></P>
+</td></tr>
+</table>
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">$PVLIB_HOME/include/fmruntime/scx/*.*
+</FONT></P>
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">$PVLIB_HOME/include/fmruntime/sc_sg_callbacks.h
+</FONT></P>
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">$PVLIB_HOME/include/fmruntime/sc_sg_wrapper_base.h; and
+</FONT></P>
+
+<!-- letter list; first item on line 123 -->
+<table width="85%">
+<tr><td width="7%">&nbsp;</td><td><P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+(ii) generated by you using the Fast Models Tools and located alongside the generated
+Exported Virtual Subsystem.
+</FONT></P>
+</td></tr>
+</table>
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">SECTION 2 - SEPARATE FILES 
+</FONT></P>
+
+<!-- para from line 128 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+SDL v1.2.13 (www.libsdl.org) licensed to you under the GNU Lesser General Public
+Licence, version 2.1*.  
+</FONT></P>
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">Zlib v1.2.3 licensed to you under the Zlib license.  
+</FONT></P>
+
+<!-- para from line 132 -->
+<P ALIGN="JUSTIFY"><FONT FACE="Arial, sans-serif">
+*To the extent ARM is obliged to do so, ARM hereby offers to supply the files in
+source code form, subject to the terms of the GNU Lesser General Public Licence,
+upon request. This offer is valid for three (3) years from the date of your acceptance
+of this Licence. 
+</FONT></P>
+
+
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">LEC-PRE-00374-V8.0 - Fast Models V8.1 NM/HJ /end
+</FONT></P>
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">9 May 2013 CONFIDENTIAL LEC-PRE-00374 SP-Version: 8.0
+</FONT></P>
+
+<P ALIGN="LEFT"><FONT FACE="Arial, sans-serif">1 of 6
+</FONT></P>
+
+</body>
+</html>

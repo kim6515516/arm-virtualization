@@ -1,0 +1,74 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// The ICS307 clock generator component.
+
+component ICS307
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Serially Programmable Clock Source.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    resources
+    {
+        PARAMETER { description("VDW"), type(uint32_t), default(4) } vdw;
+        PARAMETER { description("RDR"), type(uint32_t), default(6) } rdr;
+        PARAMETER { description("OD"), type(uint32_t), default(3) } od;
+        
+        uint32_t v;
+        uint32_t r;
+        uint32_t o;
+    }
+
+    composition
+    {
+        clkdiv_clk1 : ClockDivider;
+    }
+    
+    connection
+    {
+        self.clk_in => self.clk_out_ref;
+        self.clk_in => clkdiv_clk1.clk_in;
+        clkdiv_clk1.clk_out => self.clk_out_clk1;
+    }
+    
+    slave port<ClockSignal> clk_in;
+    master port<ClockSignal> clk_out_clk1;
+    master port<ClockSignal> clk_out_ref;
+    
+    slave port<ICS307Configuration> configuration
+    {
+        behaviour setConfiguration(uint32_t new_v, uint32_t new_r, uint32_t new_o)
+        {
+            updateConfig(new_v,new_r,new_o);
+        }
+    }
+    
+    behaviour init()
+    {
+        composition.init();
+        updateConfig(vdw,rdr,od);
+    }
+    
+    behaviour updateConfig(uint32_t new_v, uint32_t new_r, uint32_t new_o)
+    {
+        v = new_v;
+        r = new_r;
+
+        /*! Values table 1, p. 4 of ICS307-01/02 manual. */
+        static const uint32_t odValues[8] = { 10, 2, 8, 4, 5, 7, 3, 6};
+        o = odValues[new_o & 0x7];
+        
+        uint32_t mul = 2 * (v + 8);
+        uint32_t div = (r + 2) * o;
+
+        clkdiv_clk1.rate.set(mul, div);
+    }
+
+}

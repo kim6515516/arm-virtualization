@@ -1,0 +1,812 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    CCI400.sgcanvas
+#//  Created: Mon Oct 24 10:55:57 2011
+#//  By: Fast Models  System Canvas 6.2.005  (Jul 22 2011)
+#//
+# *  Do NOT modify this file. It is for internal use by System Canvas only.
+#//
+#//  Copyright (c) 2004-2008 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 12;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Arial";
+            font_size = 10;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Arial";
+            font_size = 10;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "cciinterconnect"
+        (
+            x = 70;
+            y = -10;
+            width = 271;
+            height = 431;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "acchannelen"
+                (
+                x = 0;
+                y = 32;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "barrierterminate"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "broadcastcachemain"
+                (
+                x = 0;
+                y = 92;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "bufferableoverride"
+                (
+                x = 0;
+                y = 122;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "control"
+                (
+                x = 0;
+                y = 352;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "downstream"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "downstream[0]"
+                (
+                x = 160;
+                y = 92;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "errorirq"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "event_bus"
+                (
+                x = 270;
+                y = 272;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "reset_in"
+                (
+                x = 0;
+                y = 372;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "reset_state_of_upstream_port_3"
+                (
+                x = 0;
+                y = 152;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "reset_state_of_upstream_port_4"
+                (
+                x = 10;
+                y = 182;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "upstream"
+                (
+                x = 0;
+                y = 162;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "upstream[0]"
+                (
+                x = 0;
+                y = 212;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "upstream[1]"
+                (
+                x = 10;
+                y = 242;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "upstream[2]"
+                (
+                x = 0;
+                y = 272;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "upstream[3]"
+                (
+                x = 0;
+                y = 302;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "upstream[4]"
+                (
+                x = 10;
+                y = 332;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+            )
+        )
+        instance "cciregisters"
+        (
+            x = 820;
+            y = 220;
+            width = 171;
+            height = 139;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "cciinterconnect_control"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "event_bus_s"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = -20;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "reset_in"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "timer_callback_handler"
+                (
+                x = 0;
+                y = 82;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pvbusdecoder"
+        (
+            x = 490;
+            y = 80;
+            width = 171;
+            height = 81;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m_range"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+    )
+    ports
+    (
+        define "acchannelen"
+        (
+            x = -410;
+            y = 60;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "barrierterminate"
+        (
+            x = -410;
+            y = 90;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "broadcastcachemain"
+        (
+            x = -410;
+            y = 120;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "bufferableoverride"
+        (
+            x = -410;
+            y = 150;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "errorirq"
+        (
+            x = 1050;
+            y = 50;
+            width = 101;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "evntcntoverflow"
+        (
+            x = 80;
+            y = 610;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "lint_ace_3_reset_state"
+        (
+            x = -410;
+            y = 180;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "lint_ace_4_reset_state"
+        (
+            x = -410;
+            y = 210;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "pvbus_m"
+        (
+            x = 1050;
+            y = 120;
+            width = 101;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "pvbus_s_ace_3"
+        (
+            x = -410;
+            y = 330;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "pvbus_s_ace_4"
+        (
+            x = -410;
+            y = 360;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "pvbus_s_ace_lite_plus_dvm_0"
+        (
+            x = -410;
+            y = 240;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "pvbus_s_ace_lite_plus_dvm_1"
+        (
+            x = -410;
+            y = 270;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "pvbus_s_ace_lite_plus_dvm_2"
+        (
+            x = -410;
+            y = 300;
+            width = 201;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "reset_in"
+        (
+            x = -110;
+            y = 470;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+    )
+    connections
+    (
+        define "cciinterconnect.downstream=>pvbusdecoder.pvbus_s"
+        (
+            point
+            (
+                x = 420;
+                y = 40;
+                automatic = true;
+            )
+            point
+            (
+                x = 420;
+                y = 130;
+                automatic = true;
+            )
+        )
+        define "cciinterconnect.downstream[0]=>pvbusdecoder.pvbus_s"
+        (
+        )
+        define "cciinterconnect.event_bus=>cciregisters.event_bus_s"
+        (
+        )
+        define "cciregisters.cciinterconnect_control=>cciinterconnect.control"
+        (
+            point
+            (
+                x = 1000;
+                y = 270;
+                automatic = true;
+            )
+            point
+            (
+                x = 1000;
+                y = 510;
+                automatic = false;
+            )
+            point
+            (
+                x = -140;
+                y = 510;
+                automatic = false;
+            )
+            point
+            (
+                x = -140;
+                y = 390;
+                automatic = false;
+            )
+        )
+        define "pvbusdecoder.pvbus_m_range=>cciregisters.pvbus_s"
+        (
+            point
+            (
+                x = 800;
+                y = 130;
+                automatic = false;
+            )
+            point
+            (
+                x = 800;
+                y = 290;
+                automatic = false;
+            )
+        )
+    )
+    portmaps
+    (
+        define "cciinterconnect.errorirq=>self.errorirq"
+        (
+        )
+        define "pvbusdecoder.pvbus_m_range=>self.pvbus_m"
+        (
+        )
+        define "self.acchannelen=>cciinterconnect.acchannelen"
+        (
+        )
+        define "self.barrierterminate=>cciinterconnect.barrierterminate"
+        (
+        )
+        define "self.broadcastcachemain=>cciinterconnect.broadcastcachemain"
+        (
+        )
+        define "self.bufferableoverride=>cciinterconnect.bufferableoverride"
+        (
+        )
+        define "self.lint_ace_3_reset_state=>cciinterconnect.reset_state_of_upstream_port_3"
+        (
+        )
+        define "self.lint_ace_4_reset_state=>cciinterconnect.reset_state_of_upstream_port_4"
+        (
+        )
+        define "self.pvbus_s_ace_3=>cciinterconnect.upstream"
+        (
+            point
+            (
+                x = -190;
+                y = 340;
+                automatic = true;
+            )
+            point
+            (
+                x = -190;
+                y = 260;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 260;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 200;
+                automatic = true;
+            )
+        )
+        define "self.pvbus_s_ace_3=>cciinterconnect.upstream[3]"
+        (
+        )
+        define "self.pvbus_s_ace_4=>cciinterconnect.upstream"
+        (
+            point
+            (
+                x = -190;
+                y = 370;
+                automatic = true;
+            )
+            point
+            (
+                x = -190;
+                y = 260;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 260;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 200;
+                automatic = true;
+            )
+        )
+        define "self.pvbus_s_ace_4=>cciinterconnect.upstream[4]"
+        (
+        )
+        define "self.pvbus_s_ace_lite_plus_dvm_0=>cciinterconnect.upstream"
+        (
+            point
+            (
+                x = -200;
+                y = 250;
+                automatic = true;
+            )
+            point
+            (
+                x = -200;
+                y = 250;
+                automatic = true;
+            )
+            point
+            (
+                x = 60;
+                y = 250;
+                automatic = true;
+            )
+            point
+            (
+                x = 60;
+                y = 200;
+                automatic = true;
+            )
+        )
+        define "self.pvbus_s_ace_lite_plus_dvm_0=>cciinterconnect.upstream[0]"
+        (
+        )
+        define "self.pvbus_s_ace_lite_plus_dvm_1=>cciinterconnect.upstream"
+        (
+            point
+            (
+                x = -190;
+                y = 280;
+                automatic = true;
+            )
+            point
+            (
+                x = -190;
+                y = 260;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 260;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 200;
+                automatic = true;
+            )
+        )
+        define "self.pvbus_s_ace_lite_plus_dvm_1=>cciinterconnect.upstream[1]"
+        (
+        )
+        define "self.pvbus_s_ace_lite_plus_dvm_2=>cciinterconnect.upstream"
+        (
+            point
+            (
+                x = -190;
+                y = 310;
+                automatic = true;
+            )
+            point
+            (
+                x = -190;
+                y = 260;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 260;
+                automatic = true;
+            )
+            point
+            (
+                x = 50;
+                y = 200;
+                automatic = true;
+            )
+        )
+        define "self.pvbus_s_ace_lite_plus_dvm_2=>cciinterconnect.upstream[2]"
+        (
+        )
+        define "self.reset_in=>cciinterconnect.reset_in"
+        (
+            point
+            (
+                x = 10;
+                y = 480;
+                automatic = true;
+            )
+            point
+            (
+                x = 10;
+                y = 410;
+                automatic = true;
+            )
+        )
+        define "self.reset_in=>cciregisters.reset_in"
+        (
+            point
+            (
+                x = 810;
+                y = 480;
+                automatic = false;
+            )
+            point
+            (
+                x = 810;
+                y = 330;
+                automatic = false;
+            )
+        )
+    )
+    labels
+    (
+    )
+)

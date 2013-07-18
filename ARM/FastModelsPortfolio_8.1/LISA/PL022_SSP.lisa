@@ -1,0 +1,537 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved. 
+ */
+
+// LISA Implementation of PL022 SSP
+
+component PL022_SSP
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell Synchronous Serial Port(PL022)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes
+    {
+        #include "hostconf/zinttypes.h"
+        #include "pv/PVBus.h"
+        #include <queue>
+        #include <stdio.h>
+        #define PL022_TRACE if (!0) ; else printf
+        
+        // create a mask of bits in a word
+        #define pl022_mask(s, e) (0xffffffff>>(31-(s)) & (0xffffffff << (e)))
+        #define pl022_bit(b) (1<<(b))
+        
+        #define MAX_FIFO_SIZE 8
+    }
+    
+    composition
+    {
+        prescaler : ClockDivider();
+        busslave : PVBusSlave(size = 0x1000);
+    }
+    
+    resources
+    {
+        // SSPCR0
+        enum {
+            SSPCR0_SCR_MASK = pl022_mask(15, 8),
+            SSPCR0_SCR_SHIFT = 8,
+            SSPCR0_SPH_MASK = pl022_bit(7),
+            SSPCR0_SPH_SHIFT = 7,
+            SSPCR0_SPO_MASK = pl022_bit(6),
+            SSPCR0_SPO_SHIFT = 6,
+            SSPCR0_FRF_MASK = pl022_mask(5, 4),
+            SSPCR0_FRF_SHIFT = 4,
+            SSPCR0_DSS_MASK = pl022_mask(3, 0)
+        };
+        // SSPCR1
+        enum {
+            SSPCR1_SOD_MASK = pl022_bit(3),
+            SSPCR1_SOD_SHIFT = 3,
+            SSPCR1_MS_MASK = pl022_bit(2),
+            SSPCR1_MS_SHIFT = 2,
+            SSPCR1_SSE_MASK = pl022_bit(1),
+            SSPCR1_SSE_SHIFT = 1,
+            SSPCR1_LBM_MASK = 0
+        };
+        // SSPSR
+        enum {
+            SSPSR_BSY_MASK = pl022_bit(4),
+            SSPSR_BSY_SHIFT = 4,
+            SSPSR_RFF_MASK = pl022_bit(3),
+            SSPSR_RFF_SHIFT = 3,
+            SSPSR_RNE_MASK = pl022_bit(2),
+            SSPSR_RNE_SHIFT = 2,
+            SSPSR_TNF_MASK = pl022_bit(1),
+            SSPSR_TNF_SHIFT = 1,
+            SSPSR_TFE_MASK = pl022_bit(0),
+            SSPSR_TFE_SHIFT = 0
+        };
+        // SSPCPSR
+        enum {
+            SSPCPSR_CPSDVSR_MASK = pl022_mask(7, 0)
+        };
+        // SSPIMSC
+        enum {
+            SSPIMSC_TXIM_MASK = pl022_bit(3),
+            SSPIMSC_TXIM_SHIFT = 3,
+            SSPIMSC_RXIM_MASK = pl022_bit(2),
+            SSPIMSC_RXIM_SHIFT = 2,
+            SSPIMSC_RTIM_MASK = pl022_bit(1),
+            SSPIMSC_RTIM_SHIFT = 1,
+            SSPIMSC_RORIM_MASK = pl022_bit(0)
+        };
+        //SSPRIS
+        enum {
+            SSPRIS_TXRIS_MASK = pl022_bit(3),
+            SSPRIS_TXRIS_SHIFT = 3,
+            SSPRIS_RXRIS_MASK = pl022_bit(2),
+            SSPRIS_RXRIS_SHIFT = 2,
+            SSPRIS_RTRIS_MASK = pl022_bit(1),
+            SSPRIS_RTRIS_SHIFT = 1,
+            SSPRIS_RORRIS_MASK = pl022_bit(0)
+        };
+        // SSPMIS
+        enum {
+            SSPMIS_TXMIS_MASK = pl022_bit(3),
+            SSPMIS_TXMIS_SHIFT = 3,
+            SSPMIS_RXMIS_MASK = pl022_bit(2),
+            SSPMIS_RXMIS_SHIFT = 2,
+            SSPMIS_RTMIS_MASK = pl022_bit(1),
+            SSPMIS_RTMIS_SHIFT = 1,
+            SSPMIS_RORMIS_MASK = pl022_bit(0)
+        };
+        // SSPICR
+        enum {
+            SSPICR_RTIC_MASK = pl022_bit(1),
+            SSPICR_RTIC_SHIFT = 1,
+            SSPICR_RORIC_MASK = pl022_bit(0)
+        };
+        // SSPDMACR
+        enum {
+            SSPICR_TXDMAE_MASK = pl022_bit(1),
+            SSPICR_TXDMAE_SHIFT = 1,
+            SSPICR_RXDMAE_MASK = pl022_bit(0)
+        };
+        
+        REGISTER { description("Control register 0"),       read_function(debug_read), write_function(debug_write), reg_number(0x000) } SSPCR0; // 16 bits
+        REGISTER { description("Control register 1"),       read_function(debug_read), write_function(debug_write), reg_number(0x004) } SSPCR1; // 4 bits
+        REGISTER { description("FIFO data"),                read_function(debug_read), write_function(debug_write), reg_number(0x008) } SSPDR; // 16 bits
+        REGISTER { description("Status"),                   read_function(debug_read), write_function(debug_write), reg_number(0x00C) } SSPSR; // 5 bits
+        REGISTER { description("Clock prescale"),           read_function(debug_read), write_function(debug_write), reg_number(0x010) } SSPCPSR; // 8 bits
+        REGISTER { description("Interrupt mask set/clear"), read_function(debug_read), write_function(debug_write), reg_number(0x014) } SSPIMSC; // 4 bits
+        REGISTER { description("Raw interrupt status"),     read_function(debug_read), write_function(debug_write), reg_number(0x018) } SSPRIS; // 4 bits
+        REGISTER { description("Masked interrupt status"),  read_function(debug_read), write_function(debug_write), reg_number(0x01C) } SSPMIS; // 4 bits
+        REGISTER { description("Interrupt clear"),          read_function(debug_read), write_function(debug_write), reg_number(0x020) } SSPICR; // 4 bits
+        REGISTER { description("DMA control"),              read_function(debug_read), write_function(debug_write), reg_number(0x024) } SSPDMACR; // 2 bits
+        // ID registers
+        REGISTER { description("Peripheral ID bits 7:0"),   read_function(debug_read), write_function(debug_write), reg_number(0xFE0), attribute(read_only) } SSPPeriphID0; // 8 bits
+        REGISTER { description("Peripheral ID bits 15:8"),  read_function(debug_read), write_function(debug_write), reg_number(0xFE4), attribute(read_only) } SSPPeriphID1; // 8 bits
+        REGISTER { description("Peripheral ID bits 23:16"), read_function(debug_read), write_function(debug_write), reg_number(0xFE8), attribute(read_only) } SSPPeriphID2; // 8 bits
+        REGISTER { description("Peripheral ID bits 31:24"), read_function(debug_read), write_function(debug_write), reg_number(0xFEC), attribute(read_only) } SSPPeriphID3; // 8 bits
+        REGISTER { description("PrimeCell ID bits 7:0"),    read_function(debug_read), write_function(debug_write), reg_number(0xFF0), attribute(read_only) } SSPPCellID0; // 8 bits
+        REGISTER { description("PrimeCell ID bits 15:8"),   read_function(debug_read), write_function(debug_write), reg_number(0xFF4), attribute(read_only) } SSPPCellID1; // 8 bits
+        REGISTER { description("PrimeCell ID bits 23:16"),  read_function(debug_read), write_function(debug_write), reg_number(0xFF8), attribute(read_only) } SSPPCellID2; // 8 bits
+        REGISTER { description("PrimeCell ID bits 31:24"),  read_function(debug_read), write_function(debug_write), reg_number(0xFFC), attribute(read_only) } SSPPCellID3; // 8 bits
+        
+        uint32_t peri_id; // Peripheral Identification
+        float watermark;
+        std::queue<uint16_t> receive_fifo;
+        std::queue<uint16_t> transmit_fifo;
+        uint32_t receive_fifo_size;
+        uint32_t transmit_fifo_size;
+        bool dma_mode;
+        bool txdmae;
+        bool rxdmae;
+    }
+    // interrupt signal
+    master port<Signal> rxintr;
+    master port<Signal> txintr;
+    master port<Signal> rorintr;
+    master port<Signal> rtintr; // we don't implement time out interrupt
+    master port<Signal> intr;
+    // data exchange
+    master port<Value> txd;
+    /*{
+        behavior getValue() : uint32_t
+        {
+            uint32_t data = (uint32_t)transmit_fifo.front();
+            transmit_fifo.pop();
+            if(transmit_fifo.size() <= MAX_FIFO_SIZE/2)
+            {
+                SSPRIS |= SSPRIS_TXRIS_MASK; // Set Raw TX interrupt
+                SSPMIS = SSPRIS & SSPIMSC; // Masked interrupt source
+                if((SSPMIS & SSPMIS_TXMIS_MASK) >> SSPMIS_TXMIS_SHIFT)
+                {
+                    if(txintr.setValue.implemented())
+                        txintr.setValue(sg::Signal::Set);
+                    if(intr.setValue.implemented())
+                        intr.setValue(sg::Signal::Set);
+                }
+            }
+            if(transmit_fifo.size()==0)
+            {
+                SSPSR |= SSPSR_TFE_MASK;       // Set Transmit FIFO empty bit
+
+                if(!dma_mode)
+                    SSPSR &= ~SSPSR_BSY_MASK;  // Clear busy flag
+                else
+                    SSPSR |= SSPSR_BSY_MASK;   // Set busy flag
+            }
+            else
+            {
+                SSPSR &= ~SSPSR_TFE_MASK;      // Clear Transmit FIFO empty bit
+            }
+            
+            return data;
+        }
+    }*/
+    slave port<Value> rxd
+    {
+        behavior setValue(uint32_t data)
+        {
+            PL022_TRACE("PL022 - Receive FIFO received data 0x%x\n", (uint16_t)data);
+            if(receive_fifo.size() == MAX_FIFO_SIZE)
+            {
+                SSPRIS |= SSPRIS_RORRIS_MASK; // Set Raw receive overrun interrupt
+                SSPMIS = SSPRIS & SSPIMSC; // Masked interrupt source
+                if(SSPMIS & SSPMIS_RORMIS_MASK)
+                {
+                    if(rorintr.setValue.implemented())
+                        rorintr.setValue(sg::Signal::Set);
+                    if(intr.setValue.implemented())
+                        intr.setValue(sg::Signal::Set);
+                }
+                return;
+            }
+            receive_fifo.push((uint16_t)data);
+            PL022_TRACE("PL022 - After push data, the size of receive_fifo is %"PRIu64"\n", (uint64_t)receive_fifo.size());
+
+            SSPSR |= SSPSR_RNE_MASK;    // Set Receive FIFO Not Empty Bit
+
+            if(receive_fifo.size() == MAX_FIFO_SIZE)
+                SSPSR |= SSPSR_RFF_MASK;    // Set Receive FIFO Full bit
+            else
+                SSPSR &= ~SSPSR_RFF_MASK;   // Clear Receive FIFO Full bit
+
+            if(receive_fifo.size() < MAX_FIFO_SIZE*watermark)
+                rx_dma_port.request(PL080_REQ_BURST);
+            else if(receive_fifo.size() >= (uint32_t)MAX_FIFO_SIZE*watermark)
+                rx_dma_port.request(PL080_REQ_SINGLE);
+        }
+    }
+    // Clock. The internal data transmit/receive is not clocked by clock input
+    // The ports here are for furture enhancement
+    slave port<ClockSignal> clkin;
+    slave port<ClockSignal> clk;
+    master port<ClockSignal> clkout;
+    // Dma port
+    master port<PL080_DMAC_DmaPortProtocol> rx_dma_port
+    {
+       behaviour response(uint32_t response)
+       {
+           // DO NOTHING
+       }
+    }
+    master port<PL080_DMAC_DmaPortProtocol> tx_dma_port
+    {
+       behaviour response(uint32_t response)
+       {
+           // DO NOTHING
+       }
+    }
+
+    // Memory-mapped register interface
+    slave port<PVBus> pvbus;
+
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx)
+                    : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32((uint32_t)registerRead(tx.getAddress() & ~3));
+        }
+        
+        behavior write(pv::WriteTransaction tx)
+                    : pv::Tx_Result
+        {
+            registerWrite(tx.getAddress(),
+                          tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        self.clk => prescaler.clk_in;
+        prescaler.clk_out => self.clkout;
+    }
+    
+    behavior init()
+    {
+        composition.init();
+        peri_id = 0x041022;
+        watermark = 0.5;
+    }
+    
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        receive_fifo_size = 0;
+        transmit_fifo_size = 0;
+        dma_mode = false;
+        txdmae = false;
+        rxdmae = false;
+        
+        // initialise register
+        SSPCR0 = 0x0000;
+        SSPCR1 = 0x0;
+        SSPSR = 0x03;
+        SSPCPSR = 0x00;
+        SSPIMSC = 0x0;
+        SSPRIS = 0x8;
+        SSPMIS = 0x0;
+        SSPICR = 0x0;
+        SSPDMACR = 0x0;
+        
+    }
+    
+    behavior registerRead(pv::bus_addr_t addr) : uint32_t
+    {
+        uint32_t data = 0;
+        switch (addr) 
+        {
+        case 0x000:
+            data = SSPCR0;
+            PL022_TRACE("%s: Rd SSPCR0 -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+
+        case 0x004:
+            data = SSPCR1;
+            PL022_TRACE("%s: Rd SSPCR1 -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+
+        case 0x008:
+            if(receive_fifo.size() != 0)
+            {
+                data = (uint32_t)receive_fifo.front();
+                receive_fifo.pop();
+            }
+
+            if(receive_fifo.size() != 0)
+                SSPSR |= SSPSR_RNE_MASK;      // Set Rx FIFO is not empty bit
+            else
+                SSPSR &= ~SSPSR_RNE_MASK;     // Clear Rx FIFO is not empty bit
+
+            if(receive_fifo.size() <= MAX_FIFO_SIZE*watermark)
+            {
+                SSPRIS |= SSPRIS_RXRIS_MASK;  // Set RXRIS bit
+                SSPMIS = SSPRIS & SSPIMSC;
+                if((SSPMIS & SSPMIS_RXMIS_MASK) >> SSPMIS_RXMIS_SHIFT)
+                {
+                    if(rxintr.setValue.implemented())
+                        rxintr.setValue(sg::Signal::Set);
+                    if(intr.setValue.implemented())
+                        intr.setValue(sg::Signal::Set);
+                }
+                rx_dma_port.request(PL080_REQ_BURST);
+            } else {
+                rx_dma_port.request(PL080_REQ_SINGLE);
+            }
+            
+            PL022_TRACE("%s: Rd SSPDR -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+
+        case 0x00C:
+            data = SSPSR;
+            PL022_TRACE("%s: Rd SSPSR -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+
+        case 0x010:
+            data = SSPCPSR;
+            PL022_TRACE("%s: Rd SSPCPSR -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+
+        case 0x014:
+            data = SSPIMSC;
+            PL022_TRACE("%s: Rd SSPIMSC -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+
+        case 0x018:
+            data = SSPRIS;
+            PL022_TRACE("%s: Rd SSPRIS -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+
+        case 0x01C:
+            SSPMIS = SSPRIS & SSPIMSC;
+            data = SSPMIS;
+            PL022_TRACE("%s: Rd SSPMIS -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+
+        case 0x020:
+            PL022_TRACE("%s: Rd SSPICR - WRITE ONLY\n", getInstanceName().c_str());
+            break;
+
+        case 0x024:
+            data = SSPDMACR;
+            PL022_TRACE("%s: Rd SSPDMACR -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+
+            #define PCELL_ID(ldata,pcellid)                 \
+        case 0xFE0: ldata = pcellid & 0xff; break; \
+        case 0xFE4: ldata = (pcellid >> 8) & 0xff; break;     \
+        case 0xFE8: ldata = (pcellid >> 16) & 0xff; break;    \
+        case 0xFEC: ldata = (pcellid >> 24) & 0xff; break;    \
+        case 0xFF0: ldata = 0x0D; break; \
+        case 0xFF4: ldata = 0xF0; break; \
+        case 0xFF8: ldata = 0x05; break; \
+        case 0xFFC: ldata = 0xB1; break;
+            PCELL_ID(data,peri_id);
+
+        default:
+            printf("%s: Access(read) Error: Invalid address 0x%x\n", getInstanceName().c_str(), (uint32_t)addr);
+        }
+        
+        return data;
+    }
+    
+    behavior registerWrite(pv::bus_addr_t addr, uint32_t data)
+    {
+        switch (addr)
+        {
+        case 0x000: // SSPCR0
+            SSPCR0 = data;
+            //uint32_t scr = (SSPCR0 & SSPCR0_SCR_MASK) >> SSPCR0_SCR_SHIFT;
+            //prescaler.rate.set(1,SSPCPSR * (1+scr));
+            PL022_TRACE("%s: Wr SSPCR0 <- 0x%x\n", getInstanceName().c_str(), data);
+            return;
+
+        case 0x004: // SSPCR1
+            SSPCR1 = data;
+            PL022_TRACE("%s: Wr SSPCR1 <- 0x%x\n", getInstanceName().c_str(), data);
+            return;
+
+        case 0x008: // SSPDR
+            transmit_fifo.push((uint16_t)data);
+            transmit_fifo.pop();
+            txd.setValue(data);
+
+            if(transmit_fifo.size() != MAX_FIFO_SIZE)
+                SSPSR |= SSPSR_TNF_MASK;    // Set transmit FIFO not full bit
+            else
+                SSPSR &= ~SSPSR_TNF_MASK;   // Clear transmit FIFO not full bit
+
+            if(transmit_fifo.size() == 0)
+                SSPSR |= SSPSR_TFE_MASK;    // Set transmit FIFO empty bit
+            else
+                SSPSR &= ~SSPSR_TFE_MASK;   // Clear transmit FIFO empty bit
+
+            if(transmit_fifo.size() < MAX_FIFO_SIZE*watermark && transmit_fifo.size() != 0)
+                tx_dma_port.request(PL080_REQ_SINGLE);
+            else if(transmit_fifo.size() >= (uint32_t)MAX_FIFO_SIZE*watermark)
+                tx_dma_port.request(PL080_REQ_BURST);
+            PL022_TRACE("%s: Wr SSPDR <- 0x%x\n", getInstanceName().c_str(), data);
+            return;
+
+        case 0x00C: // SSPSR
+            PL022_TRACE("%s: Wr SSPSR - READ ONLY\n", getInstanceName().c_str());
+            return;
+
+        case 0x010: // SSPCPSR
+            SSPCPSR = (uint8_t)(data & SSPCPSR_CPSDVSR_MASK) & ~(1<<0); // The LSB always returns zero on reads
+            //uint32_t scr = (SSPCR0 & SSPCR0_SCR_MASK) >> SSPCR0_SCR_SHIFT;
+            //prescaler.rate.set(1,SSPCPSR * (1+scr));
+            PL022_TRACE("%s: Wr SSPCPSR <- 0x%x\n", getInstanceName().c_str(), data);
+            return;
+
+        case 0x014: // SSPIMSC
+            SSPIMSC = data;
+            SSPMIS = SSPRIS & SSPIMSC;
+            PL022_TRACE("%s: Wr SSPIMSC <- 0x%x\n", getInstanceName().c_str(), data);
+            return;
+
+        case 0x018: // SSPRIS
+            PL022_TRACE("%s: Wr SSPRIS - READ ONLY\n", getInstanceName().c_str());
+            return;
+
+        case 0x01C: // SSPMIS
+            PL022_TRACE("%s: Wr SSPMIS - READ ONLY\n", getInstanceName().c_str());
+            return;
+
+        case 0x020: // SSPICR
+            SSPICR = data;
+            if((SSPICR & (0x1<<SSPICR_RTIC_SHIFT)) != 0)
+            {
+                if(rtintr.setValue.implemented())
+                    rtintr.setValue(sg::Signal::Clear);
+                if(intr.setValue.implemented())
+                    intr.setValue(sg::Signal::Clear);
+            }
+            if((SSPICR & 0x1) != 0)
+            {
+                if(rorintr.setValue.implemented())
+                    rorintr.setValue(sg::Signal::Clear);
+                if(intr.setValue.implemented())
+                    intr.setValue(sg::Signal::Clear);
+            }
+
+            PL022_TRACE("%s: Wr SSPICR <- 0x%x\n", getInstanceName().c_str(), data);
+            return;
+
+        case 0x024: // SSPDMACR
+            SSPDMACR = data;
+            if((SSPDMACR & SSPICR_TXDMAE_MASK) >> SSPICR_TXDMAE_SHIFT) 
+                txdmae = true;
+            else
+                txdmae = false;
+            
+            if(SSPDMACR & SSPICR_RXDMAE_MASK)
+                rxdmae = true;
+            else
+                rxdmae = false;
+            PL022_TRACE("%s: Wr SSPDMACR <- 0x%x\n", getInstanceName().c_str(), data);
+            return;
+
+        default:
+            printf("%s: Access(write) Error: Invalid address 0x%x\n", getInstanceName().c_str(), (uint32_t)addr);
+            return;
+        }
+    }
+    
+    // debugger register access support
+    behavior debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+
+        return ACCESS_FUNC_OK;
+    }
+
+    behavior debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+
+        return ACCESS_FUNC_OK;
+    }
+}

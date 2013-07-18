@@ -1,0 +1,762 @@
+CADI Target Name   : FVP_EB_Cortex_A8
+CADI Target Version: 0.00
+
+Component providing trace: FVP_EB_Cortex_A8.coretile.core
+=============================================================================
+Component is of type "ARM_Cortex-A8"
+Version is "5.2.13"
+#Sources: 38
+
+Source #0: BRA_DIR (Branches to an immediate address.)
+    Field #0: PC type:MTI_UNSIGNED_INT size:4 (The address of the branch instruction.)
+    Field #1: ISET type:MTI_ENUM size:1 (The instructions set of the branch instruction.)
+        0x0 = ARM
+        0x1 = Thumb
+        0x2 = Jazelle
+        0x3 = Thumb2EE
+    Field #2: TARGET_PC type:MTI_UNSIGNED_INT size:4 (The address the instruction branches to.)
+    Field #3: TARGET_ISET type:MTI_ENUM size:1 (The instructions set after the branch.)
+        0x0 = ARM
+        0x1 = Thumb
+        0x2 = Jazelle
+        0x3 = Thumb2EE
+    Field #4: IS_COND type:MTI_BOOL size:1 (Indicates if this is a conditional branch.)
+    Field #5: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #1: BRA_INDIR (Branches which are indirect (e.g. to a register).)
+    Field #0: PC type:MTI_UNSIGNED_INT size:4 (The address of the branch instruction.)
+    Field #1: ISET type:MTI_ENUM size:1 (The instructions set of the branch instruction.)
+        0x0 = ARM
+        0x1 = Thumb
+        0x2 = Jazelle
+        0x3 = Thumb2EE
+    Field #2: TARGET_PC type:MTI_UNSIGNED_INT size:4 (The address the instruction branches to.)
+    Field #3: TARGET_ISET type:MTI_ENUM size:1 (The instructions set after the branch.)
+        0x0 = ARM
+        0x1 = Thumb
+        0x2 = Jazelle
+        0x3 = Thumb2EE
+    Field #4: IS_COND type:MTI_BOOL size:1 (Indicates if this is a conditional branch.)
+    Field #5: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #2: BUS_READ_ACCESS (Trace reads from the core to external memories and peripherals.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:8 (Physical address of access.)
+    Field #1: ACCESS_SIZE type:MTI_UNSIGNED_INT size:1 (Logarithm of the access size: 0=byte, 1=halfword, 2=word, 3=doubleword, ...)
+    Field #2: BURST_LEN type:MTI_UNSIGNED_INT size:1 (The number of data transfers (beats) in this burst.)
+    Field #3: MASTER_ID type:MTI_UNSIGNED_INT size:4 (The AXI master ID.)
+    Field #4: LOCK type:MTI_ENUM size:1 (Normal / Locked / Exclusive.)
+        0x0 = Normal
+        0x1 = Exclusive
+        0x2 = Locked
+    Field #5: PRIV type:MTI_BOOL size:1 (Is privileged access.)
+    Field #6: NS type:MTI_BOOL size:1 (Is a nonsecure access.)
+    Field #7: INST type:MTI_BOOL size:1 (Is an instruction fetch.)
+    Field #8: OUTER_ATTRIBUTES type:MTI_UNSIGNED_INT size:1 (The outer attributes: bit0=write allocate, bit1=read allocate, bit2=cachable, bit3=bufferable, bit4=shareable)
+    Field #9: INNER_ATTRIBUTES type:MTI_UNSIGNED_INT size:1 (The inner attributes: bit0=write allocate, bit1=read allocate, bit2=cachable, bit3=bufferable, bit4=shareable)
+    Field #10: RESPONSE type:MTI_ENUM size:1 (Whether the transaction was successful, or an error occurred.)
+        0x0 = OK
+        0x1 = EXOKAY
+        0x2 = SLVERR
+        0x3 = DECERR
+    Field #11: USER_FLAGS type:MTI_UNSIGNED_INT size:4 (Core specific additional signals.)
+    Field #12: DATA type:MTI_UNSIGNED_INT size:0 max_size:2048 (The data transferred.)
+
+Source #3: BUS_WRITE_ACCESS (Trace writes from the core to external memories and peripherals.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:8 (Physical address of access.)
+    Field #1: ACCESS_SIZE type:MTI_UNSIGNED_INT size:1 (Logarithm of the access size: 0=byte, 1=halfword, 2=word, 3=doubleword, ...)
+    Field #2: BURST_LEN type:MTI_UNSIGNED_INT size:1 (The number of data transfers (beats) in this burst.)
+    Field #3: MASTER_ID type:MTI_UNSIGNED_INT size:4 (The AXI master ID.)
+    Field #4: LOCK type:MTI_ENUM size:1 (Normal / Locked / Exclusive.)
+        0x0 = Normal
+        0x1 = Exclusive
+        0x2 = Locked
+    Field #5: PRIV type:MTI_BOOL size:1 (Is privileged access.)
+    Field #6: NS type:MTI_BOOL size:1 (Is a nonsecure access.)
+    Field #7: INST type:MTI_BOOL size:1 (Is an instruction fetch.)
+    Field #8: OUTER_ATTRIBUTES type:MTI_UNSIGNED_INT size:1 (The outer attributes: bit0=write allocate, bit1=read allocate, bit2=cachable, bit3=bufferable, bit4=shareable)
+    Field #9: INNER_ATTRIBUTES type:MTI_UNSIGNED_INT size:1 (The inner attributes: bit0=write allocate, bit1=read allocate, bit2=cachable, bit3=bufferable, bit4=shareable)
+    Field #10: RESPONSE type:MTI_ENUM size:1 (Whether the transaction was successful, or an error occurred.)
+        0x0 = OK
+        0x1 = EXOKAY
+        0x2 = SLVERR
+        0x3 = DECERR
+    Field #11: USER_FLAGS type:MTI_UNSIGNED_INT size:4 (Core specific additional signals.)
+    Field #12: DATA type:MTI_UNSIGNED_INT size:0 max_size:2048 (The data transferred.)
+
+Source #4: CCFAIL (Failed condition check of conditional instructions.)
+    Field #0: COND type:MTI_ENUM size:1 (The condition of the conditional instruction.)
+        0x0 = EQ
+        0x1 = NE
+        0x2 = CS
+        0x3 = CC
+        0x4 = MI
+        0x5 = PL
+        0x6 = VS
+        0x7 = VC
+        0x8 = HI
+        0x9 = LS
+        0xa = GE
+        0xb = LT
+        0xc = GT
+        0xd = LE
+        0xe = AL
+    Field #1: PC type:MTI_UNSIGNED_INT size:4 (The address of the conditional instruction.)
+    Field #2: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #5: CCPASS (Passed condition check of conditional instructions.)
+    Field #0: COND type:MTI_ENUM size:1 (The condition of the conditional instruction.)
+        0x0 = EQ
+        0x1 = NE
+        0x2 = CS
+        0x3 = CC
+        0x4 = MI
+        0x5 = PL
+        0x6 = VS
+        0x7 = VC
+        0x8 = HI
+        0x9 = LS
+        0xa = GE
+        0xb = LT
+        0xc = GT
+        0xd = LE
+        0xe = AL
+    Field #1: PC type:MTI_UNSIGNED_INT size:4 (The address of the conditional instruction.)
+    Field #2: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #6: COMPILE_INST (Triggers when the CT compiler compiles an ARM instruction into x86 code.)
+    Field #0: PC type:MTI_UNSIGNED_INT size:4 (The address of the instruction.)
+    Field #1: OPCODE type:MTI_UNSIGNED_INT size:4 (The opcode of the instruction.)
+    Field #2: SIZE type:MTI_UNSIGNED_INT size:1 (The size of the instruction in bytes.)
+    Field #3: ISET type:MTI_ENUM size:1 (The instruction set of this instruction.)
+        0x0 = ARM
+        0x1 = Thumb
+        0x2 = Jazelle
+        0x3 = Thumb2EE
+    Field #4: ITSTATE type:MTI_UNSIGNED_INT size:1 (The ITSTATE current for the instruction.)
+
+Source #7: CONTEXTIDR (Writes to the Context ID Register.)
+    Field #0: NS type:MTI_BOOL size:1 (Secure or nonsecure banked register is accessed.)
+    Field #1: VALUE type:MTI_UNSIGNED_INT size:4 (The new value written.)
+    Field #2: UNDEF type:MTI_BOOL size:1 (The register accessed is undefined.)
+    Field #3: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #8: CORE_INFO (Static attributes describing the core. This source will never trigger by itself, only the DumpState() method is implemented.)
+    Field #0: NUM_CORES type:MTI_UNSIGNED_INT size:1 (The number of cores in this MP processor.)
+    Field #1: CORE_NUM type:MTI_UNSIGNED_INT size:1 (The number of this core in an MP processor.)
+    Field #2: CLUSTER_ID type:MTI_UNSIGNED_INT size:1 (The cluster ID of this processor.)
+    Field #3: ARCH_PROFILE type:MTI_ENUM size:1 (The architecture profile of the core.)
+        0x0 = AR
+        0x1 = M
+    Field #4: MEM_ARCH type:MTI_ENUM size:1 (The memory architecture of the core.)
+        0x0 = VMSA
+        0x1 = PMSA
+        0x2 = FLAT
+
+Source #9: CORE_LOADS (Load accesses by the core.)
+    Field #0: VADDR type:MTI_UNSIGNED_INT size:4 (The virtual address of the access.)
+    Field #1: LOCK type:MTI_ENUM size:1 (Normal, exclusive or locked access.)
+        0x0 = Normal
+        0x1 = Exclusive
+        0x2 = Locked
+    Field #2: TRANS type:MTI_BOOL size:1 (Is this a translated access.)
+    Field #3: SIZE type:MTI_UNSIGNED_INT size:1 (Width of the access in bytes. Only required if DATA is not traced.)
+    Field #4: DATA type:MTI_UNSIGNED_INT size:0 max_size:64 (The data read or written.)
+
+Source #10: CORE_REGS (Changes of the core registers R0 to R14.)
+    Field #0: ID type:MTI_UNSIGNED_INT size:1 (The register number, 0 to 14.)
+    Field #1: PHYS_ID type:MTI_ENUM size:1 (The physical register accessed.)
+        0x0 = R0_usr
+        0x1 = R1_usr
+        0x2 = R2_usr
+        0x3 = R3_usr
+        0x4 = R4_usr
+        0x5 = R5_usr
+        0x6 = R6_usr
+        0x7 = R7_usr
+        0x8 = R8_usr
+        0x9 = R9_usr
+        0xa = R10_usr
+        0xb = R11_usr
+        0xc = R12_usr
+        0xd = R8_fiq
+        0xe = R9_fiq
+        0xf = R10_fiq
+        0x10 = R11_fiq
+        0x11 = R12_fiq
+        0x12 = SP_usr
+        0x13 = LR_usr
+        0x14 = SP_fiq
+        0x15 = LR_fiq
+        0x16 = SP_irq
+        0x17 = LR_irq
+        0x18 = SP_svc
+        0x19 = LR_svc
+        0x1a = SP_mon
+        0x1b = LR_mon
+        0x1c = SP_abt
+        0x1d = LR_abt
+        0x1e = SP_und
+        0x1f = LR_und
+    Field #2: VALUE type:MTI_UNSIGNED_INT size:4 (The new value written to the register.)
+    Field #3: OLD_VALUE type:MTI_UNSIGNED_INT size:4 (The old value overwritten.)
+    Field #4: MODE type:MTI_ENUM size:1 (Bank of the register accessed.)
+        0x10 = usr
+        0x11 = fiq
+        0x12 = irq
+        0x13 = svc
+        0x16 = mon
+        0x17 = abt
+        0x1b = und
+        0x1f = sys
+    Field #5: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #11: CORE_STORES (Store accesses by the core.)
+    Field #0: VADDR type:MTI_UNSIGNED_INT size:4 (The virtual address of the access.)
+    Field #1: LOCK type:MTI_ENUM size:1 (Normal, exclusive or locked access.)
+        0x0 = Normal
+        0x1 = Exclusive
+        0x2 = Locked
+    Field #2: TRANS type:MTI_BOOL size:1 (Is this a translated access.)
+    Field #3: SIZE type:MTI_UNSIGNED_INT size:1 (Width of the access in bytes. Only required if DATA is not traced.)
+    Field #4: DATA type:MTI_UNSIGNED_INT size:0 max_size:64 (The data read or written.)
+
+Source #12: CP14_READ (Reads to the System Coprocessor registers.)
+    Field #0: CRn type:MTI_UNSIGNED_INT size:1 (CRn)
+    Field #1: opc1 type:MTI_UNSIGNED_INT size:1 (opcode 1)
+    Field #2: CRm type:MTI_UNSIGNED_INT size:1 (CRm)
+    Field #3: opc2 type:MTI_UNSIGNED_INT size:1 (opcode 2)
+    Field #4: NS type:MTI_BOOL size:1 (Secure or nonsecure banked register is accessed.)
+    Field #5: VALUE type:MTI_UNSIGNED_INT size:4 (The value read.)
+    Field #6: UNDEF type:MTI_BOOL size:1 (The register accessed is undefined.)
+    Field #7: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+    Field #8: REG_NAME type:MTI_STRING size:0 max_size:64 (Name of the CP14 register accessed.)
+
+Source #13: CP14_WRITE (Writes to the System Coprocessor registers.)
+    Field #0: CRn type:MTI_UNSIGNED_INT size:1 (CRn)
+    Field #1: opc1 type:MTI_UNSIGNED_INT size:1 (opcode 1)
+    Field #2: CRm type:MTI_UNSIGNED_INT size:1 (CRm)
+    Field #3: opc2 type:MTI_UNSIGNED_INT size:1 (opcode 2)
+    Field #4: NS type:MTI_BOOL size:1 (Secure or nonsecure banked register is accessed.)
+    Field #5: VALUE type:MTI_UNSIGNED_INT size:4 (The new value written.)
+    Field #6: UNDEF type:MTI_BOOL size:1 (The register accessed is undefined.)
+    Field #7: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+    Field #8: REG_NAME type:MTI_STRING size:0 max_size:64 (Name of the CP14 register accessed.)
+
+Source #14: CP15_READ (Reads to the System Coprocessor registers.)
+    Field #0: CRn type:MTI_UNSIGNED_INT size:1 (CRn)
+    Field #1: opc1 type:MTI_UNSIGNED_INT size:1 (opcode 1)
+    Field #2: CRm type:MTI_UNSIGNED_INT size:1 (CRm)
+    Field #3: opc2 type:MTI_UNSIGNED_INT size:1 (opcode 2)
+    Field #4: NS type:MTI_BOOL size:1 (Secure or nonsecure banked register is accessed.)
+    Field #5: VALUE type:MTI_UNSIGNED_INT size:4 (The value read.)
+    Field #6: UNDEF type:MTI_BOOL size:1 (The register accessed is undefined.)
+    Field #7: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+    Field #8: REG_NAME type:MTI_STRING size:0 max_size:64 (Name of the CP15 register accessed.)
+
+Source #15: CP15_READ64 (Reads to the System Coprocessor registers.)
+    Field #0: CRm type:MTI_UNSIGNED_INT size:1 (CRn)
+    Field #1: opc type:MTI_UNSIGNED_INT size:1 (opcode 1)
+    Field #2: NS type:MTI_BOOL size:1 (Secure or nonsecure banked register is accessed.)
+    Field #3: VALUE type:MTI_UNSIGNED_INT size:8 (The value read.)
+    Field #4: UNDEF type:MTI_BOOL size:1 (The register accessed is undefined.)
+    Field #5: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+    Field #6: REG_NAME type:MTI_STRING size:0 max_size:64 (Name of the CP15 register accessed.)
+
+Source #16: CP15_WRITE (Writes to the System Coprocessor registers.)
+    Field #0: CRn type:MTI_UNSIGNED_INT size:1 (CRn)
+    Field #1: opc1 type:MTI_UNSIGNED_INT size:1 (opcode 1)
+    Field #2: CRm type:MTI_UNSIGNED_INT size:1 (CRm)
+    Field #3: opc2 type:MTI_UNSIGNED_INT size:1 (opcode 2)
+    Field #4: NS type:MTI_BOOL size:1 (Secure or nonsecure banked register is accessed.)
+    Field #5: VALUE type:MTI_UNSIGNED_INT size:4 (The new value written.)
+    Field #6: UNDEF type:MTI_BOOL size:1 (The register accessed is undefined.)
+    Field #7: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+    Field #8: REG_NAME type:MTI_STRING size:0 max_size:64 (Name of the CP15 register accessed.)
+
+Source #17: CP15_WRITE64 (Writes to the System Coprocessor registers.)
+    Field #0: CRm type:MTI_UNSIGNED_INT size:1 (CRm)
+    Field #1: opc type:MTI_UNSIGNED_INT size:1 (opcode 1)
+    Field #2: NS type:MTI_BOOL size:1 (Secure or nonsecure banked register is accessed.)
+    Field #3: VALUE type:MTI_UNSIGNED_INT size:8 (The new value written.)
+    Field #4: UNDEF type:MTI_BOOL size:1 (The register accessed is undefined.)
+    Field #5: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+    Field #6: REG_NAME type:MTI_STRING size:0 max_size:64 (Name of the CP15 register accessed.)
+
+Source #18: CPSR (Changes to the CPSR.)
+    Field #0: VALUE type:MTI_UNSIGNED_INT size:4 (The new CPSR value)
+    Field #1: OLD_VALUE type:MTI_UNSIGNED_INT size:4 (The old CPSR value)
+    Field #2: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #19: EXCEPTION (An Exception is taken.)
+    Field #0: PC type:MTI_UNSIGNED_INT size:4 (The location where the exception occurred.)
+    Field #1: LR type:MTI_UNSIGNED_INT size:4 (The value assigned to the link register.)
+    Field #2: TARGET_PC type:MTI_UNSIGNED_INT size:4 (The address the exception branches to.)
+    Field #3: VECTOR type:MTI_ENUM size:1 (The exception vector.)
+        0x0 = Reset
+        0x4 = UndefinedInstr
+        0x8 = SWI
+        0xc = PrefetchAbort
+        0x10 = DataAbort
+        0x18 = IRQ
+        0x1c = FIQ
+    Field #4: TARGET_ISET type:MTI_ENUM size:1 (The instruction set of the exception handler code.)
+        0x0 = ARM
+        0x1 = Thumb
+        0x2 = Jazelle
+        0x3 = Thumb2EE
+    Field #5: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #20: EXCEPTION_RETURN (Branches when leaving an exception.)
+    Field #0: PC type:MTI_UNSIGNED_INT size:4 (The address of the branch instruction.)
+    Field #1: ISET type:MTI_ENUM size:1 (The instructions set of the branch instruction.)
+        0x0 = ARM
+        0x1 = Thumb
+        0x2 = Jazelle
+        0x3 = Thumb2EE
+    Field #2: TARGET_PC type:MTI_UNSIGNED_INT size:4 (The address the instruction branches to.)
+    Field #3: TARGET_ISET type:MTI_ENUM size:1 (The instructions set after the branch.)
+        0x0 = ARM
+        0x1 = Thumb
+        0x2 = Jazelle
+        0x3 = Thumb2EE
+    Field #4: IS_COND type:MTI_BOOL size:1 (Indicates if this is a conditional branch.)
+    Field #5: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #21: INST (Every instruction executed.)
+    Field #0: PC type:MTI_UNSIGNED_INT size:4 (The address of the instruction.)
+    Field #1: OPCODE type:MTI_UNSIGNED_INT size:4 (The opcode of the instruction.)
+    Field #2: SIZE type:MTI_UNSIGNED_INT size:1 (The size of the instruction in bytes.)
+    Field #3: MODE type:MTI_ENUM size:1 (The mode the core is in.)
+        0x10 = usr
+        0x11 = fiq
+        0x12 = irq
+        0x13 = svc
+        0x16 = mon
+        0x17 = abt
+        0x1b = und
+        0x1f = sys
+    Field #4: ISET type:MTI_ENUM size:1 (The current instruction set.)
+        0x0 = ARM
+        0x1 = Thumb
+        0x2 = Jazelle
+        0x3 = Thumb2EE
+    Field #5: NS type:MTI_UNSIGNED_INT size:1 (The core's non-secure bit.)
+    Field #6: ITSTATE type:MTI_UNSIGNED_INT size:1 (The current ITSTATE.)
+    Field #7: INST_COUNT type:MTI_UNSIGNED_INT size:8 (The core's instruction counter.)
+    Field #8: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #22: MMU_TLB_FILL (TLB fill event.)
+    Field #0: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+    Field #1: SIDE type:MTI_ENUM size:1 (Inst / Data.)
+        0x0 = Inst
+        0x1 = Data
+    Field #2: PAGESIZE type:MTI_UNSIGNED_INT size:1 (Size of the region (log2))
+    Field #3: VBASE type:MTI_UNSIGNED_INT size:4 (Virtual base address of the region.)
+    Field #4: PBASE type:MTI_UNSIGNED_INT size:8 (Physical base address of the region.)
+    Field #5: ASID type:MTI_UNSIGNED_INT size:4 (The Address Space Identifier of this TLB entry.)
+
+Source #23: MMU_TLB_HIT (TLB accesses that hit.)
+    Field #0: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+    Field #1: SIDE type:MTI_ENUM size:1 (Inst / Data.)
+        0x0 = Inst
+        0x1 = Data
+    Field #2: VADDR type:MTI_UNSIGNED_INT size:4 (Virtual address of the access.)
+
+Source #24: MMU_TLB_MISS (TLB access that missed.)
+    Field #0: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+    Field #1: SIDE type:MTI_ENUM size:1 (Inst / Data.)
+        0x0 = Inst
+        0x1 = Data
+    Field #2: VADDR type:MTI_UNSIGNED_INT size:4 (Virtual address of the access.)
+
+Source #25: MMU_TRANS (Address translation information.)
+    Field #0: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+    Field #1: SIDE type:MTI_ENUM size:1 (Inst / Data.)
+        0x0 = Inst
+        0x1 = Data
+    Field #2: ASID type:MTI_UNSIGNED_INT size:1 (Address space identifier.)
+    Field #3: VMID type:MTI_UNSIGNED_INT size:1 (Virtual machine identifier.)
+    Field #4: VADDR type:MTI_UNSIGNED_INT size:4 (Virtual address of the access.)
+    Field #5: NSDESC type:MTI_ENUM size:1 (Is secure side supposed to access secure or nonseure memory)
+        0x0 = Secure
+        0x1 = NonSecure
+    Field #6: PADDR type:MTI_UNSIGNED_INT size:8 (Physical address of the access.)
+    Field #7: PAGESIZE type:MTI_UNSIGNED_INT size:1 (Page size as log2(size).)
+    Field #8: MEMTYPE type:MTI_ENUM size:1 (Memory type.)
+        0x0 = StronglyOrdered
+        0x1 = Device
+        0x2 = Normal
+    Field #9: OUTERCACHE_TYPE type:MTI_ENUM size:1 (Outer Caching scheme (NC/MB/WA).)
+        0x0 = NonCacheable
+        0x1 = WriteThrough
+        0x2 = WriteBack
+    Field #10: OUTERCACHE_RA type:MTI_BOOL size:1 (Is the outer cache allocate on read)
+    Field #11: OUTERCACHE_WA type:MTI_BOOL size:1 (Is the outer cache allocate on write)
+    Field #12: INNERCACHE_TYPE type:MTI_ENUM size:1 (Inner Caching scheme (NC/MB/WA).)
+        0x0 = NonCacheable
+        0x1 = WriteThrough
+        0x2 = WriteBack
+    Field #13: INNERCACHE_RA type:MTI_BOOL size:1 (Is the inner cache allocate on read)
+    Field #14: INNERCACHE_WA type:MTI_BOOL size:1 (Is the inner cache allocate on write)
+    Field #15: SH type:MTI_ENUM size:1 (Shareability)
+        0x0 = NonShareable
+        0x1 = InnerShareable
+        0x2 = OuterShareable
+
+Source #26: MODE_CHANGE (Change of the current mode.)
+    Field #0: MODE type:MTI_ENUM size:1 (The new mode.)
+        0x10 = usr
+        0x11 = fiq
+        0x12 = irq
+        0x13 = svc
+        0x16 = mon
+        0x17 = abt
+        0x1b = und
+        0x1f = sys
+    Field #1: OLD_MODE type:MTI_ENUM size:1 (The old mode.)
+        0x10 = usr
+        0x11 = fiq
+        0x12 = irq
+        0x13 = svc
+        0x16 = mon
+        0x17 = abt
+        0x1b = und
+        0x1f = sys
+    Field #2: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #27: PERIODIC (Called for every quantum.)
+    Field #0: INST_COUNT type:MTI_UNSIGNED_INT size:8 (The instruction count of this CPU.)
+    Field #1: PC type:MTI_UNSIGNED_INT size:4 (The address of the next instruction to be executed on this CPU.)
+    Field #2: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #28: PRELOAD_DATA (A PLD instruction triggered a data preload.)
+    Field #0: VADDR type:MTI_UNSIGNED_INT size:4 (Virtual address of the data that should be preloaded.)
+
+Source #29: SPSR (Changes to the SPSR.)
+    Field #0: VALUE type:MTI_UNSIGNED_INT size:4 (The new SPSR value)
+    Field #1: OLD_VALUE type:MTI_UNSIGNED_INT size:4 (The old SPSR value)
+    Field #2: MODE type:MTI_ENUM size:1 (Which of the banked SPSR registers is written.)
+        0x11 = fiq
+        0x12 = irq
+        0x13 = svc
+        0x16 = mon
+        0x17 = abt
+        0x1b = und
+    Field #3: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #30: VFP_D_REGS (Writes to the VFP/NEON D 64 bit registers.)
+    Field #0: ID type:MTI_UNSIGNED_INT size:1 (The register number.)
+    Field #1: VALUE type:MTI_UNSIGNED_INT size:8 (The new value written to the register.)
+    Field #2: OLD_VALUE type:MTI_UNSIGNED_INT size:8 (The old value overwritten.)
+    Field #3: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #31: VFP_Q_REGS (Writes to the VFP/NEON Q 128 bit registers.)
+    Field #0: ID type:MTI_UNSIGNED_INT size:1 (The register number.)
+    Field #1: VALUE type:MTI_UNSIGNED_INT size:16 (The new value written to the register.)
+    Field #2: OLD_VALUE type:MTI_UNSIGNED_INT size:16 (The old value overwritten.)
+    Field #3: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #32: VFP_SYS_REGS (Writes to the VFP/NEON units system registers.)
+    Field #0: ID type:MTI_ENUM size:1 (Which VFP system register is written.)
+        0x1 = FPSCR
+        0x8 = FPEXC
+    Field #1: VALUE type:MTI_UNSIGNED_INT size:4 (The new value written to the VFP system register.)
+    Field #2: OLD_VALUE type:MTI_UNSIGNED_INT size:4 (The register's old value overwritten.)
+    Field #3: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #33: VFP_S_REGS (Writes to the VFP/NEON S 32 bit registers.)
+    Field #0: ID type:MTI_UNSIGNED_INT size:1 (The register number.)
+    Field #1: VALUE type:MTI_UNSIGNED_INT size:4 (The new value written to the register.)
+    Field #2: OLD_VALUE type:MTI_UNSIGNED_INT size:4 (The old value overwritten.)
+    Field #3: CORE_NUM type:MTI_UNSIGNED_INT size:1 (Core number in a multi processor.)
+
+Source #34: WFE_END (WFE ended.)
+    Field #0: INST_COUNT type:MTI_UNSIGNED_INT size:8 (Ticks count when leaving WFE.)
+
+Source #35: WFE_START (WFE entered.)
+    Field #0: INST_COUNT type:MTI_UNSIGNED_INT size:8 (Ticks count when entering WFE.)
+
+Source #36: WFI_END (WFI ended.)
+    Field #0: INST_COUNT type:MTI_UNSIGNED_INT size:8 (Ticks count when leaving WFI.)
+
+Source #37: WFI_START (WFI entered.)
+    Field #0: INST_COUNT type:MTI_UNSIGNED_INT size:8 (Ticks count when entering WFI.)
+
+Component providing trace: FVP_EB_Cortex_A8.coretile.core.L1_DCache
+=============================================================================
+Component is of type "PIPTCache"
+Version is "5.2.13"
+#Sources: 11
+
+Source #0: CACHE_INFO (Static attributes describing this cache. This source will never trigger by itself, only the DumpState() method is implemented.)
+    Field #0: LEVEL type:MTI_UNSIGNED_INT size:1 (1 = First Level cache, 2 = Second Level cache, ...)
+    Field #1: LINELEN type:MTI_UNSIGNED_INT size:1 (The number of bytes in one cache line.)
+    Field #2: ASSOCIATIVITY type:MTI_UNSIGNED_INT size:1 (The set-associativity, also called number of ways.)
+    Field #3: NSETS type:MTI_UNSIGNED_INT size:4 (The number of cache sets in the cache.)
+    Field #4: CACHE_TYPE type:MTI_ENUM size:1 (If the cache is a unified cache, if not which side (Instruction/Data) it is.)
+        0x1 = Instruction
+        0x2 = Data
+        0x3 = Unified
+    Field #5: TAGGING_POLICY type:MTI_ENUM size:1 (Describes the indexing and tagging policy of the cache.)
+        0x0 = Reserved
+        0x1 = AIVIVT
+        0x2 = VIPT
+        0x3 = PIPT
+    Field #6: WT type:MTI_BOOL size:1 (Does this cache supports write through?)
+    Field #7: WB type:MTI_BOOL size:1 (Does this cache supports write back?)
+    Field #8: RA type:MTI_BOOL size:1 (Does this cache supports read allocate?)
+    Field #9: WA type:MTI_BOOL size:1 (Does this cache supports write allocate?)
+
+Source #1: CACHE_LINE_CLEAN (Cache lines which are cleaned.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #2: CACHE_LINE_EVICTION (Cache lines which are cast out from the cache.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #3: CACHE_LINE_FILL (Cache lines which are filled from the next cache level of from memory.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #4: CACHE_LINE_INVALIDATE (Cache lines which are invalidated.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #5: CACHE_READ_HIT (Reads addressed to this cache that hit.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #6: CACHE_READ_MISS (Reads addressed to this cache that miss.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #7: CACHE_READ_NON_CACHEABLE (Reads addressed to this cache that non_cacheable.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #8: CACHE_WRITE_HIT (Writes addressed to this cache that hit.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #9: CACHE_WRITE_MISS (Writes addressed to this cache that miss.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #10: CACHE_WRITE_NON_CACHEABLE (Writes addressed to this cache that non_cacheable.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Component providing trace: FVP_EB_Cortex_A8.coretile.core.L1_ICache
+=============================================================================
+Component is of type "PIPTCache"
+Version is "5.2.13"
+#Sources: 11
+
+Source #0: CACHE_INFO (Static attributes describing this cache. This source will never trigger by itself, only the DumpState() method is implemented.)
+    Field #0: LEVEL type:MTI_UNSIGNED_INT size:1 (1 = First Level cache, 2 = Second Level cache, ...)
+    Field #1: LINELEN type:MTI_UNSIGNED_INT size:1 (The number of bytes in one cache line.)
+    Field #2: ASSOCIATIVITY type:MTI_UNSIGNED_INT size:1 (The set-associativity, also called number of ways.)
+    Field #3: NSETS type:MTI_UNSIGNED_INT size:4 (The number of cache sets in the cache.)
+    Field #4: CACHE_TYPE type:MTI_ENUM size:1 (If the cache is a unified cache, if not which side (Instruction/Data) it is.)
+        0x1 = Instruction
+        0x2 = Data
+        0x3 = Unified
+    Field #5: TAGGING_POLICY type:MTI_ENUM size:1 (Describes the indexing and tagging policy of the cache.)
+        0x0 = Reserved
+        0x1 = AIVIVT
+        0x2 = VIPT
+        0x3 = PIPT
+    Field #6: WT type:MTI_BOOL size:1 (Does this cache supports write through?)
+    Field #7: WB type:MTI_BOOL size:1 (Does this cache supports write back?)
+    Field #8: RA type:MTI_BOOL size:1 (Does this cache supports read allocate?)
+    Field #9: WA type:MTI_BOOL size:1 (Does this cache supports write allocate?)
+
+Source #1: CACHE_LINE_CLEAN (Cache lines which are cleaned.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #2: CACHE_LINE_EVICTION (Cache lines which are cast out from the cache.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #3: CACHE_LINE_FILL (Cache lines which are filled from the next cache level of from memory.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #4: CACHE_LINE_INVALIDATE (Cache lines which are invalidated.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #5: CACHE_READ_HIT (Reads addressed to this cache that hit.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #6: CACHE_READ_MISS (Reads addressed to this cache that miss.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #7: CACHE_READ_NON_CACHEABLE (Reads addressed to this cache that non_cacheable.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #8: CACHE_WRITE_HIT (Writes addressed to this cache that hit.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #9: CACHE_WRITE_MISS (Writes addressed to this cache that miss.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #10: CACHE_WRITE_NON_CACHEABLE (Writes addressed to this cache that non_cacheable.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Component providing trace: FVP_EB_Cortex_A8.coretile.core.L2_Cache
+=============================================================================
+Component is of type "PIPTCache"
+Version is "5.2.13"
+#Sources: 11
+
+Source #0: CACHE_INFO (Static attributes describing this cache. This source will never trigger by itself, only the DumpState() method is implemented.)
+    Field #0: LEVEL type:MTI_UNSIGNED_INT size:1 (1 = First Level cache, 2 = Second Level cache, ...)
+    Field #1: LINELEN type:MTI_UNSIGNED_INT size:1 (The number of bytes in one cache line.)
+    Field #2: ASSOCIATIVITY type:MTI_UNSIGNED_INT size:1 (The set-associativity, also called number of ways.)
+    Field #3: NSETS type:MTI_UNSIGNED_INT size:4 (The number of cache sets in the cache.)
+    Field #4: CACHE_TYPE type:MTI_ENUM size:1 (If the cache is a unified cache, if not which side (Instruction/Data) it is.)
+        0x1 = Instruction
+        0x2 = Data
+        0x3 = Unified
+    Field #5: TAGGING_POLICY type:MTI_ENUM size:1 (Describes the indexing and tagging policy of the cache.)
+        0x0 = Reserved
+        0x1 = AIVIVT
+        0x2 = VIPT
+        0x3 = PIPT
+    Field #6: WT type:MTI_BOOL size:1 (Does this cache supports write through?)
+    Field #7: WB type:MTI_BOOL size:1 (Does this cache supports write back?)
+    Field #8: RA type:MTI_BOOL size:1 (Does this cache supports read allocate?)
+    Field #9: WA type:MTI_BOOL size:1 (Does this cache supports write allocate?)
+
+Source #1: CACHE_LINE_CLEAN (Cache lines which are cleaned.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #2: CACHE_LINE_EVICTION (Cache lines which are cast out from the cache.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #3: CACHE_LINE_FILL (Cache lines which are filled from the next cache level of from memory.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #4: CACHE_LINE_INVALIDATE (Cache lines which are invalidated.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical address stored in tag.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access stored in tag.)
+        0x0 = S
+        0x1 = NS
+    Field #2: SET type:MTI_UNSIGNED_INT size:2 (Index of the cache set the operation takes place on.)
+    Field #3: WAY type:MTI_UNSIGNED_INT size:1 (Index of the way of a set of cache lines this operation takes place on.)
+
+Source #5: CACHE_READ_HIT (Reads addressed to this cache that hit.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #6: CACHE_READ_MISS (Reads addressed to this cache that miss.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #7: CACHE_READ_NON_CACHEABLE (Reads addressed to this cache that non_cacheable.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #8: CACHE_WRITE_HIT (Writes addressed to this cache that hit.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #9: CACHE_WRITE_MISS (Writes addressed to this cache that miss.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS
+
+Source #10: CACHE_WRITE_NON_CACHEABLE (Writes addressed to this cache that non_cacheable.)
+    Field #0: PADDR type:MTI_UNSIGNED_INT size:4 (Physical (translated) address of memory access.)
+    Field #1: NS type:MTI_ENUM size:1 (Secure or non-secure access.)
+        0x0 = S
+        0x1 = NS

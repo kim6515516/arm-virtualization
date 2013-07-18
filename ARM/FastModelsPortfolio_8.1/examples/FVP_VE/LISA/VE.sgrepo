@@ -1,0 +1,121 @@
+component "FVP_VE_Cortex_A15x1"
+{
+    path = "FVP_VE_Cortex_A15x1.lisa";
+}
+component "FVP_VE_Cortex_A15x2"
+{
+    path = "FVP_VE_Cortex_A15x2.lisa";
+}
+component "FVP_VE_Cortex_A15x4"
+{
+    path = "FVP_VE_Cortex_A15x4.lisa";
+}
+component "FVP_VE_Cortex_A7x1"
+{
+    path = "FVP_VE_Cortex_A7x1.lisa";
+}
+component "FVP_VE_Cortex_A7x2"
+{
+    path = "FVP_VE_Cortex_A7x2.lisa";
+}
+component "FVP_VE_Cortex_A7x3"
+{
+    path = "FVP_VE_Cortex_A7x3.lisa";
+}
+component "FVP_VE_Cortex_A7x4"
+{
+    path = "FVP_VE_Cortex_A7x4.lisa";
+}
+component "FVP_VE_Cortex_A9x1"
+{
+    path = "FVP_VE_Cortex_A9x1.lisa";
+}
+component "FVP_VE_Cortex_A9x2"
+{
+    path = "FVP_VE_Cortex_A9x2.lisa";
+}
+component "FVP_VE_Cortex_A9x4"
+{
+    path = "FVP_VE_Cortex_A9x4.lisa";
+}
+component "FVP_VE_Cortex_R5x1"
+{
+    path = "FVP_VE_Cortex_R5x1.lisa";
+}
+component "FVP_VE_Cortex_R5x2"
+{
+    path = "FVP_VE_Cortex_R5x2.lisa";
+}
+component "FVP_VE_Cortex_R7x1"
+{
+    path = "FVP_VE_Cortex_R7x1.lisa";
+}
+component "FVP_VE_Cortex_R7x2"
+{
+    path = "FVP_VE_Cortex_R7x2.lisa";
+}
+component "VEDaughterBoard"
+{
+    path = "VEDaughterBoard.lisa";
+}
+component "VEDaughterBoardCortex_R5x1"
+{
+    path = "VEDaughterBoardCortex_R5x1.lisa";
+}
+component "VEDaughterBoardCortex_R5x2"
+{
+    path = "VEDaughterBoardCortex_R5x2.lisa";
+}
+component "VEDaughterBoardCortex_R7x1"
+{
+    path = "VEDaughterBoardCortex_R7x1.lisa";
+}
+component "VEDaughterBoardCortex_R7x2"
+{
+    path = "VEDaughterBoardCortex_R7x2.lisa";
+}
+component "VECBProtocol"
+{
+    path = "VECBProtocol.lisa";
+}
+component "VEDCC"
+{
+    path = "VEDCC.lisa";
+}
+component "VEInterruptMapper"
+{
+    path = "VEInterruptMapper.lisa";
+}
+component "VEMotherBoard"
+{
+    path = "VEMotherBoard.lisa";
+}
+component "VEMotherBoardR"
+{
+    path = "VEMotherBoardR.lisa";
+}
+component "VE_SysRegs"
+{
+    path = "VE_SysRegs.lisa";
+}
+component "VEVisualisation"
+{
+    path = "VEVisualisation.lisa";
+}
+component "VE_CompactFlash"
+{
+    path = "VE_CompactFlash.lisa";
+}
+component "DebugAccessPort"
+{
+    path="$PVLIB_HOME/LISA/DebugAccessPort.lisa";
+}
+files
+{
+    path = "$(PVLIB_HOME)/etc/sglib.sgrepo";
+    path = "$(PVLIB_HOME)/VFS2/etc/vfs2.sgrepo";
+    path = "../../Common/LISA/IntelStrataFlashJ3.lisa";
+    path = "../../Common/LISA/LCDLayoutInfoProtocol.lisa";
+    path = "../../Common/LISA/UIClass/UIClass.cpp";
+    path = "../../Common/LISA/";
+}

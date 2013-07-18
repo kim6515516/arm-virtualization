@@ -1,0 +1,145 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// A simple example component providing some registers which can be read and written through CADI; besides the target can do cycle stepping.
+// R15 is treated as PC and is increased by 4 for each cycle step
+
+component exampleComponent
+{
+    properties
+    {
+        version = "1.0";
+        component_type = "Example Component";
+        description = "Example Component providing basic register read and write functionality for CADI as well as simple stepping functionality.";
+        is_single_stepped = 1; //enables stepping, behavior 'step()' needs to be implemented then
+    }
+
+    includes
+    {
+        #define NUM_OF_REGS 16
+        #define PC_REG      15
+        #define NUM_OF_MEMS 2
+        #define MEM_SIZE    16000
+    }
+
+    resources
+    {
+        REGISTER{name("R%d"), bitwidth(32), read_function(debug_reg_read), write_function(debug_reg_write) } R[NUM_OF_REGS - 1]; //Registers R0 to R14
+        REGISTER{name("R15"), is_program_counter(true), bitwidth(32), read_function(debug_reg_read), write_function(debug_reg_write) } R15; //PC
+        
+        MEMORY {space_id(0), mau_size(8), read_function(debug_mem_read), write_function(debug_mem_write)} progMem[16k]; //Declaring a 16KByte Prog Memory (there is no ISA implemented!!)
+        MEMORY {space_id(1), mau_size(8), read_function(debug_mem_read), write_function(debug_mem_write)} dataMem[16k]; //Declaring a 16KByte Data Memory
+    }
+
+    behavior reset(int level)
+    {
+        for (uint32_t i = 0; i < (NUM_OF_REGS - 1); i++)
+            R[i] = 0;
+
+        R15  = 0;
+        
+        for (uint32_t i = 0; i < MEM_SIZE; i++)
+        {
+            progMem[i] = 0;
+            dataMem[i] = 0;
+        }
+    }
+
+    // implements a cycle step, 'is_single_stepped' needs to be set to '1'
+    behavior step()
+    {
+        R15 += 4;
+    }
+
+    // debugger register access support, accessible through CADI 2.0 debug interface
+    behavior debug_reg_read(CASIU32 reg_id, CASIU64* datap, bool side_effects) : CADIReturn_t
+    {
+        if (reg_id > PC_REG)
+            return eslapi::CADI_STATUS_IllegalArgument;
+
+        if (reg_id == PC_REG)
+        {
+            *datap = R15;
+            return eslapi::CADI_STATUS_OK;
+        }
+
+        *datap = R[reg_id];
+        return eslapi::CADI_STATUS_OK;
+    }
+
+    behavior debug_reg_write(CASIU32 reg_id, const CASIU64* datap, bool side_effects) : CADIReturn_t
+    {
+        if (reg_id > PC_REG)
+            return eslapi::CADI_STATUS_IllegalArgument;
+
+        if (reg_id == PC_REG)
+        {
+            R15 = *datap;
+            return eslapi::CADI_STATUS_OK;
+        }
+
+        R[reg_id] = (uint32_t)*datap;
+        return eslapi::CADI_STATUS_OK;
+    }
+    
+    // debugger memory access support, accessible through CADI 2.0 debug interface
+    behavior debug_mem_read(uint32_t space_id,
+                            uint32_t block_id,
+                            uint64_t offset,
+                            uint32_t size_in_maus,
+                            uint64_t *data,
+                            bool side_effects,
+                            sg::MemoryAccessContext *mac) : CADIReturn_t
+    {
+        switch(space_id)
+        {
+            case 0:
+                for (uint32_t i = 0; (i < size_in_maus) && (i + offset < MEM_SIZE); i++)
+                {
+                    data[i] = progMem[i + offset];
+                }
+                break;
+            case 1:
+                for (uint32_t i = 0; (i < size_in_maus) && (i + offset < MEM_SIZE); i++)
+                {
+                    data[i] = dataMem[i + offset];
+                }
+                break;
+            default:
+                printf("debug_mem_read(): Unknown Memory Space (ID: %d).\n", space_id);
+                return eslapi::CADI_STATUS_IllegalArgument;
+        }
+        return eslapi::CADI_STATUS_OK;
+    }
+    
+    behavior debug_mem_write(uint32_t space_id,
+                             uint32_t block_id,
+                             uint64_t offset,
+                             uint32_t size_in_maus,
+                             const uint64_t *data,
+                             bool side_effects,
+                             sg::MemoryAccessContext *mac) : CADIReturn_t
+    {
+        switch(space_id)
+        {
+            case 0:
+                for (uint32_t i = 0; (i < size_in_maus) && (i + offset < MEM_SIZE); i++)
+                {
+                    progMem[i + offset] = data[i];
+                }
+                break;
+            case 1:
+                for (uint32_t i = 0; (i < size_in_maus) && (i + offset < MEM_SIZE); i++)
+                {
+                    dataMem[i + offset] = data[i];
+                }
+                break;
+            default:
+                printf("debug_mem_write(): Unknown Memory Space (ID: %d).\n", space_id);
+                return eslapi::CADI_STATUS_IllegalArgument;
+        }
+        return eslapi::CADI_STATUS_OK;
+    }
+}

@@ -1,0 +1,3974 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    LinuxBoot_VEMotherBoard.sgcanvas
+#//  Created: Mon Aug 13 18:02:29 2012
+#//  By: Fast Models  System Canvas 0.0.730  (Aug 13 2012)
+#//
+# *  Do NOT modify this file. It is for internal use by System Canvas only.
+#//
+#//  Copyright (c) 2004-2008 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "audioout"
+        (
+            x = 1090;
+            y = -2680;
+            width = 171;
+            height = 62;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "audio"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clk"
+        (
+            x = -230;
+            y = -3590;
+            width = 171;
+            height = 41;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clock100Hz"
+        (
+            x = -30;
+            y = -2450;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clock24MHz"
+        (
+            x = 60;
+            y = -3430;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clock35MHz"
+        (
+            x = -30;
+            y = -2020;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clock50Hz"
+        (
+            x = 60;
+            y = -3590;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "clockCLCD"
+        (
+            x = -30;
+            y = -1790;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 170;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 170;
+                y = 3;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "cs2_decoder"
+        (
+            x = -40;
+            y = -1040;
+            width = 171;
+            height = 81;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m_range"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "cs3_decoder"
+        (
+            x = -40;
+            y = -1170;
+            width = 171;
+            height = 81;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus_m_range"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "dummy_CF"
+        (
+            x = 580;
+            y = -1350;
+            width = 171;
+            height = 81;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "dummy_local_dap_rom"
+        (
+            x = 580;
+            y = -780;
+            width = 171;
+            height = 81;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "dummy_ram"
+        (
+            x = -40;
+            y = -930;
+            width = 171;
+            height = 81;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "dummy_usb"
+        (
+            x = 580;
+            y = -930;
+            width = 171;
+            height = 62;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "flash0"
+        (
+            x = -40;
+            y = -810;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "flashloader"
+                (
+                x = 170;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "mbs_control"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "mem_port"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = -10;
+                y = 12;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "flash1"
+        (
+            x = -40;
+            y = -740;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "flashloader"
+                (
+                x = 170;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "mbs_control"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "mem_port"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 12;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "flashloader0"
+        (
+            x = 140;
+            y = -810;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "flash_device0"
+                (
+                x = 0;
+                y = 12;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "flash_device1"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "flash_device2"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "flash_device3"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "flashloader1"
+        (
+            x = 140;
+            y = -740;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "flash_device0"
+                (
+                x = 10;
+                y = 12;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "flash_device1"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "flash_device2"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "flash_device3"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "hostbridge"
+        (
+            x = 1260;
+            y = -1010;
+            width = 171;
+            height = 62;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "eth"
+                (
+                x = -10;
+                y = 12;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "mmc"
+        (
+            x = 1090;
+            y = -2540;
+            width = 171;
+            height = 81;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "card_present"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_in"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "mmc"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl011_uart0"
+        (
+            x = 580;
+            y = -3200;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in_ref"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "serial_out"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl011_uart1"
+        (
+            x = 580;
+            y = -3070;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in_ref"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "serial_out"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl011_uart2"
+        (
+            x = 580;
+            y = -2950;
+            width = 171;
+            height = 71;
+            sheight = 30;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in_ref"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 170;
+                y = 3;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 23;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "serial_out"
+                (
+                x = 170;
+                y = 23;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl011_uart3"
+        (
+            x = 580;
+            y = -2810;
+            width = 171;
+            height = 112;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in_ref"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 170;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "serial_out"
+                (
+                x = 160;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl031_rtc"
+        (
+            x = 580;
+            y = -1220;
+            width = 171;
+            height = 111;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clock"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 72;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl041_aaci"
+        (
+            x = 580;
+            y = -2680;
+            width = 171;
+            height = 101;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "audio"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clk_in_ref"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "dma_rx"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "dma_tx"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl050_kmi0"
+        (
+            x = 580;
+            y = -1450;
+            width = 171;
+            height = 80;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clock"
+                (
+                x = 170;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "ps2device"
+                (
+                x = 170;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = -30;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "timer_callback"
+                (
+                x = 0;
+                y = 43;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl050_kmi1"
+        (
+            x = 580;
+            y = -1550;
+            width = 171;
+            height = 80;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clock"
+                (
+                x = 170;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "ps2device"
+                (
+                x = 170;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = -20;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "timer_callback"
+                (
+                x = 0;
+                y = 43;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl111_clcd"
+        (
+            x = 580;
+            y = -1770;
+            width = 171;
+            height = 82;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "control"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "display"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = -60;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus_m"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "pl180_mci"
+        (
+            x = 580;
+            y = -2560;
+            width = 171;
+            height = 81;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "MCIINTR"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "MCIINTR[0]"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "MCIINTR[1]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "mmc_m"
+                (
+                x = 180;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "ps2keyboard"
+        (
+            x = 1090;
+            y = -1410;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = -10;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "keyboard"
+                (
+                x = 160;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ps2"
+                (
+                x = -10;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "ps2mouse"
+        (
+            x = 1090;
+            y = -1510;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = -10;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "mouse"
+                (
+                x = 170;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ps2"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "psram"
+        (
+            x = -40;
+            y = -650;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "smsc_91c111"
+        (
+            x = 580;
+            y = -1050;
+            width = 171;
+            height = 111;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clock"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "eth"
+                (
+                x = 160;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "intr"
+                (
+                x = 170;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 32;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "sp805_wdog"
+        (
+            x = 580;
+            y = -1670;
+            width = 171;
+            height = 101;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "irq_out"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_in"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "reset_out"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "sp810_sysctrl"
+        (
+            x = 580;
+            y = -2250;
+            width = 171;
+            height = 219;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "hclkdivsel"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "npor"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pll_en"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = -10;
+                y = 182;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ref_clk_in"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "remap_clear"
+                (
+                x = 0;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "remap_stat"
+                (
+                x = 0;
+                y = 82;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "sleep_mode"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "sys_id"
+                (
+                x = 0;
+                y = 102;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "sys_mode"
+                (
+                x = 0;
+                y = 122;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "sys_stat"
+                (
+                x = 0;
+                y = 142;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "timer_clk_en"
+                (
+                x = 0;
+                y = 82;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "timer_clk_en[0]"
+                (
+                x = 170;
+                y = 162;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "timer_clk_en[1]"
+                (
+                x = 160;
+                y = 182;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "timer_clk_en[2]"
+                (
+                x = 160;
+                y = 142;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "timer_clk_en[3]"
+                (
+                x = 160;
+                y = 122;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "wd_clk_en"
+                (
+                x = 170;
+                y = 102;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "wd_en"
+                (
+                x = 0;
+                y = 162;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "terminal_0"
+        (
+            x = 1090;
+            y = -3200;
+            width = 171;
+            height = 111;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "terminal_1"
+        (
+            x = 1090;
+            y = -3070;
+            width = 171;
+            height = 111;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "terminal_2"
+        (
+            x = 1090;
+            y = -2940;
+            width = 171;
+            height = 111;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "terminal_3"
+        (
+            x = 1090;
+            y = -2810;
+            width = 171;
+            height = 111;
+            sheight = 41;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "ve_sysregs"
+        (
+            x = 580;
+            y = -2460;
+            width = 171;
+            height = 191;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "cb"
+                (
+                x = 170;
+                y = 112;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "cb[0]"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cb[1]"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "clock_24Mhz"
+                (
+                x = -10;
+                y = 32;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clock_100Hz"
+                (
+                x = 0;
+                y = 12;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clock_CLCD"
+                (
+                x = 0;
+                y = 52;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "lcd"
+                (
+                x = 180;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "leds"
+                (
+                x = 170;
+                y = 32;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "mmb"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "mmb[0]"
+                (
+                x = 170;
+                y = 132;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "mmb[1]"
+                (
+                x = 0;
+                y = 92;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "mmb[2]"
+                (
+                x = 0;
+                y = 112;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "mmc_card_present"
+                (
+                x = 0;
+                y = 102;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus"
+                (
+                x = 0;
+                y = 132;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "user_switches"
+                (
+                x = 180;
+                y = 52;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "vfs2"
+        (
+            x = 580;
+            y = -3300;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "intr"
+                (
+                x = 0;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "pvbus_s"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "virtualethernetcrossover"
+        (
+            x = 1040;
+            y = -1010;
+            width = 171;
+            height = 62;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "deva"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "devb"
+                (
+                x = 170;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "vis"
+        (
+            x = 1430;
+            y = -1900;
+            width = 171;
+            height = 219;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "boot_switch"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "clock_50Hz"
+                (
+                x = 170;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "cluster0_ticks"
+                (
+                x = 170;
+                y = 142;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "cluster0_ticks[0]"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cluster0_ticks[1]"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cluster0_ticks[2]"
+                (
+                x = 0;
+                y = 82;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cluster0_ticks[3]"
+                (
+                x = 0;
+                y = 102;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cluster1_ticks"
+                (
+                x = 170;
+                y = 172;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "cluster1_ticks[0]"
+                (
+                x = 0;
+                y = 122;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cluster1_ticks[1]"
+                (
+                x = 0;
+                y = 142;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cluster1_ticks[2]"
+                (
+                x = 0;
+                y = 162;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "cluster1_ticks[3]"
+                (
+                x = 0;
+                y = 182;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+                )
+                define "daughter_leds"
+                (
+                x = 0;
+                y = 102;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "daughter_user_switches"
+                (
+                x = 10;
+                y = 122;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "keyboard"
+                (
+                x = 0;
+                y = 162;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "lcd"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "lcd_layout"
+                (
+                x = 0;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "leds"
+                (
+                x = 0;
+                y = 62;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "mouse"
+                (
+                x = 10;
+                y = 142;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "touch_screen"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "user_switches"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "vram"
+        (
+            x = 580;
+            y = -860;
+            width = 171;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "pvbus"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+    )
+    ports
+    (
+        define "CB"
+        (
+            x = 840;
+            y = -2330;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "clcd_pvbus"
+        (
+            x = 790;
+            y = -1710;
+            width = 101;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster0_ticks"
+        (
+            x = 1640;
+            y = -1740;
+            width = 101;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "cluster1_ticks"
+        (
+            x = 1640;
+            y = -1710;
+            width = 101;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "daughter_leds"
+        (
+            x = 1160;
+            y = -1780;
+            width = 121;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "daughter_switches"
+        (
+            x = 1160;
+            y = -1750;
+            width = 121;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "interrupts"
+        (
+            x = 1410;
+            y = -2220;
+            width = 101;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "masterclk"
+        (
+            x = 130;
+            y = -3670;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "mmb_db1"
+        (
+            x = 400;
+            y = -2350;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "smb_cs"
+        (
+            x = -290;
+            y = -890;
+            width = 101;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "timer_clock"
+        (
+            x = 210;
+            y = -2000;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "timer_en"
+        (
+            x = 830;
+            y = -2080;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+        define "timer_irq_in"
+        (
+            x = 1090;
+            y = -2190;
+            width = 61;
+            height = 21;
+            mirrored = true;
+            hidden = false;
+            expanded = false;
+        )
+        define "timer_pvbus"
+        (
+            x = 580;
+            y = -1090;
+            width = 61;
+            height = 21;
+            mirrored = false;
+            hidden = false;
+            expanded = false;
+        )
+    )
+    connections
+    (
+        define "clk.clk_out=>clock100Hz.clk_in"
+        (
+            point
+            (
+                x = -50;
+                y = -3560;
+                automatic = true;
+            )
+            point
+            (
+                x = -50;
+                y = -2420;
+                automatic = true;
+            )
+        )
+        define "clk.clk_out=>clock24MHz.clk_in"
+        (
+            point
+            (
+                x = -50;
+                y = -3560;
+                automatic = false;
+            )
+            point
+            (
+                x = -50;
+                y = -3400;
+                automatic = false;
+            )
+        )
+        define "clk.clk_out=>clock35MHz.clk_in"
+        (
+            point
+            (
+                x = -50;
+                y = -3560;
+                automatic = true;
+            )
+            point
+            (
+                x = -50;
+                y = -1990;
+                automatic = true;
+            )
+        )
+        define "clk.clk_out=>clock50Hz.clk_in"
+        (
+        )
+        define "clk.clk_out=>clockCLCD.clk_in"
+        (
+            point
+            (
+                x = -50;
+                y = -3560;
+                automatic = true;
+            )
+            point
+            (
+                x = -50;
+                y = -1760;
+                automatic = true;
+            )
+        )
+        define "clk.clk_out=>pl031_rtc.clock"
+        (
+            point
+            (
+                x = -50;
+                y = -3560;
+                automatic = false;
+            )
+            point
+            (
+                x = -50;
+                y = -1190;
+                automatic = false;
+            )
+        )
+        define "clock100Hz.clk_out=>ve_sysregs.clock_100Hz"
+        (
+        )
+        define "clock24MHz.clk_out=>mmc.clk_in"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -2470;
+                automatic = false;
+            )
+        )
+        define "clock24MHz.clk_out=>pl011_uart0.clk_in_ref"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -3170;
+                automatic = false;
+            )
+        )
+        define "clock24MHz.clk_out=>pl011_uart1.clk_in_ref"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -3040;
+                automatic = false;
+            )
+        )
+        define "clock24MHz.clk_out=>pl011_uart2.clk_in_ref"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -2911;
+                automatic = false;
+            )
+        )
+        define "clock24MHz.clk_out=>pl011_uart3.clk_in_ref"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -2780;
+                automatic = false;
+            )
+        )
+        define "clock24MHz.clk_out=>pl041_aaci.clk_in_ref"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -2650;
+                automatic = false;
+            )
+        )
+        define "clock24MHz.clk_out=>ps2keyboard.clk_in"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -1360;
+                automatic = false;
+            )
+        )
+        define "clock24MHz.clk_out=>ps2mouse.clk_in"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -1460;
+                automatic = false;
+            )
+        )
+        define "clock24MHz.clk_out=>smsc_91c111.clock"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -1020;
+                automatic = false;
+            )
+        )
+        define "clock24MHz.clk_out=>sp805_wdog.clk_in"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -1620;
+                automatic = false;
+            )
+        )
+        define "clock24MHz.clk_out=>ve_sysregs.clock_24Mhz"
+        (
+            point
+            (
+                x = 290;
+                y = -3400;
+                automatic = false;
+            )
+            point
+            (
+                x = 290;
+                y = -2400;
+                automatic = false;
+            )
+        )
+        define "clock50Hz.clk_out=>vis.clock_50Hz"
+        (
+            point
+            (
+                x = 1660;
+                y = -3560;
+                automatic = false;
+            )
+            point
+            (
+                x = 1660;
+                y = -1870;
+                automatic = false;
+            )
+        )
+        define "clockCLCD.clk_out=>pl111_clcd.clk_in"
+        (
+        )
+        define "cs2_decoder.pvbus_m_range=>dummy_usb.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -990;
+                automatic = true;
+            )
+            point
+            (
+                x = 360;
+                y = -900;
+                automatic = true;
+            )
+        )
+        define "cs2_decoder.pvbus_m_range=>smsc_91c111.pvbus"
+        (
+        )
+        define "cs2_decoder.pvbus_m_range=>vram.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -990;
+                automatic = true;
+            )
+            point
+            (
+                x = 360;
+                y = -830;
+                automatic = true;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>dummy_CF.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = true;
+            )
+            point
+            (
+                x = 360;
+                y = -1300;
+                automatic = true;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>dummy_local_dap_rom.pvbus"
+        (
+            point
+            (
+                x = 330;
+                y = -1120;
+                automatic = false;
+            )
+            point
+            (
+                x = 330;
+                y = -730;
+                automatic = false;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>pl011_uart0.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = false;
+            )
+            point
+            (
+                x = 360;
+                y = -3150;
+                automatic = false;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>pl011_uart1.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = false;
+            )
+            point
+            (
+                x = 360;
+                y = -3020;
+                automatic = false;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>pl011_uart2.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = false;
+            )
+            point
+            (
+                x = 360;
+                y = -2890;
+                automatic = false;
+            )
+            point
+            (
+                x = 470;
+                y = -2890;
+                automatic = false;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>pl011_uart3.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = false;
+            )
+            point
+            (
+                x = 360;
+                y = -2760;
+                automatic = false;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>pl031_rtc.pvbus"
+        (
+        )
+        define "cs3_decoder.pvbus_m_range=>pl041_aaci.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = false;
+            )
+            point
+            (
+                x = 360;
+                y = -2630;
+                automatic = false;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>pl050_kmi0.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = true;
+            )
+            point
+            (
+                x = 360;
+                y = -1420;
+                automatic = true;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>pl050_kmi1.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = true;
+            )
+            point
+            (
+                x = 360;
+                y = -1520;
+                automatic = true;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>pl111_clcd.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = true;
+            )
+            point
+            (
+                x = 360;
+                y = -1700;
+                automatic = true;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>pl180_mci.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = false;
+            )
+            point
+            (
+                x = 360;
+                y = -2530;
+                automatic = false;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>sp805_wdog.pvbus_s"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = true;
+            )
+            point
+            (
+                x = 360;
+                y = -1600;
+                automatic = true;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>sp810_sysctrl.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = false;
+            )
+            point
+            (
+                x = 360;
+                y = -2040;
+                automatic = false;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>ve_sysregs.pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = false;
+            )
+            point
+            (
+                x = 360;
+                y = -2300;
+                automatic = false;
+            )
+        )
+        define "cs3_decoder.pvbus_m_range=>vfs2.pvbus_s"
+        (
+            point
+            (
+                x = 190;
+                y = -1120;
+                automatic = true;
+            )
+            point
+            (
+                x = 190;
+                y = -3270;
+                automatic = true;
+            )
+        )
+        define "flashloader0.flash_device0=>flash0.flashloader"
+        (
+        )
+        define "flashloader1.flash_device0=>flash1.flashloader"
+        (
+        )
+        define "hostbridge.eth=>virtualethernetcrossover.devb"
+        (
+        )
+        define "mmc.card_present=>ve_sysregs.mmc_card_present"
+        (
+            point
+            (
+                x = 1265;
+                y = -2510;
+                automatic = true;
+            )
+            point
+            (
+                x = 1265;
+                y = -2455;
+                automatic = true;
+            )
+            point
+            (
+                x = 755;
+                y = -2455;
+                automatic = true;
+            )
+            point
+            (
+                x = 755;
+                y = -2465;
+                automatic = true;
+            )
+            point
+            (
+                x = 575;
+                y = -2465;
+                automatic = true;
+            )
+            point
+            (
+                x = 575;
+                y = -2330;
+                automatic = true;
+            )
+        )
+        define "pl011_uart0.serial_out=>terminal_0.serial"
+        (
+        )
+        define "pl011_uart1.serial_out=>terminal_1.serial"
+        (
+        )
+        define "pl011_uart2.serial_out=>terminal_2.serial"
+        (
+        )
+        define "pl011_uart3.serial_out=>terminal_3.serial"
+        (
+        )
+        define "pl041_aaci.audio=>audioout.audio"
+        (
+        )
+        define "pl111_clcd.display=>ve_sysregs.mmb"
+        (
+            point
+            (
+                x = 760;
+                y = -1740;
+                automatic = true;
+            )
+            point
+            (
+                x = 760;
+                y = -2022;
+                automatic = true;
+            )
+            point
+            (
+                x = 570;
+                y = -2022;
+                automatic = true;
+            )
+            point
+            (
+                x = 570;
+                y = -2390;
+                automatic = true;
+            )
+        )
+        define "pl111_clcd.display=>ve_sysregs.mmb[0]"
+        (
+            point
+            (
+                x = 810;
+                y = -1740;
+                automatic = false;
+            )
+            point
+            (
+                x = 810;
+                y = -2300;
+                automatic = false;
+            )
+        )
+        define "pl180_mci.mmc_m=>mmc.mmc"
+        (
+            point
+            (
+                x = 1040;
+                y = -2490;
+                automatic = false;
+            )
+        )
+        define "ps2keyboard.ps2=>pl050_kmi0.ps2device"
+        (
+        )
+        define "ps2mouse.ps2=>pl050_kmi1.ps2device"
+        (
+        )
+        define "smsc_91c111.eth=>virtualethernetcrossover.deva"
+        (
+        )
+        define "ve_sysregs.clock_CLCD=>clockCLCD.rate"
+        (
+            point
+            (
+                x = 200;
+                y = -2380;
+                automatic = false;
+            )
+            point
+            (
+                x = 200;
+                y = -1759;
+                automatic = false;
+            )
+        )
+        define "ve_sysregs.lcd=>vis.lcd"
+        (
+            point
+            (
+                x = 1260;
+                y = -2420;
+                automatic = false;
+            )
+            point
+            (
+                x = 1260;
+                y = -1830;
+                automatic = false;
+            )
+        )
+        define "ve_sysregs.leds=>vis.leds"
+        (
+            point
+            (
+                x = 1240;
+                y = -2400;
+                automatic = false;
+            )
+            point
+            (
+                x = 1240;
+                y = -1810;
+                automatic = false;
+            )
+        )
+        define "ve_sysregs.user_switches=>vis.user_switches"
+        (
+            point
+            (
+                x = 1330;
+                y = -2380;
+                automatic = false;
+            )
+            point
+            (
+                x = 1330;
+                y = -1850;
+                automatic = false;
+            )
+        )
+        define "vis.keyboard=>ps2keyboard.keyboard"
+        (
+            point
+            (
+                x = 1370;
+                y = -1710;
+                automatic = false;
+            )
+            point
+            (
+                x = 1370;
+                y = -1380;
+                automatic = false;
+            )
+        )
+        define "vis.mouse=>ps2mouse.mouse"
+        (
+            point
+            (
+                x = 1350;
+                y = -1730;
+                automatic = true;
+            )
+            point
+            (
+                x = 1350;
+                y = -1480;
+                automatic = true;
+            )
+        )
+    )
+    portmaps
+    (
+        define "clk.clk_out=>self.masterclk"
+        (
+            point
+            (
+                x = -50;
+                y = -3560;
+                automatic = false;
+            )
+            point
+            (
+                x = -50;
+                y = -3660;
+                automatic = false;
+            )
+        )
+        define "clock35MHz.clk_out=>self.timer_clock"
+        (
+        )
+        define "cs3_decoder.pvbus_m_range=>self.timer_pvbus"
+        (
+            point
+            (
+                x = 360;
+                y = -1120;
+                automatic = true;
+            )
+            point
+            (
+                x = 360;
+                y = -1080;
+                automatic = true;
+            )
+        )
+        define "pl011_uart0.intr=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -3170;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "pl011_uart1.intr=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -3040;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "pl011_uart2.intr=>self.interrupts"
+        (
+            point
+            (
+                x = 780;
+                y = -2910;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2910;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "pl011_uart3.intr=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -2780;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "pl031_rtc.intr=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -1190;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "pl041_aaci.irq=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -2590;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "pl050_kmi0.intr=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -1420;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "pl050_kmi1.intr=>self.interrupts"
+        (
+            point
+            (
+                x = 880;
+                y = -1520;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -1520;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "pl111_clcd.intr=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -1720;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "pl111_clcd.pvbus_m=>self.clcd_pvbus"
+        (
+        )
+        define "pl180_mci.MCIINTR=>self.interrupts"
+        (
+            point
+            (
+                x = 830;
+                y = -2530;
+                automatic = true;
+            )
+            point
+            (
+                x = 830;
+                y = -2210;
+                automatic = true;
+            )
+        )
+        define "pl180_mci.MCIINTR[0]=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -2530;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "pl180_mci.MCIINTR[1]=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -2510;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "self.cluster0_ticks=>vis.cluster0_ticks"
+        (
+        )
+        define "self.cluster1_ticks=>vis.cluster1_ticks"
+        (
+        )
+        define "self.daughter_leds=>vis.daughter_leds"
+        (
+            point
+            (
+                x = 1310;
+                y = -1770;
+                automatic = false;
+            )
+        )
+        define "self.daughter_switches=>vis.daughter_user_switches"
+        (
+            point
+            (
+                x = 1330;
+                y = -1740;
+                automatic = false;
+            )
+            point
+            (
+                x = 1330;
+                y = -1750;
+                automatic = false;
+            )
+        )
+        define "self.mmb_db1=>ve_sysregs.mmb"
+        (
+            point
+            (
+                x = 520;
+                y = -2340;
+                automatic = true;
+            )
+            point
+            (
+                x = 520;
+                y = -2390;
+                automatic = true;
+            )
+        )
+        define "self.mmb_db1=>ve_sysregs.mmb[1]"
+        (
+        )
+        define "self.smb_cs=>cs2_decoder.pvbus_s"
+        (
+            point
+            (
+                x = -120;
+                y = -880;
+                automatic = true;
+            )
+            point
+            (
+                x = -120;
+                y = -990;
+                automatic = true;
+            )
+        )
+        define "self.smb_cs=>cs3_decoder.pvbus_s"
+        (
+            point
+            (
+                x = -120;
+                y = -880;
+                automatic = true;
+            )
+            point
+            (
+                x = -120;
+                y = -1120;
+                automatic = true;
+            )
+        )
+        define "self.smb_cs=>dummy_ram.pvbus"
+        (
+        )
+        define "self.smb_cs=>flash0.pvbus"
+        (
+            point
+            (
+                x = -120;
+                y = -880;
+                automatic = true;
+            )
+            point
+            (
+                x = -120;
+                y = -770;
+                automatic = true;
+            )
+        )
+        define "self.smb_cs=>flash1.pvbus"
+        (
+            point
+            (
+                x = -120;
+                y = -880;
+                automatic = true;
+            )
+            point
+            (
+                x = -120;
+                y = -700;
+                automatic = true;
+            )
+        )
+        define "self.smb_cs=>psram.pvbus"
+        (
+            point
+            (
+                x = -120;
+                y = -880;
+                automatic = true;
+            )
+            point
+            (
+                x = -120;
+                y = -620;
+                automatic = true;
+            )
+        )
+        define "self.timer_irq_in=>self.interrupts"
+        (
+            point
+            (
+                x = 1280;
+                y = -2180;
+                automatic = true;
+            )
+            point
+            (
+                x = 1280;
+                y = -2210;
+                automatic = true;
+            )
+        )
+        define "smsc_91c111.intr=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -1010;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "sp805_wdog.irq_out=>self.interrupts"
+        (
+            point
+            (
+                x = 950;
+                y = -1620;
+                automatic = false;
+            )
+            point
+            (
+                x = 950;
+                y = -2210;
+                automatic = false;
+            )
+        )
+        define "sp810_sysctrl.timer_clk_en=>self.timer_en"
+        (
+            point
+            (
+                x = 790;
+                y = -2140;
+                automatic = true;
+            )
+            point
+            (
+                x = 790;
+                y = -2070;
+                automatic = true;
+            )
+        )
+        define "sp810_sysctrl.timer_clk_en[0]=>self.timer_en"
+        (
+            point
+            (
+                x = 790;
+                y = -2060;
+                automatic = true;
+            )
+            point
+            (
+                x = 790;
+                y = -2070;
+                automatic = true;
+            )
+        )
+        define "sp810_sysctrl.timer_clk_en[1]=>self.timer_en"
+        (
+            point
+            (
+                x = 790;
+                y = -2040;
+                automatic = true;
+            )
+            point
+            (
+                x = 790;
+                y = -2070;
+                automatic = true;
+            )
+        )
+        define "sp810_sysctrl.timer_clk_en[2]=>self.timer_en"
+        (
+            point
+            (
+                x = 790;
+                y = -2080;
+                automatic = true;
+            )
+            point
+            (
+                x = 790;
+                y = -2070;
+                automatic = true;
+            )
+        )
+        define "sp810_sysctrl.timer_clk_en[3]=>self.timer_en"
+        (
+            point
+            (
+                x = 790;
+                y = -2100;
+                automatic = true;
+            )
+            point
+            (
+                x = 790;
+                y = -2070;
+                automatic = true;
+            )
+        )
+        define "ve_sysregs.cb=>self.CB"
+        (
+            point
+            (
+                x = 790;
+                y = -2320;
+                automatic = false;
+            )
+        )
+        define "vfs2.intr=>self.interrupts"
+        (
+            point
+            (
+                x = 830;
+                y = -3270;
+                automatic = true;
+            )
+            point
+            (
+                x = 830;
+                y = -2210;
+                automatic = true;
+            )
+        )
+    )
+    labels
+    (
+    )
+)

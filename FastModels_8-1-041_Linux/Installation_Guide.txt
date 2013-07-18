@@ -1,0 +1,192 @@
+==============================================================================
+How to set up Fast Models 8.1
+==============================================================================
+
+This is a quick start guide to install and setup the tools and the model
+library.
+
+Detailed documentation can be found in 'doc' subfolder for Fast Model 
+Tools and the 'Docs' subfolder for the Fast Model Portfolio.
+
+---------------------------------
+Platform requirements for Windows
+---------------------------------
+
+When running Microsoft Windows XP or Microsoft Windows 7 it is
+recommended to use machines with at least 2GB RAM, and preferably at
+least 4GB for best performance. To use audio a 2GHz, or faster, Intel
+Core2Duo, or similar performing, processor is recommended.
+
+Operating system:
+Microsoft Windows XP 32 Bit SP2 or SP3.
+Microsoft Windows 7 32 bit RTM or SP1, Professional or Enterprise editions.
+Microsoft Windows 7 64 bit RTM or SP1, Professional or Enterprise editions.
+
+Compiler:
+
+Microsoft Visual Studio 2008 with Service Pack 1 and the Microsoft
+Visual Studio 2008 Service Pack 1 ATL Security Update.
+
+or
+
+Microsoft Visual Studio 2010 with Service Pack 1.
+
+Runtime Libraries:
+Fast Models Portfolio does not contain the Microsoft Visual Studio 2008 SP1 
+or Microsoft Visual Studio 2010 SP1 runtime libraries.
+
+Models built with Microsoft Visual Studio 2008 SP1 or Microsoft Visual
+Studio 2010 SP1 require both the Microsoft Visual Studio 2005 SP1 and
+the Microsoft Visual Studio 2008/2010 SP1 Redistributable Package to
+be installed in order to run.
+
+Please email support-esl@arm.com with any comments.
+
+To view the documentation, Adobe Acrobat reader (Version 8 or higher)
+needs to be installed on the system.
+
+
+-------------------------------
+Platform requirements for Linux
+-------------------------------
+
+When running on Linux it is recommended to use machines with at least 2GB RAM,
+and preferably at least 4GB for best performance. To use audio a 2GHz, or
+faster, Intel Core2Duo, or similar performing, processor is recommended.
+
+Operating system:
+Red Hat Enterprise Linux 4 (on either 32 or 64 bit architecture)
+Red Hat Enterprise Linux 5 (on either 32 or 64 bit architecture)
+Red Hat Enterprise Linux 6 (on either 32 or 64 bit architecture)
+
+Compiler:
+
+When building models for 32bit hosts, Fast Models 8.1 for Linux
+supports the following compilers:
+ - gcc 4.1.2 (built against at least binutils 2.17)
+ - gcc 4.4.4
+
+When building models for 64bit hosts, Fast Models 8.1 for Linux
+supports the following compiler:
+ - gcc 4.1.2 (built against at least binutils 2.17)
+ - gcc 4.4.4
+
+To view the documentation, Adobe Acrobat reader (Version 8 or higher) needs to
+be installed on the system.
+
+
+----------------------
+A) Install Fast Models
+----------------------
+Prerequisites:
+- You have the current Fast Models installation package
+  I.e. FastModels_8-1-0XX_Linux.tgz (Linux) or
+       FastModels_8-1-0XX_Win32.zip (Win32)
+
+Note: Japanese or Korean characters must not be used in installation or 
+project file paths, as they can cause corrupted installations or failure
+to find the specified libraries.
+
+1. On Linux, unpack the installation package into a temporary location. The
+   installation package is unpacked to a pre-defined directory 
+   (FastModels_8-1-0XX_Linux).
+
+   On Windows the product can normally be installed directly from the
+   archive if the unarchiving tool being used supports this functionality. 
+   If it does not the installation package will need to be unpacked manually.
+   It will unpack it into the selected working directory.
+   
+2. Change to the appropriate directory (on Linux: FastModels_8-1-0XX_Linux)
+   and execute ./setup.bin (Linux) or Setup.exe (Win32) 
+
+3. The installer window will appear. Follow the installation procedure.
+
+4. Linux only: To setup the environment, the appropriate setup script 
+   must be sourced:
+       bash:   source etc/setup_all.sh
+       csh:    source etc/setup_all.csh
+ 
+   You may wish to add this to your shell initialization files; otherwise
+   the setup script must be sourced at the start of each session.
+
+--------------------------------------------
+B) Install Third Party IP add-ons (optional)
+--------------------------------------------
+
+The Third Party IP add-ons package provides example code and binaries
+that contain Third-Party IP. It also contains SystemC and TLM header files 
+and binaries for building EVS (SystemC Export), and support packages
+for allowing models access to the external network. 
+
+Please note that you can also use your own OSCI SystemC and TLM
+packages. The SystemC export examples delivered with Fast Models rely
+on a directory structure which might differ to the structure of your
+OSCI packages. You either need to adapt the examples or apply the
+patch present in the TPIP package to your OSCI packages.
+ 
+ Prerequisites:
+- You have the latest Third Party IP add-ons package
+  I.e. FastModels_ThirdParty_IP_8-1_bXX_Linux.tgz (Linux) or
+  FastModels_ThirdParty_IP_8-1_bXX_Win32.zip (Windows)
+  (You can download the package from the same location as the Fast Models
+  package)
+
+1. Unpack the installation package in a temporary location
+
+2. Execute the command ./setup.bin (Linux) or Setup.exe (Win32), and 
+   follow the installation instructions. 
+   It is recommended to choose the same installation directory used for
+   the ARM Fast Models PV Model Library.
+
+----------------------------
+Licence management utilities
+----------------------------
+
+If you are using floating licenses, you must use FLEXnet license
+management utilities version 9.2 or higher. FLEXnet 10.8 license
+management utilities are available as an optional installable
+component in the product installer.
+
+Use the highest version of the license management utilities provided with
+any ARM tools you are using. It is recommended to setup the user
+environment running applications of the Fast Models product only for one
+armlmd license server, because spreading Fast Models license features
+over different servers could result in license denials for certain features.
+
+For more instructions on installing licenses please consult the ARM
+online documentation:
+* How do I install my floating license?
+    http://infocenter.arm.com/help/topic/com.arm.doc.faqs/ka3861.html
+* How do I install my node locked license?
+    http://infocenter.arm.com/help/topic/com.arm.doc.faqs/ka3510.html
+* FLEXnet for ARM® Tools License Management Guide v4.3
+    http://infocenter.arm.com/help/topic/com.arm.doc.dui0209-/index.html
+
+
+----------------------------
+Known limitations on Windows
+----------------------------
+
+- Do not use an installation path that is longer than 255 characters.
+  This is a limitation of the Windows host operating system.
+- The installation path which is used to set MAXCORE_HOME/MAXVIEW_HOME 
+  environment variables and the paths to SimGen and ModelDebugger cannot 
+  be set to an UNC path. A path containing a drive letter  must be used 
+  instead (can be achieved by mapping the UNC path to a drive).
+- If Visual Studio is installed properly, System Generator automatically
+  locates devenv by checking the environment variable VS80COMNTOOLS for
+  Visual Studio 2008. If the path to the appropriate devenv cannot
+  be determined, building the model is not possible. If there are problems
+  with the automatic mechanism, or to select a different version of this 
+  tool, after installing start sgcanvas, select Preferences from the File 
+  menu and enter the path to devenv from the Applications page. You can
+  specify different paths for Visual Studio 2008 and 2010 to enable either 
+  version of the tool to be used depending on the project settings.
+
+
+Date:  2013/06/18 13:52:38 GMT
+Build: 8.1:41
+
+==============================================================================
+END
+==============================================================================

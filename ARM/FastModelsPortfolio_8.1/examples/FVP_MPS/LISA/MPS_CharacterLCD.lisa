@@ -1,0 +1,697 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// The model of MPS system registers
+
+component MPS_CharacterLCD
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Character LCD DS700";
+        documentation_file = "../../../#DUI0423#";
+    }
+
+    includes
+    {
+        #define CHARLCD_TRACE     if (!0) ; else printf
+        #define CHARLCD_TRACE_INT if (!0) ; else printf
+
+        typedef char TChar[8];
+        static const TChar lclcharRom[] =
+        {
+            {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /*   1   ' ' */
+            {0x08, 0x08, 0x08, 0x08, 0x08, 0x00, 0x08, 0x00}, /*   2   '!' */
+            {0x14, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /*   3   '"' */
+            {0x00, 0x14, 0x3E, 0x14, 0x3E, 0x14, 0x00, 0x00}, /*   4   '#' */
+            {0x08, 0x1E, 0x28, 0x1C, 0x0A, 0x3C, 0x08, 0x00}, /*   5   '$' */
+            {0x30, 0x32, 0x04, 0x08, 0x10, 0x26, 0x06, 0x00}, /*   6   '%' */
+            {0x1C, 0x20, 0x20, 0x10, 0x2A, 0x24, 0x1A, 0x00}, /*   7   '&' */
+            {0x08, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /*   8   ''' */
+            {0x02, 0x04, 0x08, 0x08, 0x08, 0x04, 0x02, 0x00}, /*   9   '(' */
+            {0x20, 0x10, 0x08, 0x08, 0x08, 0x10, 0x20, 0x00}, /*  10   ')' */
+            {0x00, 0x08, 0x2A, 0x1C, 0x2A, 0x08, 0x00, 0x00}, /*  11   '*' */
+            {0x00, 0x08, 0x08, 0x3E, 0x08, 0x08, 0x00, 0x00}, /*  12   '+' */
+            {0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x08, 0x10}, /*  13   ',' */
+            {0x00, 0x00, 0x00, 0x3E, 0x00, 0x00, 0x00, 0x00}, /*  14   '-' */
+            {0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x08, 0x00}, /*  15   '.' */
+            {0x02, 0x02, 0x04, 0x04, 0x08, 0x08, 0x10, 0x10}, /*  16   '/' */
+            {0x1C, 0x22, 0x26, 0x2A, 0x32, 0x22, 0x1C, 0x00}, /*  17   '0' */
+            {0x08, 0x18, 0x08, 0x08, 0x08, 0x08, 0x08, 0x00}, /*  18   '1' */
+            {0x1C, 0x22, 0x02, 0x04, 0x08, 0x10, 0x3E, 0x00}, /*  19   '2' */
+            {0x1C, 0x22, 0x02, 0x0C, 0x02, 0x22, 0x1C, 0x00}, /*  20   '3' */
+            {0x0C, 0x0C, 0x14, 0x14, 0x3E, 0x04, 0x0E, 0x00}, /*  21   '4' */
+            {0x3E, 0x20, 0x3C, 0x02, 0x02, 0x22, 0x1C, 0x00}, /*  22   '5' */
+            {0x0C, 0x10, 0x20, 0x3C, 0x22, 0x22, 0x1C, 0x00}, /*  23   '6' */
+            {0x3E, 0x22, 0x02, 0x04, 0x04, 0x08, 0x08, 0x00}, /*  24   '7' */
+            {0x1C, 0x22, 0x22, 0x1C, 0x22, 0x22, 0x1C, 0x00}, /*  25   '8' */
+            {0x1C, 0x22, 0x22, 0x1E, 0x02, 0x04, 0x18, 0x00}, /*  26   '9' */
+            {0x00, 0x08, 0x08, 0x00, 0x00, 0x08, 0x08, 0x00}, /*  27   ':' */
+            {0x00, 0x08, 0x08, 0x00, 0x00, 0x08, 0x08, 0x10}, /*  28   ';' */
+            {0x00, 0x06, 0x18, 0x60, 0x18, 0x06, 0x00, 0x00}, /*  29   '<' */
+            {0x00, 0x00, 0x3E, 0x00, 0x3E, 0x00, 0x00, 0x00}, /*  30   '=' */
+            {0x00, 0x60, 0x18, 0x06, 0x18, 0x60, 0x00, 0x00}, /*  31   '>' */
+            {0x1C, 0x22, 0x02, 0x04, 0x08, 0x00, 0x08, 0x00}, /*  32   '?' */
+            {0x1C, 0x22, 0x2E, 0x2E, 0x2C, 0x20, 0x1C, 0x00}, /*  33   '@' */
+            {0x08, 0x14, 0x22, 0x22, 0x3E, 0x22, 0x22, 0x00}, /*  34   'A' */
+            {0x3C, 0x22, 0x22, 0x3C, 0x22, 0x22, 0x3C, 0x00}, /*  35   'B' */
+            {0x1C, 0x22, 0x20, 0x20, 0x20, 0x22, 0x1C, 0x00}, /*  36   'C' */
+            {0x38, 0x24, 0x22, 0x22, 0x22, 0x24, 0x38, 0x00}, /*  37   'D' */
+            {0x3E, 0x20, 0x20, 0x3C, 0x20, 0x20, 0x3E, 0x00}, /*  38   'E' */
+            {0x3E, 0x20, 0x20, 0x3C, 0x20, 0x20, 0x20, 0x00}, /*  39   'F' */
+            {0x1C, 0x22, 0x20, 0x26, 0x22, 0x22, 0x1E, 0x00}, /*  40   'G' */
+            {0x22, 0x22, 0x22, 0x3E, 0x22, 0x22, 0x22, 0x00}, /*  41   'H' */
+            {0x3E, 0x08, 0x08, 0x08, 0x08, 0x08, 0x3E, 0x00}, /*  42   'I' */
+            {0x0E, 0x02, 0x02, 0x02, 0x22, 0x22, 0x1C, 0x00}, /*  43   'J' */
+            {0x22, 0x24, 0x28, 0x30, 0x28, 0x24, 0x22, 0x00}, /*  44   'K' */
+            {0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x3E, 0x00}, /*  45   'L' */
+            {0x22, 0x36, 0x2A, 0x2A, 0x22, 0x22, 0x22, 0x00}, /*  46   'M' */
+            {0x22, 0x32, 0x32, 0x2A, 0x26, 0x26, 0x22, 0x00}, /*  47   'N' */
+            {0x1C, 0x22, 0x22, 0x22, 0x22, 0x22, 0x1C, 0x00}, /*  48   'O' */
+            {0x3C, 0x22, 0x22, 0x3C, 0x20, 0x20, 0x20, 0x00}, /*  49   'P' */
+            {0x1C, 0x22, 0x22, 0x22, 0x22, 0x22, 0x1C, 0x06}, /*  50   'Q' */
+            {0x3C, 0x22, 0x22, 0x3C, 0x28, 0x24, 0x22, 0x00}, /*  51   'R' */
+            {0x1C, 0x22, 0x20, 0x1C, 0x02, 0x22, 0x1C, 0x00}, /*  52   'S' */
+            {0x3E, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x00}, /*  53   'T' */
+            {0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x1C, 0x00}, /*  54   'U' */
+            {0x22, 0x22, 0x22, 0x14, 0x14, 0x08, 0x08, 0x00}, /*  55   'V' */
+            {0x22, 0x22, 0x22, 0x2A, 0x2A, 0x36, 0x22, 0x00}, /*  56   'W' */
+            {0x22, 0x22, 0x14, 0x08, 0x14, 0x22, 0x22, 0x00}, /*  57   'X' */
+            {0x22, 0x22, 0x14, 0x08, 0x08, 0x08, 0x08, 0x00}, /*  58   'Y' */
+            {0x3E, 0x02, 0x04, 0x08, 0x10, 0x20, 0x3E, 0x00}, /*  59   'Z' */
+            {0x0E, 0x08, 0x08, 0x08, 0x08, 0x08, 0x0E, 0x00}, /*  60   '[' */
+            {0x10, 0x10, 0x08, 0x08, 0x04, 0x04, 0x02, 0x02}, /*  61   '\' */
+            {0x38, 0x08, 0x08, 0x08, 0x08, 0x08, 0x38, 0x00}, /*  62   ']' */
+            {0x08, 0x1c, 0x2a, 0x08, 0x08, 0x08, 0x00, 0x00}, /*  63   up arrow */
+            {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7E, 0x00}, /*  64   '_' */
+            {0x08, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /*  65    '`' */
+            {0x00, 0x00, 0x1E, 0x22, 0x22, 0x26, 0x1A, 0x00}, /*  66    'a' */
+            {0x20, 0x20, 0x3C, 0x22, 0x22, 0x22, 0x3C, 0x00}, /*  67    'b' */
+            {0x00, 0x00, 0x1E, 0x20, 0x20, 0x20, 0x1E, 0x00}, /*  68    'c' */
+            {0x02, 0x02, 0x1E, 0x22, 0x22, 0x22, 0x1E, 0x00}, /*  69    'd' */
+            {0x00, 0x00, 0x1C, 0x22, 0x3E, 0x20, 0x1C, 0x00}, /*  70    'e' */
+            {0x0E, 0x10, 0x3C, 0x10, 0x10, 0x10, 0x10, 0x00}, /*  71    'f' */
+            {0x00, 0x00, 0x1E, 0x22, 0x22, 0x1E, 0x02, 0x1C}, /*  72    'g' */
+            {0x20, 0x20, 0x3C, 0x22, 0x22, 0x22, 0x22, 0x00}, /*  73    'h' */
+            {0x08, 0x00, 0x18, 0x08, 0x08, 0x08, 0x1C, 0x00}, /*  74    'i' */
+            {0x04, 0x00, 0x1C, 0x04, 0x04, 0x04, 0x04, 0x38}, /*  75    'j' */
+            {0x20, 0x20, 0x24, 0x28, 0x30, 0x28, 0x24, 0x00}, /*  76    'k' */
+            {0x18, 0x08, 0x08, 0x08, 0x08, 0x08, 0x1C, 0x00}, /*  77    'l' */
+            {0x00, 0x00, 0x34, 0x2A, 0x2A, 0x2A, 0x22, 0x00}, /*  78    'm' */
+            {0x00, 0x00, 0x2C, 0x32, 0x22, 0x22, 0x22, 0x00}, /*  79    'n' */
+            {0x00, 0x00, 0x1C, 0x22, 0x22, 0x22, 0x1C, 0x00}, /*  80    'o' */
+            {0x00, 0x00, 0x3C, 0x22, 0x22, 0x3C, 0x20, 0x20}, /*  81    'p' */
+            {0x00, 0x00, 0x1E, 0x22, 0x22, 0x1E, 0x02, 0x02}, /*  82    'q' */
+            {0x00, 0x00, 0x2C, 0x30, 0x20, 0x20, 0x20, 0x00}, /*  83    'r' */
+            {0x00, 0x00, 0x1E, 0x20, 0x1C, 0x02, 0x3C, 0x00}, /*  84    's' */
+            {0x08, 0x08, 0x3E, 0x08, 0x08, 0x08, 0x06, 0x00}, /*  85    't' */
+            {0x00, 0x00, 0x22, 0x22, 0x22, 0x26, 0x1A, 0x00}, /*  86    'u' */
+            {0x00, 0x00, 0x36, 0x14, 0x14, 0x08, 0x08, 0x00}, /*  87    'v' */
+            {0x00, 0x00, 0x22, 0x2A, 0x2A, 0x2A, 0x14, 0x00}, /*  88    'w' */
+            {0x00, 0x00, 0x22, 0x14, 0x08, 0x14, 0x22, 0x00}, /*  89    'x' */
+            {0x00, 0x00, 0x22, 0x22, 0x22, 0x1E, 0x02, 0x1C}, /*  90    'y' */
+            {0x00, 0x00, 0x3E, 0x04, 0x08, 0x10, 0x3E, 0x00}, /*  91    'z' */
+            {0x02, 0x04, 0x04, 0x08, 0x04, 0x04, 0x02, 0x00}, /*  92    '{' */
+            {0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x00}, /*  93    '|' */
+            {0x20, 0x10, 0x10, 0x08, 0x10, 0x10, 0x20, 0x00}, /*  94    '}' */
+            {0x10, 0x2A, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00}, /*  95    '~' */
+        };
+
+    }
+
+    resources
+    {
+        REGISTER { description("Command"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x00) } CHAR_COM;
+        REGISTER { description("Data"   ), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x04) } CHAR_DAT;
+        REGISTER { description("Read"   ), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x08) } CHAR_RD;
+        REGISTER { description("Raw"    ), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0C) } CHAR_RAW;
+        REGISTER { description("Mask"   ), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x10) } CHAR_MASK;
+        REGISTER { description("Stat"   ), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x14) } CHAR_STAT;
+
+        enum { CGRAM_SIZE = 80, DDRAM_SIZE = 104 };
+        enum { DDRAM, CGRAM } TRamArea;
+        enum { BLINK_RATE = 5000000};
+        TCharacterInfo m_charInfo;
+        TChar *charRom;
+        uint32_t m_current_ram_area;
+        uint8_t m_cgram[CGRAM_SIZE];
+        uint8_t m_ddram[DDRAM_SIZE];
+        uint8_t m_ram_addr;
+
+        uint32_t m_dl;
+        uint32_t m_n;
+        uint32_t m_f;
+        uint32_t m_id;
+        uint32_t m_sc;
+        uint32_t m_rl;
+        uint32_t m_s;
+        uint32_t m_c;
+        uint32_t m_d;
+        uint32_t m_b;
+        uint32_t m_chars_per_line;
+        uint32_t m_intraw;
+
+        bool m_cursor_blink_on;
+
+        int32_t m_display_pos;
+    }
+
+    //
+    // Ports
+    //
+    master port<CharacterLCD> display;
+    master port<Signal> intr;
+    slave port<ClockSignal> clock;
+    slave port<PVBus> pvbus;
+
+    internal slave port <TimerCallback> updatetimer_callback_handler
+    {
+        behaviour signal() : uint32_t
+        {
+            if (m_intraw)
+            {
+                redrawDisplay();
+                m_intraw = 0;
+                //CHARLCD_TRACE_INT("updatetimer callback: start pulse CHAR_MASK=0x%08X\n", CHAR_MASK);
+                if ((CHAR_MASK & 1) && intr.setValue.implemented())
+                {
+                    intr.setValue(sg::Signal::Set);
+                }
+                // hold int high for a clock cycle
+                return 1;
+            }
+            else
+            {
+                // end of int pulse, take signal low again
+                //m_intraw = 0;
+                //CHARLCD_TRACE_INT("updatetimer callback: end  pulse CHAR_MASK=0x%08X\n", CHAR_MASK);
+                if ((CHAR_MASK & 1) && intr.setValue.implemented())
+                {
+                    intr.setValue(sg::Signal::Clear);
+                }
+                return 0;
+            }
+        }
+    }
+
+    internal slave port <TimerCallback> cursortimer_callback_handler
+    {
+        behaviour signal() : uint32_t
+        {
+            CHARLCD_TRACE_INT("cursortimer callback\n");
+            m_cursor_blink_on = !m_cursor_blink_on;
+            redrawDisplay();
+            return BLINK_RATE;
+        }
+    }
+
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+        cursortimer : ClockTimer;
+        updatetimer : ClockTimer;
+    }
+
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        self.clock => cursortimer.clk_in;
+        self.clock => updatetimer.clk_in;
+        cursortimer.timer_callback => self.cursortimer_callback_handler;
+        updatetimer.timer_callback => self.updatetimer_callback_handler;
+    }
+
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned())
+                return tx.generateAbort();
+
+            return tx.setReturnData32((uint32_t)registerRead(tx.getAddress() & ~3));
+        }
+
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned())
+                return tx.generateAbort();
+
+            registerWrite(tx.getAddress(),tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+
+
+    behaviour init_vars()
+    {
+        int i;
+        CHAR_RD   = 0;
+        CHAR_RAW  = 0;
+        CHAR_MASK = 0;
+        CHAR_STAT = 0;
+        m_dl = 1;
+        m_n = 0;
+        m_f = 0;
+        m_id = 1;
+        m_sc = 0;
+        m_rl = 0;
+        m_s = 0;
+        m_c = 0;
+        m_d = 0;
+        m_b = 0;
+        m_ram_addr = 0;
+        m_chars_per_line = 20;
+        m_intraw = 0;
+        m_display_pos = 0;
+
+        m_current_ram_area = DDRAM;
+        m_charInfo.posX = 0;       // Upper left corner X
+        m_charInfo.posY = 0;       // Upper left corner Y
+        m_charInfo.nrPixelsX = 5;
+        m_charInfo.nrPixelsY = 8;
+        m_cursor_blink_on = true;
+
+        for (i = 0; i < DDRAM_SIZE; i++)
+        {
+            m_ddram[i] = 0x20;
+        }
+
+        m_charInfo.pBitmap = (uint8_t *)charRom[m_ddram[m_ram_addr] - 32];
+    }
+
+    behavior init()
+    {
+        composition.init();
+        charRom = (TChar *)lclcharRom;
+        init_vars();
+        display.setLayoutInfo(m_n ? 2:1, 20, 8, 8);
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        init_vars();
+
+        m_intraw = 0;
+        if (intr.setValue.implemented())
+        {
+            intr.setValue(sg::Signal::Clear);
+        }
+        cursortimer.timer_control.cancel();
+        updatetimer.timer_control.cancel();
+        clearDisplay();
+    }
+
+    behavior clearDisplay()
+    {
+        for (uint32_t i = 0; i < DDRAM_SIZE; i++)
+        {
+            m_ddram[i] = 0x20; // whitespace
+        }
+        m_ram_addr = 0;
+        m_id = 1; // side effect according to documentation
+        redrawDisplay();
+    }
+
+    behavior generateDDRamAddress(uint32_t x, uint32_t y) : uint32_t
+    {
+        uint32_t addr;
+        int32_t xlim = (x + m_display_pos);
+
+        if (xlim > 0x4f)
+        {
+            xlim -= 0x50;
+        }
+        else if (xlim < 0)
+        {
+            xlim += 0x50;
+        }
+
+        if (0 == m_n)
+        {
+            // one line with 80 bytes
+            xlim %= 0x50;
+            if (xlim < 0)
+            {
+                xlim = 0x50 - xlim;
+            }
+            addr = xlim;
+        }
+        else
+        {
+            // two lines with 40 bytes each, second line starts at 0x40
+            xlim %= 0x28;
+
+            if (xlim < 0)
+            {
+                xlim = 0x28 - xlim;
+            }
+
+            addr = (y & 1) * 0x40 + xlim;
+        }
+        return addr;
+    }
+
+    behavior redrawDisplay()
+    {
+        if (m_d) // display turned on?
+        {
+            uint32_t lines = m_n ? 2 : 1;
+            for (m_charInfo.posY = 0; m_charInfo.posY < lines; m_charInfo.posY++)
+            {
+                //            CHARLCD_TRACE("MPS_CharacterLCD: redrawDisplay(): %d lines and %d columns m_n=%d y=%d\n", m_n, m_chars_per_line, m_n, m_charInfo.posY);
+                for (m_charInfo.posX = 0; m_charInfo.posX < m_chars_per_line; m_charInfo.posX++)
+                {
+                    uint8_t addr = generateDDRamAddress(m_charInfo.posX, m_charInfo.posY);
+                    m_charInfo.pBitmap = (uint8_t *)charRom[m_ddram[addr] - 32];
+                    // cursor is on and this is the cursor address
+                    if (m_c && (addr == m_ram_addr))
+                    {
+                        uint8_t cursorBitmap[8];
+
+                        for (int i = 0; i < 8; i++)
+                        {
+                            cursorBitmap[i] = m_charInfo.pBitmap[i];
+                        }
+
+                        if (m_b) // blinking turned on
+                        {
+                            if (!m_cursor_blink_on) // in 'off-phase'
+                            {
+                                cursorBitmap[7] = 0x00;
+                            }
+                            else
+                            {
+                                cursorBitmap[7] = 0xff;
+                            }
+                        }
+                        else
+                        {
+                            cursorBitmap[7] = 0xff;
+                        }
+                        m_charInfo.pBitmap = cursorBitmap;
+                    }
+                    display.draw(&m_charInfo);
+                }
+            }
+        }
+    }
+
+    behavior readRamNoSideEffects():uint8_t
+    {
+        uint8_t data8 = (m_current_ram_area == DDRAM) ? m_ddram[m_ram_addr] : m_cgram[m_ram_addr];
+        return data8;
+    }
+
+    behavior readRam():uint8_t
+    {
+        uint8_t data8 = readRamNoSideEffects();
+
+        CHARLCD_TRACE("MPS_CharacterLCD: readRam() m_ram_addr=%2d m_id=%d\n", m_ram_addr, m_id);
+        if (m_ram_addr > 0)
+        {
+            m_ram_addr -= m_id;
+        }
+        else
+        {
+            if (m_id > 0)
+            {
+                // wrap around
+                m_ram_addr = DDRAM_SIZE;
+            }
+        }
+
+        return data8;
+    }
+
+    behavior writeRamNoSideEffects(uint8_t data8)
+    {
+        if (m_current_ram_area == DDRAM)
+        {
+           m_ddram[m_ram_addr] = data8;
+        }
+        else
+        {
+           m_cgram[m_ram_addr] = data8;
+        }
+    }
+
+    behavior writeRam(uint8_t data8)
+    {
+        writeRamNoSideEffects(data8);
+        CHARLCD_TRACE("MPS_CharacterLCD: m_ram_addr=%2d m_id=%d DDRAM:", m_ram_addr, m_id);
+        for (int i = 0; i < DDRAM_SIZE; i++)
+        {
+                CHARLCD_TRACE("%c", m_ddram[i]);
+        }
+        CHARLCD_TRACE("@@@\n");
+        // auto increment
+        m_ram_addr += m_id;
+
+        // we don't want to crash
+        if (m_ram_addr >= DDRAM_SIZE)
+        {
+            m_ram_addr = 0;
+        }
+    }
+
+    behavior setupDelay()
+    {
+        m_intraw = 1;
+        updatetimer.timer_control.set(1000);
+    }
+
+    behavior isDelaying() : bool
+    {
+        return (m_intraw == 1) && updatetimer.timer_control.isSet();
+    }
+
+    behavior registerRead(uint32_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+
+        switch(device_addr)
+        {
+            case 0x00: // CHAR_COM
+                data = 0;
+                CHARLCD_TRACE("MPS_CharacterLCD: read(CHAR_COM) -> %x\n", data);
+                break;
+
+            case 0x04: // CHAR_DAT
+                data = 0;
+                CHAR_RD = readRam();
+                CHARLCD_TRACE("MPS_CharacterLCD: read(CHAR_DAT) -> %x\n", data);
+                break;
+
+            case 0x08: // CHAR_RD
+                if (!isDelaying())
+                {
+                    CHAR_RD |= 0x100; // bit 8 indicate busy
+                }
+                data = CHAR_RD;
+                //CHARLCD_TRACE("MPS_CharacterLCD: read(CHAR_RD) -> %x\n", data);
+                break;
+
+            case 0x0C: // CHAR_RAW
+                CHAR_RAW = m_intraw;
+                if (!isDelaying())
+                {
+                    CHAR_RAW |= 0x100; // bit 8
+                }
+                data = CHAR_RAW;
+                //CHARLCD_TRACE("MPS_CharacterLCD: read(CHAR_RAW) -> %x\n", data);
+                break;
+
+            case 0x10: // CHAR_MASK
+                data = CHAR_MASK;
+                CHARLCD_TRACE("MPS_CharacterLCD: read(CHAR_MASK) -> %x\n", data);
+                break;
+
+            case 0x14: // CHAR_STAT
+                CHAR_STAT = (m_intraw & CHAR_MASK);
+                data = CHAR_STAT;
+                CHARLCD_TRACE("MPS_CharacterLCD: read(CHAR_STAT) -> %x\n", data);
+                break;
+
+            default:
+                CHARLCD_TRACE("MPS_CharacterLCD: read(Undefined register) 0x%x\n", device_addr);
+                break;
+
+        }
+        return data;
+    }
+
+    behavior registerWrite(uint32_t device_addr, uint32_t data)
+    {
+        switch (device_addr)
+        {
+            case 0x00: // CHAR_COM
+                CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_COM) <- 0x%08X\n", data);
+
+                if (data & 0x80)
+                {
+                    // Set DDRAM address
+                    m_ram_addr = data & 0x7f;
+                    m_current_ram_area = DDRAM;
+                    CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_DAT)Set DDRAM address=0x%08X\n", m_ram_addr);
+                }
+                else if (data & 0x40)
+                {
+                    // Set CGRAM address
+                    m_ram_addr = data & 0x3f;
+
+                //    CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_DAT)Set CGRAM address=0x%08X\n", m_ram_addr);
+                    m_current_ram_area = CGRAM;
+                }
+                else if (data & 0x20)
+                {
+                    // Function set
+                    m_dl = (data & 0x10) ?  8 : 4;
+                    m_n  = (data & 0x08) ?  1 : 0;
+                    m_f  = (data & 0x04) ? 10 : 8;
+
+                    CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_DAT)Function set dl=%d n=%d f=%d\n", m_dl, m_n, m_f);
+                    if (10 == m_f)
+                    {
+                        m_charInfo.nrPixelsX = 5;
+                        m_charInfo.nrPixelsY = 10;
+                    }
+                    else
+                    {
+                        m_charInfo.nrPixelsX = 5;
+                        m_charInfo.nrPixelsY = 8;
+                    }
+                    display.setLayoutInfo(m_n ? 2:1, m_n ? 20 : 40, 8, 8);
+                }
+
+                else if (data & 0x10)
+                {
+                    // Cursor or display shift
+                    m_sc = (data & 0x08) ?  1 : 0; // display shift : cursor move
+                    m_rl = (data & 0x04) ?  1 : 0; // shift to right : shift to left
+                    CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_DAT)Cursor or display shift sc=%d rl=%d\n", m_sc, m_rl);
+                    if (m_sc)
+                    {
+                        m_display_pos += m_rl ? -1 : 1;
+                    }
+                }
+                else if (data & 0x08)
+                {
+                    // Display on/off control
+                    m_d  = (data & 0x04) ?  1 : 0;
+                    m_c  = (data & 0x02) ?  1 : 0;
+                    m_b  = (data & 0x01) ?  1 : 0;
+                    if (m_b)
+                    {
+                        cursortimer.timer_control.set(BLINK_RATE);
+                    }
+                    else
+                    {
+                        cursortimer.timer_control.cancel();
+                    }
+
+                    CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_DAT)Display on/off control d=%d c=%d b=%d\n", m_d, m_c, m_b);
+                }
+                else if (data & 0x04)
+                {
+                    // Entry mode set
+                    m_id = (data & 0x02) ?  1 : 0;
+                    m_s  = (data & 0x01) ?  1 : 0;
+                    CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_DAT)Entry mode set id=%d s=%d\n", m_id, m_s);
+                }
+                else if (data & 0x02)
+                {
+                    // Return home
+                    CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_DAT)Return home\n");
+                    m_ram_addr = 0;
+                }
+                else if (data & 0x01)
+                {
+                    // Clear display
+                    CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_DAT)Clear display\n");
+                    clearDisplay();
+                }
+
+                setupDelay(); // put the model into waiting state for some time
+                break;
+
+            case 0x04: // CHAR_DAT
+                CHAR_DAT = data;
+                writeRam(CHAR_DAT);
+                setupDelay();
+                CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_DAT) -> %x\n", data);
+                break;
+
+            case 0x08: // CHAR_RD
+                CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_RD) <- %x -- Read only\n", data);
+                break;
+
+            case 0x0C: // CHAR_RAW
+                CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_RAW) <- %x\n", data);
+                if (0 == data)
+                {
+                    m_intraw = data;
+                }
+                setupDelay();
+                break;
+
+            case 0x10: // CHAR_MASK
+                CHAR_MASK = data;
+                CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_MASK) <- %x\n", data);
+                break;
+
+            case 0x14: // CHAR_STAT
+                CHAR_STAT = data;
+                CHARLCD_TRACE("MPS_CharacterLCD: write(CHAR_STAT) <- %x -- Read only\n", data);
+                break;
+
+            default:
+                CHARLCD_TRACE("MPS_CharacterLCD: write(Undefined register) 0x%x\n", device_addr);
+                break;
+        }
+    }
+
+    // debugger register access support
+    behaviour debug_read(CASIU32 reg_id, CASIU64* datap, bool side_effects) : CADIReturn_t
+    {
+        if ((reg_id == 0x08) && !side_effects)
+        {
+            *datap = readRamNoSideEffects();
+        }
+        else
+        {
+            *datap = registerRead(reg_id);
+        }
+
+        return eslapi::CADI_STATUS_OK;
+    }
+
+    behaviour debug_write(CASIU32 reg_id, const CASIU64* datap, bool side_effects) : CADIReturn_t
+    {
+        if ((reg_id == 0x08) && !side_effects)
+        {
+            writeRamNoSideEffects((uint32_t)*datap);
+        }
+        else
+        {
+            registerWrite(reg_id, (uint32_t)*datap);
+        }
+
+        return eslapi::CADI_STATUS_OK;
+    }
+}

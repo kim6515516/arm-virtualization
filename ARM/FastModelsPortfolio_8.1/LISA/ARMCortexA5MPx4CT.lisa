@@ -1,0 +1,228 @@
+/*
+ * Copyright (C) 2008-2009 ARM Limited. All rights reserved.
+ */
+
+
+extern component ARMCortexA5MPx4CT
+{
+    properties {
+        executes_software = 1; 
+        version = "8.1.37";
+        component_type = "Core";
+        description = "ARMCortexA5MPx4CT CPU component";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    resources
+    {
+
+        // Processor component parameters
+        PARAMETER { description("Base address of peripheral memory space"), name("PERIPHBASE"), type(uint32_t), default(0x13080000), min(0x0), max(0xFFFFFFFF) } PERIPHBASE;
+        PARAMETER { description("CPU cluster ID value"), name("CLUSTER_ID"), type(uint32_t), default(0x0), min(0x0), max(0xF) } CLUSTER_ID;
+        PARAMETER { description("Number of shared peripheral interrupts implemented"), name("dic-spi_count"), type(uint32_t), default(0x40), min(0x0), max(0xE0) } dic_spi_count;
+        PARAMETER { description("Enable filtering of accesses through pvbus_m0"), name("FILTEREN"), type(bool), default(false) } FILTEREN;
+        PARAMETER { description("Base of region filtered to pvbus_m0"), name("FILTERSTART"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF) } FILTERSTART;
+        PARAMETER { description("End of region filtered to pvbus_m0"), name("FILTEREND"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF) } FILTEREND;
+        PARAMETER { description("Disable some accesses to DIC registers"), name("CFGSDISABLE"), type(bool), default(false) } CFGSDISABLE;
+        PARAMETER { description("Set whether I-cache has stateful implementation"), name("icache-state_modelled"), type(bool), default(false) } icache_state_modelled;
+        PARAMETER { description("Set whether D-cache has stateful implementation"), name("dcache-state_modelled"), type(bool), default(false) } dcache_state_modelled;
+        PARAMETER { description("Specify whether all TLBs are modeled"), name("device-accurate-tlb"), type(bool), default(false) } device_accurate_tlb;
+
+        // Core subcomponents parameters
+        PARAMETER { name("cpu0.vfp-present"), type(bool), default(true), description("Set whether the model has VFP support") } cpu0_vfp_present;
+        PARAMETER { name("cpu0.ase-present"), type(bool), default(true), description("Set whether model has NEON support") } cpu0_ase_present;
+        PARAMETER { name("cpu0.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu0_CFGEND;
+        PARAMETER { name("cpu0.CFGNMFI"), type(bool), default(false), description("Enable nonmaskable FIQ interrupts on startup") } cpu0_CFGNMFI;
+        PARAMETER { name("cpu0.CP15SDISABLE"), type(bool), default(false), description("Initialize to disable access to some CP15 registers") } cpu0_CP15SDISABLE;
+        PARAMETER { name("cpu0.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu0_TEINIT;
+        PARAMETER { name("cpu0.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu0_VINITHI;
+        PARAMETER { name("cpu0.SMPnAMP"), type(bool), default(false), description("Set whether the processor is part of a coherent domain") } cpu0_SMPnAMP;
+        PARAMETER { name("cpu0.POWERCTLI"), type(uint32_t), default(0), min(0), max(3), description("Default power control state for processor") } cpu0_POWERCTLI;
+        PARAMETER { name("cpu0.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset ") } cpu0_vfp_enable_at_reset;
+        PARAMETER { name("cpu0.dcache-size"), type(uint32_t), default(0x8000), description("Set D-cache size in bytes ") } cpu0_dcache_size;
+        PARAMETER { name("cpu0.icache-size"), type(uint32_t), default(0x8000), description("Set I-cache size in bytes ") } cpu0_icache_size;
+        PARAMETER { name("cpu0.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false") } cpu0_semihosting_enable;
+        PARAMETER { name("cpu0.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting ") } cpu0_semihosting_ARM_SVC;
+        PARAMETER { name("cpu0.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting ") } cpu0_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu0.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu0_semihosting_cmd_line;
+        PARAMETER { name("cpu0.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base ") } cpu0_semihosting_heap_base;
+        PARAMETER { name("cpu0.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap ") } cpu0_semihosting_heap_limit;
+        PARAMETER { name("cpu0.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack ") } cpu0_semihosting_stack_base;
+        PARAMETER { name("cpu0.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit ") } cpu0_semihosting_stack_limit;
+        PARAMETER { name("cpu0.semihosting-cwd"), type(string), default(""), description("Virtual address if CWD")} cpu0_semihosting_cwd;
+        PARAMETER { name("cpu0.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu0_min_sync_level;
+
+
+        PARAMETER { name("cpu1.vfp-present"), type(bool), default(true), description("Set whether the model has VFP support") } cpu1_vfp_present;
+        PARAMETER { name("cpu1.ase-present"), type(bool), default(true), description("Set whether model has NEON support") } cpu1_ase_present;
+        PARAMETER { name("cpu1.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu1_CFGEND;
+        PARAMETER { name("cpu1.CFGNMFI"), type(bool), default(false), description("Enable nonmaskable FIQ interrupts on startup") } cpu1_CFGNMFI;
+        PARAMETER { name("cpu1.CP15SDISABLE"), type(bool), default(false), description("Initialize to disable access to some CP15 registers") } cpu1_CP15SDISABLE;
+        PARAMETER { name("cpu1.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu1_TEINIT;
+        PARAMETER { name("cpu1.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu1_VINITHI;
+        PARAMETER { name("cpu1.SMPnAMP"), type(bool), default(false), description("Set whether the processor is part of a coherent domain") } cpu1_SMPnAMP;
+        PARAMETER { name("cpu1.POWERCTLI"), type(uint32_t), default(0), min(0), max(3), description("Default power control state for processor") } cpu1_POWERCTLI;
+        PARAMETER { name("cpu1.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset ") } cpu1_vfp_enable_at_reset;
+        PARAMETER { name("cpu1.dcache-size"), type(uint32_t), default(0x8000), description("Set D-cache size in bytes ") } cpu1_dcache_size;
+        PARAMETER { name("cpu1.icache-size"), type(uint32_t), default(0x8000), description("Set I-cache size in bytes ") } cpu1_icache_size;
+        PARAMETER { name("cpu1.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false") } cpu1_semihosting_enable;
+        PARAMETER { name("cpu1.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting ") } cpu1_semihosting_ARM_SVC;
+        PARAMETER { name("cpu1.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting ") } cpu1_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu1.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu1_semihosting_cmd_line;
+        PARAMETER { name("cpu1.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base ") } cpu1_semihosting_heap_base;
+        PARAMETER { name("cpu1.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap ") } cpu1_semihosting_heap_limit;
+        PARAMETER { name("cpu1.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack ") } cpu1_semihosting_stack_base;
+        PARAMETER { name("cpu1.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit ") } cpu1_semihosting_stack_limit;
+        PARAMETER { name("cpu1.semihosting-cwd"), type(string), default(""), description("Virtual address if CWD")} cpu1_semihosting_cwd;
+        PARAMETER { name("cpu1.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu1_min_sync_level;
+
+
+        PARAMETER { name("cpu2.vfp-present"), type(bool), default(true), description("Set whether the model has VFP support") } cpu2_vfp_present;
+        PARAMETER { name("cpu2.ase-present"), type(bool), default(true), description("Set whether model has NEON support") } cpu2_ase_present;
+        PARAMETER { name("cpu2.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu2_CFGEND;
+        PARAMETER { name("cpu2.CFGNMFI"), type(bool), default(false), description("Enable nonmaskable FIQ interrupts on startup") } cpu2_CFGNMFI;
+        PARAMETER { name("cpu2.CP15SDISABLE"), type(bool), default(false), description("Initialize to disable access to some CP15 registers") } cpu2_CP15SDISABLE;
+        PARAMETER { name("cpu2.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu2_TEINIT;
+        PARAMETER { name("cpu2.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu2_VINITHI;
+        PARAMETER { name("cpu2.SMPnAMP"), type(bool), default(false), description("Set whether the processor is part of a coherent domain") } cpu2_SMPnAMP;
+        PARAMETER { name("cpu2.POWERCTLI"), type(uint32_t), default(0), min(0), max(3), description("Default power control state for processor") } cpu2_POWERCTLI;
+        PARAMETER { name("cpu2.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset ") } cpu2_vfp_enable_at_reset;
+        PARAMETER { name("cpu2.dcache-size"), type(uint32_t), default(0x8000), description("Set D-cache size in bytes ") } cpu2_dcache_size;
+        PARAMETER { name("cpu2.icache-size"), type(uint32_t), default(0x8000), description("Set I-cache size in bytes ") } cpu2_icache_size;
+        PARAMETER { name("cpu2.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false") } cpu2_semihosting_enable;
+        PARAMETER { name("cpu2.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting ") } cpu2_semihosting_ARM_SVC;
+        PARAMETER { name("cpu2.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting ") } cpu2_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu2.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu2_semihosting_cmd_line;
+        PARAMETER { name("cpu2.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base ") } cpu2_semihosting_heap_base;
+        PARAMETER { name("cpu2.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap ") } cpu2_semihosting_heap_limit;
+        PARAMETER { name("cpu2.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack ") } cpu2_semihosting_stack_base;
+        PARAMETER { name("cpu2.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit ") } cpu2_semihosting_stack_limit;
+        PARAMETER { name("cpu2.semihosting-cwd"), type(string), default(""), description("Virtual address if CWD")} cpu2_semihosting_cwd;
+        PARAMETER { name("cpu2.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu2_min_sync_level;
+
+
+        PARAMETER { name("cpu3.vfp-present"), type(bool), default(true), description("Set whether the model has VFP support") } cpu3_vfp_present;
+        PARAMETER { name("cpu3.ase-present"), type(bool), default(true), description("Set whether model has NEON support") } cpu3_ase_present;
+        PARAMETER { name("cpu3.CFGEND"), type(bool), default(false), description("Initialize to BE8 endianness") } cpu3_CFGEND;
+        PARAMETER { name("cpu3.CFGNMFI"), type(bool), default(false), description("Enable nonmaskable FIQ interrupts on startup") } cpu3_CFGNMFI;
+        PARAMETER { name("cpu3.CP15SDISABLE"), type(bool), default(false), description("Initialize to disable access to some CP15 registers") } cpu3_CP15SDISABLE;
+        PARAMETER { name("cpu3.TEINIT"), type(bool), default(false), description("T32 exception enable. The default has exceptions including reset handled in A32 state") } cpu3_TEINIT;
+        PARAMETER { name("cpu3.VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } cpu3_VINITHI;
+        PARAMETER { name("cpu3.SMPnAMP"), type(bool), default(false), description("Set whether the processor is part of a coherent domain") } cpu3_SMPnAMP;
+        PARAMETER { name("cpu3.POWERCTLI"), type(uint32_t), default(0), min(0), max(3), description("Default power control state for processor") } cpu3_POWERCTLI;
+        PARAMETER { name("cpu3.vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset ") } cpu3_vfp_enable_at_reset;
+        PARAMETER { name("cpu3.dcache-size"), type(uint32_t), default(0x8000), description("Set D-cache size in bytes ") } cpu3_dcache_size;
+        PARAMETER { name("cpu3.icache-size"), type(uint32_t), default(0x8000), description("Set I-cache size in bytes ") } cpu3_icache_size;
+        PARAMETER { name("cpu3.semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false") } cpu3_semihosting_enable;
+        PARAMETER { name("cpu3.semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFF), description("A32 SVC number for semihosting ") } cpu3_semihosting_ARM_SVC;
+        PARAMETER { name("cpu3.semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFF), description("T32 SVC number for semihosting ") } cpu3_semihosting_Thumb_SVC;
+        PARAMETER { name("cpu3.semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } cpu3_semihosting_cmd_line;
+        PARAMETER { name("cpu3.semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base ") } cpu3_semihosting_heap_base;
+        PARAMETER { name("cpu3.semihosting-heap_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap ") } cpu3_semihosting_heap_limit;
+        PARAMETER { name("cpu3.semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack ") } cpu3_semihosting_stack_base;
+        PARAMETER { name("cpu3.semihosting-stack_limit"), type(uint32_t), default(0x0F000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit ") } cpu3_semihosting_stack_limit;
+        PARAMETER { name("cpu3.semihosting-cwd"), type(string), default(""), description("Virtual address if CWD")} cpu3_semihosting_cwd;
+        PARAMETER { name("cpu3.min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } cpu3_min_sync_level;
+
+    }
+
+    // The clock signal connected to the clk_in port is used to determine
+    // the rate at which the core executes instructions.
+    slave port<ClockSignal> clk_in;
+
+    // the timer and the watchdog take need a clk that is scaled down 
+    // atleast by factor of two.
+    slave port<ClockSignal> periphclk_in;
+
+    // The core will generate bus requests on this port.
+    master port<PVBus> pvbus_m0;
+
+    master port<PVBus> pvbus_m1;
+
+    // AXI ACP slave port
+    slave port<PVBus> acp_s;
+
+    // Raising this signal will put the core into reset mode.
+    slave port<Signal> reset[4];
+
+    // This signal resets rest of the CA9MP system.
+    master port<Signal> wdresetreq[4];
+
+    // This peer port of event input (and output) is for wakeup from WFE
+    peer port<Signal> event;
+
+    // This signal indicates if a core is in WFE state
+    master port<Signal> standbywfe[4];
+
+    // This signal indicates if a core is in WFI state
+    master port<Signal> standbywfi[4];
+
+    // This port sets reset value for scu CPU status register
+    slave port<Value> pwrctli[4];
+
+    // This port sends scu CPU status register bits
+    master port<Value> pwrctlo[4];
+
+    // This signal resets SCU
+    slave port<Signal> scureset;
+
+    // This signal resets individual watchdog
+    slave port<Signal> wdreset[4];
+
+    // This signal resets timer and interrupt controller
+    slave port<Signal> periphreset;
+
+    // This signal disables write access to some secure Interrupt Controller registers
+    slave port<Signal> cfgsdisable;
+
+    // This signals AMP or SMP mode for each Cortex-A9 processor
+    master port<Signal> smpnamp[4];
+
+    // This signal drives the CPU's interrupt handling.
+    slave port<Signal> irq[4];
+
+    // This signal drives the CPU's fast-interrupt handling.
+    slave port<Signal> fiq[4];
+
+    // This signal drives the CPU's fast-interrupt handling.
+    slave port<Signal> ints[224];
+
+    // Interrupt signal from performance monitoring unit.
+    master port<Signal> pmuirq[4];
+
+    // The port reads the value in CPU ID register field, bits[11:8] of the MPIDR.
+    slave port<Value> clusterid;
+
+    // This signal disables write access to some system control processor registers
+    slave port<Signal> cp15sdisable[4];
+
+    // This signal enables filtering of address ranges between master bus ports
+    slave port<Signal> filteren;
+
+    // This port sets start of region mapped to pvbus_m1
+    slave port<Value> filterstart;
+
+    // This port sets end of region mapped to pvbus_m1
+    slave port<Value> filterend;
+
+    // This port sets the base address of private peripheral region
+    slave port<Value> periphbase;
+
+    // This signal provides default exception handling state
+    slave port<Signal> teinit[4];
+
+    // This port should be connected to one of the two ticks ports
+    // on a 'visualisation' component, in order to display a running
+    // instruction count.
+    master port<InstructionCount> ticks[4];
+
+    // This signal controls of the location of the exception vectors at reset    
+    slave port<Signal> vinithi[4];
+
+    // This signal disables FIQ mask in CPSR
+    slave port<Signal> cfgnmfi[4];
+
+    // This signal if for EE bit initialisation
+    slave port<Signal> cfgend[4];
+}
+

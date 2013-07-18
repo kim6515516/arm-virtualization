@@ -1,0 +1,349 @@
+#
+# nMakefile - DMADhrystone platform NMAKE makefile.
+#
+# Copyright 2012 ARM Limited.
+# All rights reserved.
+#
+
+# Common rules
+!include ..\..\Common\nMakefile.common
+
+# Specify objects and target(s) to build
+SRCS = ..\Source\*.cpp \
+	   ..\..\EVS_DMA\Source\master.cpp \
+	   ..\..\EVS_DMA\Source\pv_dma.cpp
+TARGET = EVS_DMADhrystone_Cortex-R5x1-A15x1.exe
+
+# Determine others...
+LIBPATHS=
+LIBS_rel_vs9_32=/LIBPATH:.\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs9_32) \
+	/LIBPATH:.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs9_32) \
+	scx-DMA-$(CONFIG_rel_vs9_32).lib scx-Dhrystone-$(CONFIG_rel_vs9_32).lib \
+	$(LIBS_common) \
+	DMA-$(CONFIG_rel_vs9_32).lib Dhrystone-$(CONFIG_rel_vs9_32).lib
+LIBS_dbg_vs9_32=/LIBPATH:.\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs9_32) \
+	/LIBPATH:.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs9_32) \
+	scx-DMA-$(CONFIG_dbg_vs9_32).lib scx-Dhrystone-$(CONFIG_dbg_vs9_32).lib \
+	$(LIBS_common) \
+	DMA-$(CONFIG_dbg_vs9_32).lib Dhrystone-$(CONFIG_dbg_vs9_32).lib
+LIBS_rel_vs9_64=/LIBPATH:.\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs9_64) \
+	/LIBPATH:.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs9_64) \
+	scx-DMA-$(CONFIG_rel_vs9_64).lib scx-Dhrystone-$(CONFIG_rel_vs9_64).lib \
+	$(LIBS_common) \
+	DMA-$(CONFIG_rel_vs9_64).lib Dhrystone-$(CONFIG_rel_vs9_64).lib
+LIBS_dbg_vs9_64=/LIBPATH:.\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs9_64) \
+	/LIBPATH:.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs9_64) \
+	scx-DMA-$(CONFIG_dbg_vs9_64).lib scx-Dhrystone-$(CONFIG_dbg_vs9_64).lib \
+	$(LIBS_common) \
+	DMA-$(CONFIG_dbg_vs9_64).lib Dhrystone-$(CONFIG_dbg_vs9_64).lib
+LIBS_rel_vs10_32=/LIBPATH:.\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs10_32) \
+	/LIBPATH:.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs10_32) \
+	scx-DMA-$(CONFIG_rel_vs10_32).lib scx-Dhrystone-$(CONFIG_rel_vs10_32).lib \
+	$(LIBS_common) \
+	DMA-$(CONFIG_rel_vs10_32).lib Dhrystone-$(CONFIG_rel_vs10_32).lib
+LIBS_dbg_vs10_32=/LIBPATH:.\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs10_32) \
+	/LIBPATH:.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs10_32) \
+	scx-DMA-$(CONFIG_dbg_vs10_32).lib scx-Dhrystone-$(CONFIG_dbg_vs10_32).lib \
+	$(LIBS_common) \
+	DMA-$(CONFIG_dbg_vs10_32).lib Dhrystone-$(CONFIG_dbg_vs10_32).lib
+LIBS_rel_vs10_64=/LIBPATH:.\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs10_64) \
+	/LIBPATH:.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs10_64) \
+	scx-DMA-$(CONFIG_rel_vs10_64).lib scx-Dhrystone-$(CONFIG_rel_vs10_64).lib \
+	$(LIBS_common) \
+	DMA-$(CONFIG_rel_vs10_64).lib Dhrystone-$(CONFIG_rel_vs10_64).lib
+LIBS_dbg_vs10_64=/LIBPATH:.\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs10_64) \
+	/LIBPATH:.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs10_64) \
+	scx-DMA-$(CONFIG_dbg_vs10_64).lib scx-Dhrystone-$(CONFIG_dbg_vs10_64).lib \
+	$(LIBS_common) \
+	DMA-$(CONFIG_dbg_vs10_64).lib Dhrystone-$(CONFIG_dbg_vs10_64).lib
+
+# Determine commands
+DMA_SIMGEN_CMD = "$(MAXCORE_HOME)\bin\simgen.exe" \
+				 -p ..\..\..\EVS_DMA\Build_Cortex-R5x1\EVS_DMA_Cortex-R5x1.sgproj \
+			 --num-build-cpus $(J) $(SIMGENFLAGS)
+DHRY_SIMGEN_CMD = "$(MAXCORE_HOME)\bin\simgen.exe" \
+				  -p ..\..\..\EVS_Dhrystone\Build_Cortex-A15x1\EVS_Dhrystone_Cortex-A15x1.sgproj \
+			 --num-build-cpus $(J) $(SIMGENFLAGS)
+CXX_CMD = $(CXX) /Fe$(TARGET) $(SRCS) /I..\..\EVS_DMA\Source
+CXX_CMD_rel_vs9_32=$(CXX_CMD) $(CXXFLAGS_rel_vs9_32) \
+				   /I.\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs9_32)\gen \
+				   /I.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs9_32)\gen \
+				   $(LDFLAGS_rel_vs9_32) $(LIBS_rel_vs9_32)
+CXX_CMD_dbg_vs9_32=$(CXX_CMD) $(CXXFLAGS_dbg_vs9_32) \
+				   /I.\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs9_32)\gen \
+				   /I.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs9_32)\gen \
+				   $(LDFLAGS_dbg_vs9_32) $(LIBS_dbg_vs9_32)
+CXX_CMD_rel_vs9_64=$(CXX_CMD) $(CXXFLAGS_rel_vs9_64) \
+				   /I.\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs9_64)\gen \
+				   /I.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs9_64)\gen \
+				   $(LDFLAGS_rel_vs9_64) $(LIBS_rel_vs9_64)
+CXX_CMD_dbg_vs9_64=$(CXX_CMD) $(CXXFLAGS_dbg_vs9_64) \
+				   /I.\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs9_64)\gen \
+				   /I.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs9_64)\gen \
+				   $(LDFLAGS_dbg_vs9_64) $(LIBS_dbg_vs9_64)
+CXX_CMD_rel_vs10_32=$(CXX_CMD) $(CXXFLAGS_rel_vs10_32) \
+				   /I.\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs10_32)\gen \
+				   /I.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs10_32)\gen \
+				   $(LDFLAGS_rel_vs10_32) $(LIBS_rel_vs10_32)
+CXX_CMD_dbg_vs10_32=$(CXX_CMD) $(CXXFLAGS_dbg_vs10_32) \
+				   /I.\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs10_32)\gen \
+				   /I.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs10_32)\gen \
+				   $(LDFLAGS_dbg_vs10_32) $(LIBS_dbg_vs10_32)
+CXX_CMD_rel_vs10_64=$(CXX_CMD) $(CXXFLAGS_rel_vs10_64) \
+				   /I.\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs10_64)\gen \
+				   /I.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs10_64)\gen \
+				   $(LDFLAGS_rel_vs10_64) $(LIBS_rel_vs10_64)
+CXX_CMD_dbg_vs10_64=$(CXX_CMD) $(CXXFLAGS_dbg_vs10_64) \
+				   /I.\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs10_64)\gen \
+				   /I.\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs10_64)\gen \
+				   $(LDFLAGS_dbg_vs10_64) $(LIBS_dbg_vs10_64)
+MT_CMD = mt -nologo -manifest $(TARGET).manifest -outputresource:$(TARGET);1
+DMA_DIR = .\EVS_DMA_Cortex-R5x1
+DHRY_DIR = .\EVS_Dhrystone_Cortex-A15x1
+
+# Local rules
+
+.SUFFIXES:
+
+$(DMA_DIR):
+	-mkdir $(DMA_DIR)
+
+$(DHRY_DIR):
+	-mkdir $(DHRY_DIR)
+
+rel_vs9_32: $(DMA_DIR) $(DHRY_DIR)
+	cd .\EVS_DMA_Cortex-R5x1
+	$(DMA_SIMGEN_CMD) --configuration $(CONFIG_rel_vs9_32) -b
+	cd ..\EVS_Dhrystone_Cortex-A15x1
+	$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_rel_vs9_32) -b
+	cd ..
+	copy .\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs9_32)\DMA-$(CONFIG_rel_vs9_32).dll .
+	copy .\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs9_32)\Dhrystone-$(CONFIG_rel_vs9_32).dll .
+	-mkdir $(CONFIG_rel_vs9_32) 2>nul
+	$(CXX_CMD_rel_vs9_32)
+	$(MT_CMD)
+	copy .\EVS_DMA_Cortex-R5x1\armctmodel.dll .
+	copy .\EVS_DMA_Cortex-R5x1\SDL.dll .
+	copy .\EVS_DMA_Cortex-R5x1\libMAXCOREInitSimulationEngine.2.dll .
+
+dbg_vs9_32: $(DMA_DIR) $(DHRY_DIR)
+	cd .\EVS_DMA_Cortex-R5x1
+	$(DMA_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs9_32) -b
+	cd ..\EVS_Dhrystone_Cortex-A15x1
+	$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs9_32) -b
+	cd ..
+	copy .\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs9_32)\DMA-$(CONFIG_dbg_vs9_32).dll .
+	copy .\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs9_32)\Dhrystone-$(CONFIG_dbg_vs9_32).dll .
+	-mkdir $(CONFIG_dbg_vs9_32) 2>nul
+	$(CXX_CMD_dbg_vs9_32)
+	$(MT_CMD)
+	copy .\EVS_DMA_Cortex-R5x1\armctmodel.dll .
+	copy .\EVS_DMA_Cortex-R5x1\SDL.dll .
+	copy .\EVS_DMA_Cortex-R5x1\libMAXCOREInitSimulationEngine.2.dll .
+
+rel_vs9_64: $(DMA_DIR) $(DHRY_DIR)
+	cd .\EVS_DMA_Cortex-R5x1
+	$(DMA_SIMGEN_CMD) --configuration $(CONFIG_rel_vs9_64) -b
+	cd ..\EVS_Dhrystone_Cortex-A15x1
+	$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_rel_vs9_64) -b
+	cd ..
+	copy .\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs9_64)\DMA-$(CONFIG_rel_vs9_64).dll .
+	copy .\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs9_64)\Dhrystone-$(CONFIG_rel_vs9_64).dll .
+	-mkdir $(CONFIG_rel_vs9_64) 2>nul
+	$(CXX_CMD_rel_vs9_64)
+	$(MT_CMD)
+	copy .\EVS_DMA_Cortex-R5x1\armctmodel.dll .
+	copy .\EVS_DMA_Cortex-R5x1\SDL.dll .
+	copy .\EVS_DMA_Cortex-R5x1\libMAXCOREInitSimulationEngine.2.dll .
+
+dbg_vs9_64: $(DMA_DIR) $(DHRY_DIR)
+	cd .\EVS_DMA_Cortex-R5x1
+	$(DMA_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs9_64) -b
+	cd ..\EVS_Dhrystone_Cortex-A15x1
+	$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs9_64) -b
+	cd ..
+	copy .\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs9_64)\DMA-$(CONFIG_dbg_vs9_64).dll .
+	copy .\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs9_64)\Dhrystone-$(CONFIG_dbg_vs9_64).dll .
+	-mkdir $(CONFIG_dbg_vs9_64) 2>nul
+	$(CXX_CMD_dbg_vs9_64)
+	$(MT_CMD)
+	copy .\EVS_DMA_Cortex-R5x1\armctmodel.dll .
+	copy .\EVS_DMA_Cortex-R5x1\SDL.dll .
+	copy .\EVS_DMA_Cortex-R5x1\libMAXCOREInitSimulationEngine.2.dll .
+
+rel_vs10_32: $(DMA_DIR) $(DHRY_DIR)
+	cd .\EVS_DMA_Cortex-R5x1
+	$(DMA_SIMGEN_CMD) --configuration $(CONFIG_rel_vs10_32) -b
+	cd ..\EVS_Dhrystone_Cortex-A15x1
+	$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_rel_vs10_32) -b
+	cd ..
+	copy .\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs10_32)\DMA-$(CONFIG_rel_vs10_32).dll .
+	copy .\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs10_32)\Dhrystone-$(CONFIG_rel_vs10_32).dll .
+	-mkdir $(CONFIG_rel_vs10_32) 2>nul
+	$(CXX_CMD_rel_vs10_32)
+	copy .\EVS_DMA_Cortex-R5x1\armctmodel.dll .
+	copy .\EVS_DMA_Cortex-R5x1\SDL.dll .
+	copy .\EVS_DMA_Cortex-R5x1\libMAXCOREInitSimulationEngine.2.dll .
+
+dbg_vs10_32: $(DMA_DIR) $(DHRY_DIR)
+	cd .\EVS_DMA_Cortex-R5x1
+	$(DMA_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs10_32) -b
+	cd ..\EVS_Dhrystone_Cortex-A15x1
+	$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs10_32) -b
+	cd ..
+	copy .\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs10_32)\DMA-$(CONFIG_dbg_vs10_32).dll .
+	copy .\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs10_32)\Dhrystone-$(CONFIG_dbg_vs10_32).dll .
+	-mkdir $(CONFIG_dbg_vs10_32) 2>nul
+	$(CXX_CMD_dbg_vs10_32)
+	copy .\EVS_DMA_Cortex-R5x1\armctmodel.dll .
+	copy .\EVS_DMA_Cortex-R5x1\SDL.dll .
+	copy .\EVS_DMA_Cortex-R5x1\libMAXCOREInitSimulationEngine.2.dll .
+
+rel_vs10_64: $(DMA_DIR) $(DHRY_DIR)
+	cd .\EVS_DMA_Cortex-R5x1
+	$(DMA_SIMGEN_CMD) --configuration $(CONFIG_rel_vs10_64) -b
+	cd ..\EVS_Dhrystone_Cortex-A15x1
+	$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_rel_vs10_64) -b
+	cd ..
+	copy .\EVS_DMA_Cortex-R5x1\$(CONFIG_rel_vs10_64)\DMA-$(CONFIG_rel_vs10_64).dll .
+	copy .\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_rel_vs10_64)\Dhrystone-$(CONFIG_rel_vs10_64).dll .
+	-mkdir $(CONFIG_rel_vs10_64) 2>nul
+	$(CXX_CMD_rel_vs10_64)
+	copy .\EVS_DMA_Cortex-R5x1\armctmodel.dll .
+	copy .\EVS_DMA_Cortex-R5x1\SDL.dll .
+	copy .\EVS_DMA_Cortex-R5x1\libMAXCOREInitSimulationEngine.2.dll .
+
+dbg_vs10_64: $(DMA_DIR) $(DHRY_DIR)
+	cd .\EVS_DMA_Cortex-R5x1
+	$(DMA_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs10_64) -b
+	cd ..\EVS_Dhrystone_Cortex-A15x1
+	$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs10_64) -b
+	cd ..
+	copy .\EVS_DMA_Cortex-R5x1\$(CONFIG_dbg_vs10_64)\DMA-$(CONFIG_dbg_vs10_64).dll .
+	copy .\EVS_Dhrystone_Cortex-A15x1\$(CONFIG_dbg_vs10_64)\Dhrystone-$(CONFIG_dbg_vs10_64).dll .
+	-mkdir $(CONFIG_dbg_vs10_64) 2>nul
+	$(CXX_CMD_dbg_vs10_64)
+	copy .\EVS_DMA_Cortex-R5x1\armctmodel.dll .
+	copy .\EVS_DMA_Cortex-R5x1\SDL.dll .
+	copy .\EVS_DMA_Cortex-R5x1\libMAXCOREInitSimulationEngine.2.dll .
+
+rel_vs8_32_clean: $(DMA_DIR) $(DHRY_DIR)
+	-$(DMA_SIMGEN_CMD) --configuration $(CONFIG_rel_vs8_32) --clean
+	-$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_rel_vs8_32) --clean
+	-del /f $(TARGET) 2>nul
+	-del /f $(TARGET).manifest 2>nul
+	-rmdir /s /q $(CONFIG_rel_vs8_32) 2>nul
+	-del /f DMA-$(CONFIG_rel_vs8_32).dll 2>nul
+	-del /f Dhrystone-$(CONFIG_rel_vs8_32).dll 2>nul
+	-del /f ./armctmodel.dll 2>nul
+	-del /f ./SDL.dll 2>nul
+	-del /f ./libMAXCOREInitSimulationEngine.2.dll 2>nul
+
+dbg_vs8_32_clean: $(DMA_DIR) $(DHRY_DIR)
+	-$(DMA_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs8_32) --clean
+	-$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs8_32) --clean
+	-del /f $(TARGET) 2>nul
+	-del /f $(TARGET).manifest 2>nul
+	-rmdir /s /q $(CONFIG_dbg_vs8_32) 2>nul
+	-del /f DMA-$(CONFIG_dbg_vs8_32).dll 2>nul
+	-del /f Dhrystone-$(CONFIG_dbg_vs8_32).dll 2>nul
+	-del /f ./armctmodel.dll 2>nul
+	-del /f ./SDL.dll 2>nul
+	-del /f ./libMAXCOREInitSimulationEngine.2.dll 2>nul
+
+rel_vs9_32_clean: $(DMA_DIR) $(DHRY_DIR)
+	-$(DMA_SIMGEN_CMD) --configuration $(CONFIG_rel_vs9_32) --clean
+	-$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_rel_vs9_32) --clean
+	-del /f $(TARGET) 2>nul
+	-del /f $(TARGET).manifest 2>nul
+	-rmdir /s /q $(CONFIG_rel_vs9_32) 2>nul
+	-del /f DMA-$(CONFIG_rel_vs9_32).dll 2>nul
+	-del /f Dhrystone-$(CONFIG_rel_vs9_32).dll 2>nul
+	-del /f ./armctmodel.dll 2>nul
+	-del /f ./SDL.dll 2>nul
+	-del /f ./libMAXCOREInitSimulationEngine.2.dll 2>nul
+
+dbg_vs9_32_clean: $(DMA_DIR) $(DHRY_DIR)
+	-$(DMA_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs9_32) --clean
+	-$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs9_32) --clean
+	-del /f $(TARGET) 2>nul
+	-del /f $(TARGET).manifest 2>nul
+	-rmdir /s /q $(CONFIG_dbg_vs9_32) 2>nul
+	-del /f DMA-$(CONFIG_dbg_vs9_32).dll 2>nul
+	-del /f Dhrystone-$(CONFIG_dbg_vs9_32).dll 2>nul
+	-del /f ./armctmodel.dll 2>nul
+	-del /f ./SDL.dll 2>nul
+	-del /f ./libMAXCOREInitSimulationEngine.2.dll 2>nul
+
+rel_vs9_64_clean: $(DMA_DIR) $(DHRY_DIR)
+	-$(DMA_SIMGEN_CMD) --configuration $(CONFIG_rel_vs9_64) --clean
+	-$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_rel_vs9_64) --clean
+	-del /f $(TARGET) 2>nul
+	-del /f $(TARGET).manifest 2>nul
+	-rmdir /s /q $(CONFIG_rel_vs9_64) 2>nul
+	-del /f DMA-$(CONFIG_rel_vs9_64).dll 2>nul
+	-del /f Dhrystone-$(CONFIG_rel_vs9_64).dll 2>nul
+	-del /f ./armctmodel.dll 2>nul
+	-del /f ./SDL.dll 2>nul
+	-del /f ./libMAXCOREInitSimulationEngine.2.dll 2>nul
+
+dbg_vs9_64_clean: $(DMA_DIR) $(DHRY_DIR)
+	-$(DMA_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs9_64) --clean
+	-$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs9_64) --clean
+	-del /f $(TARGET) 2>nul
+	-del /f $(TARGET).manifest 2>nul
+	-rmdir /s /q $(CONFIG_dbg_vs9_64) 2>nul
+	-del /f DMA-$(CONFIG_dbg_vs9_64).dll 2>nul
+	-del /f Dhrystone-$(CONFIG_dbg_vs9_64).dll 2>nul
+	-del /f ./armctmodel.dll 2>nul
+	-del /f ./SDL.dll 2>nul
+	-del /f ./libMAXCOREInitSimulationEngine.2.dll 2>nul
+
+rel_vs10_32_clean: $(DMA_DIR) $(DHRY_DIR)
+	-$(DMA_SIMGEN_CMD) --configuration $(CONFIG_rel_vs10_32) --clean
+	-$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_rel_vs10_32) --clean
+	-del /f $(TARGET) 2>nul
+	-del /f $(TARGET).manifest 2>nul
+	-rmdir /s /q $(CONFIG_rel_vs10_32) 2>nul
+	-del /f DMA-$(CONFIG_rel_vs10_32).dll 2>nul
+	-del /f Dhrystone-$(CONFIG_rel_vs10_32).dll 2>nul
+	-del /f ./armctmodel.dll 2>nul
+	-del /f ./SDL.dll 2>nul
+	-del /f ./libMAXCOREInitSimulationEngine.2.dll 2>nul
+
+dbg_vs10_32_clean: $(DMA_DIR) $(DHRY_DIR)
+	-$(DMA_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs10_32) --clean
+	-$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs10_32) --clean
+	-del /f $(TARGET) 2>nul
+	-del /f $(TARGET).manifest 2>nul
+	-rmdir /s /q $(CONFIG_dbg_vs10_32) 2>nul
+	-del /f DMA-$(CONFIG_dbg_vs10_32).dll 2>nul
+	-del /f Dhrystone-$(CONFIG_dbg_vs10_32).dll 2>nul
+	-del /f ./armctmodel.dll 2>nul
+	-del /f ./SDL.dll 2>nul
+	-del /f ./libMAXCOREInitSimulationEngine.2.dll 2>nul
+
+rel_vs10_64_clean: $(DMA_DIR) $(DHRY_DIR)
+	-$(DMA_SIMGEN_CMD) --configuration $(CONFIG_rel_vs10_64) --clean
+	-$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_rel_vs10_64) --clean
+	-del /f $(TARGET) 2>nul
+	-del /f $(TARGET).manifest 2>nul
+	-rmdir /s /q $(CONFIG_rel_vs10_64) 2>nul
+	-del /f DMA-$(CONFIG_rel_vs10_64).dll 2>nul
+	-del /f Dhrystone-$(CONFIG_rel_vs10_64).dll 2>nul
+	-del /f ./armctmodel.dll 2>nul
+	-del /f ./SDL.dll 2>nul
+	-del /f ./libMAXCOREInitSimulationEngine.2.dll 2>nul
+
+dbg_vs10_64_clean: $(DMA_DIR) $(DHRY_DIR)
+	-$(DMA_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs10_64) --clean
+	-$(DHRY_SIMGEN_CMD) --configuration $(CONFIG_dbg_vs10_64) --clean
+	-del /f $(TARGET) 2>nul
+	-del /f $(TARGET).manifest 2>nul
+	-rmdir /s /q $(CONFIG_dbg_vs10_64) 2>nul
+	-del /f DMA-$(CONFIG_dbg_vs10_64).dll 2>nul
+	-del /f Dhrystone-$(CONFIG_dbg_vs10_64).dll 2>nul
+	-del /f ./armctmodel.dll 2>nul
+	-del /f ./SDL.dll 2>nul
+	-del /f ./libMAXCOREInitSimulationEngine.2.dll 2>nul
+

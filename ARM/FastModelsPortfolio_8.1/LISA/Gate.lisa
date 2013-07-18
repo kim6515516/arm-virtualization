@@ -1,0 +1,119 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component OrGate
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Or Gate";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    resources
+    {
+        sg::Signal::State input_state[2];
+        sg::Signal::State output_state;
+    }
+  
+    master port<Signal> output;
+  
+    slave port<Signal> input[2]
+    {
+        behaviour setValue(unsigned int index, sg::Signal::State state)
+        {
+            if (input_state[index] != state)
+            {
+                input_state[index] = state;
+                
+                sg::Signal::State new_output_state = calculate();
+                
+                if (output_state != new_output_state)
+                {
+                    output_state = new_output_state;
+                    
+                    if (output.setValue.implemented())
+                        output.setValue(output_state);
+                }
+            }
+        }
+    }
+    
+    behaviour calculate() : sg::Signal::State
+    {
+        for (int i=0; i<2; ++i)
+        {
+            if (input_state[i] == sg::Signal::Set)
+                return sg::Signal::Set;
+        }
+        return sg::Signal::Clear;
+    }
+    
+    behaviour init()
+    {
+        for (int i=0; i<2; ++i)
+            input_state[i] = sg::Signal::Clear;
+            
+        output_state = sg::Signal::Clear;
+    }
+    
+}
+
+component AndGate
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Other";
+        description = "And Gate";
+    }
+
+    resources
+    {
+        sg::Signal::State input_state[2];
+        sg::Signal::State output_state;
+    }
+  
+    master port<Signal> output;
+  
+    slave port<Signal> input[2]
+    {
+        behaviour setValue(unsigned int index, sg::Signal::State state)
+        {
+            if (input_state[index] != state)
+            {
+                input_state[index] = state;
+                
+                sg::Signal::State new_output_state = calculate();
+                
+                if (output_state != new_output_state)
+                {
+                    output_state = new_output_state;
+                    
+                    if (output.setValue.implemented())
+                        output.setValue(output_state);
+                }
+            }
+        }
+    }
+    
+    behaviour calculate() : sg::Signal::State
+    {
+        for (int i=0; i<2; ++i)
+        {
+            if (input_state[i] == sg::Signal::Clear)
+                return sg::Signal::Clear;
+        }
+        return sg::Signal::Set;
+    }
+    
+    behaviour init()
+    {
+        for (int i=0; i<2; ++i)
+            input_state[i] = sg::Signal::Clear;
+            
+        output_state = sg::Signal::Clear;
+    }
+}

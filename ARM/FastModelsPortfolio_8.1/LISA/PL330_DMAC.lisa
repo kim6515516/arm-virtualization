@@ -1,0 +1,927 @@
+/*!
+ * \file    PL330_DMAC.lisa
+ * \brief   LISA Implementation of PL330 DMA controller
+ * \date    Copyright 2007-2008 ARM Limited. All rights reserved.
+ */
+
+/*
+ * See DDI0424C_dma330_r1p1_trm.pdf for detailed documentation on the organisation and
+ * use of the PL330 DMA controller
+ *
+ * Implementation details:
+ *
+ *  The DMA controller is modelled using a single LISA component but with a C++ model for
+ *  each of the channels (included in this file)
+ *
+ *  enabled channels are kept on an enabled_channels stack in priority order. When a channel
+ *  state changes, rearbitration takes place to make the highest (topmost) channel active
+ *
+ *  The fifo storage (not the same as the fifo depth) is made large enough that
+ *  it doesn't need to wrap during a burst.
+ *
+ * Functional differences:
+ *
+ *  Bus width is assumed to be 32bits
+ *
+ *  DMA protection/access bits are currently ignored (priv/bufferable/cacheable)
+ *
+ *  Locked accesses are not supported
+ *
+ *  Requests will only be routed to the most recently activated channel configured for a port
+ *  rathen than to all channels configured for that port
+ *
+ *  Responses will be sent only from the currently active channel.
+ *
+ *  Handshaking is handled slightly differently to hardware
+ *      dmac responses are transient and only asserted during the call, not set and cleared
+ *      peripherals do not need to lower their request signals during a response
+ *      dmac clr may be globally disabled to reduce handshaking traffic
+ *
+ *  The model is timing inaccurate but makes some attempt to regulate DMA flow to avoid
+ *  starving other components in the model. Transfers are performed in batches of transactions
+ *  up to a configurable number of transactions per batch. The model then sleeps for an
+ *  equivalent number of cycles of the clock to limit the average transaction rate. This
+ *  behaviour may cause problems in some systems that require a more regulated flow control.
+ *  Reducing the maximum transactions per batch will help but will increase simulation cost.
+ *
+ *  Channels 6 and 7 are currently treated no differently to other channels
+ *
+ *  Changes to master endianness do not immediately affect enabled channels.
+ *
+ */
+
+protocol PL330CppToLISA
+{
+    behavior message_printer( uint32_t type_, std::string text_ );
+    behavior wakeup_in_ticks( unsigned ticks_ );
+    behavior cancel_wakeup_timer();
+    behavior update_abort( bool state_ );
+    behavior update_irq( unsigned index, bool state_ );
+}
+ 
+component PL330_DMAC
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell DMA Controller(PL330)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #include <pv/PVBusMaster.h>
+        #include <queue>
+#include "components/PL330_DMAC.h"
+#include "sg/SGComponentTraceHelper.h"
+    }
+
+    internal port<PL330CppToLISA> cpp_to_lisa
+    {
+        behaviour message_printer( uint32_t type_, std::string text_ )
+        {
+            uint32_t type;
+            
+            switch( fs_pl330::message_level_t(type_) )
+            {
+            case fs_pl330::MSG_WARNING:
+                type = MSG_WARNING;
+                break;
+            case fs_pl330::MSG_ERROR:
+                type = MSG_ERROR;
+                break;
+            case fs_pl330::MSG_DEBUG:
+                type = MSG_DEBUG;
+                break;
+            case fs_pl330::MSG_INFO:
+                type = MSG_INFO;
+                break;
+            case fs_pl330::MSG_FATAL_ERROR:
+                type = MSG_FATAL_ERROR;
+                break;
+            default:
+                assert( 0 );
+                return;
+            }
+            
+            message( type, "%s", text_.c_str() );
+        }
+        
+        behavior wakeup_in_ticks( unsigned ticks_ )
+        {
+            timer.timer_control.set( ticks_ );
+        }
+        
+        behavior cancel_wakeup_timer()
+        {
+            timer.timer_control.cancel();
+        }
+        
+        behaviour update_abort( bool state_ )
+        {
+            irq_abort_master_port.setValue( state_ ? sg::Signal::Set : sg::Signal::Clear );
+        }
+        
+        behaviour update_irq( unsigned index_, bool state_ )
+        {
+            irq_master_port[index_].setValue( state_ ? sg::Signal::Set : sg::Signal::Clear );
+        }
+    }
+    
+    composition
+    {
+        // slave for publising our registers
+
+        busslave : PVBusSlave(size = 0x1000);
+        busslave_ns : PVBusSlave(size = 0x1000);
+
+        // masters for accessing devices and memory
+
+        busmaster : PVBusMaster;
+
+        // timer for controlling activity rate
+
+        timer : ClockTimer;
+    }
+
+    resources
+    {
+        PARAMETER { description("Channel FIFO size in bytes"), type(uint32_t), default(16) }  fifo_size;
+        PARAMETER { description("Largest atomic transfer"), type(uint32_t), default(256) } max_transfer;
+        PARAMETER { description("Generate clear response"), type(bool), default(false) } generate_clear;
+        PARAMETER { description("request delay"), type(uint32_t), default(0), runtime(true) } activate_delay;
+        PARAMETER { name("revision"), description("revision ID"), type(string), default("r0p0") } revision_string;
+
+        PARAMETER { description("number of interrupts"            ), min(0), max(32), default(32)     , runtime(false), type(uint32_t) } p_max_irqs;
+        PARAMETER { description("buffer depth"                    ), default(16)    , runtime(false), type(uint32_t) } p_buffer_depth;
+        PARAMETER { description("LSQ read buffer depth"           ), default(4)     , runtime(false), type(uint32_t) } p_lsq_read_size;
+        PARAMETER { description("LSQ write buffer depth"          ), default(4)     , runtime(false), type(uint32_t) } p_lsq_write_size;
+        PARAMETER { description("AXI read issuing capability"     ), default(1)     , runtime(false), type(uint32_t) } p_read_issuing_capability;
+        PARAMETER { description("AXI write issuing capability"    ), default(1)     , runtime(false), type(uint32_t) } p_write_issuing_capability;
+        PARAMETER { description("AXI bus width"                   ), min(32), max(128), default(32) , runtime(false), type(uint32_t) } p_axi_bus_width_param;
+        PARAMETER { description("number of words in a cache line" ), default(1)     , runtime(false), type(uint32_t) } p_cache_line_words;
+        PARAMETER { description("number of cache lines"           ), default(1)     , runtime(false), type(uint32_t) } p_cache_lines;
+        PARAMETER { description("virtual channels"                ), default(8)     , runtime(false), type(uint32_t) } p_max_channels;
+        PARAMETER { description("Controller non-secure at reset (boot_manager_ns)"  ), default(false) , runtime(true ), type(bool)     } p_controller_nsecure;
+        PARAMETER { description("Interrupts non-secure at reset"  ), default(false) , runtime(true ), type(bool)     } p_irq_nsecure;
+        PARAMETER { description("Peripherals non-secure at reset" ), default(false) , runtime(true ), type(bool)     } p_periph_nsecure;
+        PARAMETER { description("DMA boots from reset"            ), default(true) , runtime(true ), type(bool)     } p_controller_boots;
+        PARAMETER { description("DMA PC at reset"                 ), default(0x60000000), runtime(true ), type(uint32_t) } p_reset_pc;
+//        PARAMETER { description("apbs Base Address"               ), default(0x00000000), runtime(false), type(uint32_t) } p_apbs_base;
+//        PARAMETER { description("apbns Base Address"              ), default(0x00001000), runtime(false), type(uint32_t) } p_apbns_base;
+        PARAMETER { description("number of peripheral interfaces" ), default(32)    , runtime(false), type(uint32_t) } p_max_periph;
+        PARAMETER { description("Peripheral 0 request acceptance" ), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_0;
+        PARAMETER { description("Peripheral 1 request acceptance" ), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_1;
+        PARAMETER { description("Peripheral 2 request acceptance" ), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_2;
+        PARAMETER { description("Peripheral 3 request acceptance" ), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_3;
+        PARAMETER { description("Peripheral 4 request acceptance" ), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_4;
+        PARAMETER { description("Peripheral 5 request acceptance" ), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_5;
+        PARAMETER { description("Peripheral 6 request acceptance" ), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_6;
+        PARAMETER { description("Peripheral 7 request acceptance" ), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_7;
+        PARAMETER { description("Peripheral 8 request acceptance" ), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_8;
+        PARAMETER { description("Peripheral 9 request acceptance" ), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_9;
+        PARAMETER { description("Peripheral 10 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_10;
+        PARAMETER { description("Peripheral 11 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_11;
+        PARAMETER { description("Peripheral 12 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_12;
+        PARAMETER { description("Peripheral 13 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_13;
+        PARAMETER { description("Peripheral 14 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_14;
+        PARAMETER { description("Peripheral 15 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_15;
+        PARAMETER { description("Peripheral 16 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_16;
+        PARAMETER { description("Peripheral 17 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_17;
+        PARAMETER { description("Peripheral 18 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_18;
+        PARAMETER { description("Peripheral 19 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_19;
+        PARAMETER { description("Peripheral 20 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_20;
+        PARAMETER { description("Peripheral 21 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_21;
+        PARAMETER { description("Peripheral 22 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_22;
+        PARAMETER { description("Peripheral 23 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_23;
+        PARAMETER { description("Peripheral 24 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_24;
+        PARAMETER { description("Peripheral 25 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_25;
+        PARAMETER { description("Peripheral 26 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_26;
+        PARAMETER { description("Peripheral 27 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_27;
+        PARAMETER { description("Peripheral 28 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_28;
+        PARAMETER { description("Peripheral 29 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_29;
+        PARAMETER { description("Peripheral 30 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_30;
+        PARAMETER { description("Peripheral 31 request acceptance"), default(2)     , runtime(false), type(uint32_t) } p_perip_request_acceptance_31;
+        
+        // Registers as visible in the debugger
+        REGISTER { description("DS"       ),read_function(debug_read), write_function(debug_write), reg_number(0x000) } DS;
+        REGISTER { description("DPC"      ),read_function(debug_read), write_function(debug_write), reg_number(0x004), is_program_counter(true) } DPC;
+        REGISTER { description("INTEN"    ),read_function(debug_read), write_function(debug_write), reg_number(0x020) } INTEN;
+        REGISTER { description("ES"       ),read_function(debug_read), write_function(debug_write), reg_number(0x024) } ES;
+        REGISTER { description("INTSTATUS"),read_function(debug_read), write_function(debug_write), reg_number(0x028) } INTSTATUS;
+        REGISTER { description("INTCLR"   ),read_function(debug_read), write_function(debug_write), reg_number(0x02c) } INTCLR;
+        REGISTER { description("FSM"      ),read_function(debug_read), write_function(debug_write), reg_number(0x030) } FSM;
+        REGISTER { description("FSC"      ),read_function(debug_read), write_function(debug_write), reg_number(0x034) } FSC;
+        REGISTER { description("FTM"      ),read_function(debug_read), write_function(debug_write), reg_number(0x038) } FTM;
+
+        REGISTER { description("FTC0"),   read_function(debug_read), write_function(debug_write), reg_number(0x040) } FTC0;
+        REGISTER { description("FTC1"),   read_function(debug_read), write_function(debug_write), reg_number(0x044) } FTC1;
+        REGISTER { description("FTC2"),   read_function(debug_read), write_function(debug_write), reg_number(0x048) } FTC2;
+        REGISTER { description("FTC3"),   read_function(debug_read), write_function(debug_write), reg_number(0x04C) } FTC3;
+        REGISTER { description("FTC4"),   read_function(debug_read), write_function(debug_write), reg_number(0x050) } FTC4;
+        REGISTER { description("FTC5"),   read_function(debug_read), write_function(debug_write), reg_number(0x054) } FTC5;
+        REGISTER { description("FTC6"),   read_function(debug_read), write_function(debug_write), reg_number(0x058) } FTC6;
+        REGISTER { description("FTC7"),   read_function(debug_read), write_function(debug_write), reg_number(0x05C) } FTC7;
+
+        REGISTER { description("CS0"),   read_function(debug_read), write_function(debug_write), reg_number(0x100) } CS0;
+        REGISTER { description("CS1"),   read_function(debug_read), write_function(debug_write), reg_number(0x108) } CS1;
+        REGISTER { description("CS2"),   read_function(debug_read), write_function(debug_write), reg_number(0x110) } CS2;
+        REGISTER { description("CS3"),   read_function(debug_read), write_function(debug_write), reg_number(0x118) } CS3;
+        REGISTER { description("CS4"),   read_function(debug_read), write_function(debug_write), reg_number(0x120) } CS4;
+        REGISTER { description("CS5"),   read_function(debug_read), write_function(debug_write), reg_number(0x128) } CS5;
+        REGISTER { description("CS6"),   read_function(debug_read), write_function(debug_write), reg_number(0x130) } CS6;
+        REGISTER { description("CS7"),   read_function(debug_read), write_function(debug_write), reg_number(0x138) } CS7;
+
+        REGISTER { description("CPC0"),   read_function(debug_read), write_function(debug_write), reg_number(0x104) } CPC0;
+        REGISTER { description("CPC1"),   read_function(debug_read), write_function(debug_write), reg_number(0x10C) } CPC1;
+        REGISTER { description("CPC2"),   read_function(debug_read), write_function(debug_write), reg_number(0x114) } CPC2;
+        REGISTER { description("CPC3"),   read_function(debug_read), write_function(debug_write), reg_number(0x11C) } CPC3;
+        REGISTER { description("CPC4"),   read_function(debug_read), write_function(debug_write), reg_number(0x124) } CPC4;
+        REGISTER { description("CPC5"),   read_function(debug_read), write_function(debug_write), reg_number(0x12C) } CPC5;
+        REGISTER { description("CPC6"),   read_function(debug_read), write_function(debug_write), reg_number(0x134) } CPC6;
+        REGISTER { description("CPC7"),   read_function(debug_read), write_function(debug_write), reg_number(0x13C) } CPC7;
+
+        REGISTER { description("SA_0"),   read_function(debug_read), write_function(debug_write), reg_number(0x400) } SA_0;
+        REGISTER { description("SA_1"),   read_function(debug_read), write_function(debug_write), reg_number(0x420) } SA_1;
+        REGISTER { description("SA_2"),   read_function(debug_read), write_function(debug_write), reg_number(0x440) } SA_2;
+        REGISTER { description("SA_3"),   read_function(debug_read), write_function(debug_write), reg_number(0x460) } SA_3;
+        REGISTER { description("SA_4"),   read_function(debug_read), write_function(debug_write), reg_number(0x480) } SA_4;
+        REGISTER { description("SA_5"),   read_function(debug_read), write_function(debug_write), reg_number(0x4A0) } SA_5;
+        REGISTER { description("SA_6"),   read_function(debug_read), write_function(debug_write), reg_number(0x4C0) } SA_6;
+        REGISTER { description("SA_7"),   read_function(debug_read), write_function(debug_write), reg_number(0x4E0) } SA_7;
+
+        REGISTER { description("DA_0"),   read_function(debug_read), write_function(debug_write), reg_number(0x404) } DA_0;
+        REGISTER { description("DA_1"),   read_function(debug_read), write_function(debug_write), reg_number(0x424) } DA_1;
+        REGISTER { description("DA_2"),   read_function(debug_read), write_function(debug_write), reg_number(0x444) } DA_2;
+        REGISTER { description("DA_3"),   read_function(debug_read), write_function(debug_write), reg_number(0x464) } DA_3;
+        REGISTER { description("DA_4"),   read_function(debug_read), write_function(debug_write), reg_number(0x484) } DA_4;
+        REGISTER { description("DA_5"),   read_function(debug_read), write_function(debug_write), reg_number(0x4A4) } DA_5;
+        REGISTER { description("DA_6"),   read_function(debug_read), write_function(debug_write), reg_number(0x4C4) } DA_6;
+        REGISTER { description("DA_7"),   read_function(debug_read), write_function(debug_write), reg_number(0x4E4) } DA_7;
+
+        REGISTER { description("CC_0"),   read_function(debug_read), write_function(debug_write), reg_number(0x408) } CC_0;
+        REGISTER { description("CC_1"),   read_function(debug_read), write_function(debug_write), reg_number(0x428) } CC_1;
+        REGISTER { description("CC_2"),   read_function(debug_read), write_function(debug_write), reg_number(0x448) } CC_2;
+        REGISTER { description("CC_3"),   read_function(debug_read), write_function(debug_write), reg_number(0x468) } CC_3;
+        REGISTER { description("CC_4"),   read_function(debug_read), write_function(debug_write), reg_number(0x488) } CC_4;
+        REGISTER { description("CC_5"),   read_function(debug_read), write_function(debug_write), reg_number(0x4A8) } CC_5;
+        REGISTER { description("CC_6"),   read_function(debug_read), write_function(debug_write), reg_number(0x4C8) } CC_6;
+        REGISTER { description("CC_7"),   read_function(debug_read), write_function(debug_write), reg_number(0x4E8) } CC_7;
+
+        REGISTER { description("LC0_0"),   read_function(debug_read), write_function(debug_write), reg_number(0x40C) } LC0_0;
+        REGISTER { description("LC0_1"),   read_function(debug_read), write_function(debug_write), reg_number(0x42C) } LC0_1;
+        REGISTER { description("LC0_2"),   read_function(debug_read), write_function(debug_write), reg_number(0x44C) } LC0_2;
+        REGISTER { description("LC0_3"),   read_function(debug_read), write_function(debug_write), reg_number(0x46C) } LC0_3;
+        REGISTER { description("LC0_4"),   read_function(debug_read), write_function(debug_write), reg_number(0x48C) } LC0_4;
+        REGISTER { description("LC0_5"),   read_function(debug_read), write_function(debug_write), reg_number(0x4AC) } LC0_5;
+        REGISTER { description("LC0_6"),   read_function(debug_read), write_function(debug_write), reg_number(0x4CC) } LC0_6;
+        REGISTER { description("LC0_7"),   read_function(debug_read), write_function(debug_write), reg_number(0x4EC) } LC0_7;
+
+        REGISTER { description("LC1_0"),   read_function(debug_read), write_function(debug_write), reg_number(0x410) } LC1_0;
+        REGISTER { description("LC1_1"),   read_function(debug_read), write_function(debug_write), reg_number(0x430) } LC1_1;
+        REGISTER { description("LC1_2"),   read_function(debug_read), write_function(debug_write), reg_number(0x450) } LC1_2;
+        REGISTER { description("LC1_3"),   read_function(debug_read), write_function(debug_write), reg_number(0x470) } LC1_3;
+        REGISTER { description("LC1_4"),   read_function(debug_read), write_function(debug_write), reg_number(0x490) } LC1_4;
+        REGISTER { description("LC1_5"),   read_function(debug_read), write_function(debug_write), reg_number(0x4B0) } LC1_5;
+        REGISTER { description("LC1_6"),   read_function(debug_read), write_function(debug_write), reg_number(0x4D0) } LC1_6;
+        REGISTER { description("LC1_7"),   read_function(debug_read), write_function(debug_write), reg_number(0x4F0) } LC1_7;
+
+        REGISTER { description("DBGSTATUS"),read_function(debug_read), write_function(debug_write), reg_number(0xD00) } DBGSTATUS;
+        REGISTER { description("DBGCMD"   ),read_function(debug_read), write_function(debug_write), reg_number(0xD04) } DBGCMD;
+        REGISTER { description("DBGINST0" ),read_function(debug_read), write_function(debug_write), reg_number(0xD08) } DBGINST0;
+        REGISTER { description("DBGINST1" ),read_function(debug_read), write_function(debug_write), reg_number(0xD0C) } DBGINST1;
+
+        REGISTER { description("periph_id_0"),read_function(debug_read), write_function(debug_write), reg_number(0xFE0) } periph_id_0;
+        REGISTER { description("periph_id_1"),read_function(debug_read), write_function(debug_write), reg_number(0xFE4) } periph_id_1;
+        REGISTER { description("periph_id_2"),read_function(debug_read), write_function(debug_write), reg_number(0xFE8) } periph_id_2;
+        REGISTER { description("periph_id_3"),read_function(debug_read), write_function(debug_write), reg_number(0xFEC) } periph_id_3;
+
+        REGISTER { description("pcell_id_0"),read_function(debug_read), write_function(debug_write), reg_number(0xFF0) } pcell_id_0;
+        REGISTER { description("pcell_id_1"),read_function(debug_read), write_function(debug_write), reg_number(0xFF4) } pcell_id_1;
+        REGISTER { description("pcell_id_2"),read_function(debug_read), write_function(debug_write), reg_number(0xFF8) } pcell_id_2;
+        REGISTER { description("pcell_id_3"),read_function(debug_read), write_function(debug_write), reg_number(0xFFC) } pcell_id_3;
+
+
+        // PL330 has a 32 bit output address bus.
+        MEMORY { mau_size(8),
+                description( "Secure view of memory" ),
+                supported_multiples_of_mau( "1,2,4,8" ),
+                space_id(0), // 0 we will define to be 'secure'
+                virtual(true), // don't allocate memory storage resources for this
+                read_function(dbg_read_mem), write_function(dbg_write_mem)   } s_mem[0x100000000];
+        MEMORY { mau_size(8),
+                description( "Non-secure view of memory" ),
+                supported_multiples_of_mau( "1,2,4,8" ),
+                space_id(1), // 1 we will define to be 'non-secure'
+                virtual(true), // don't allocate memory storage resources for this
+                read_function(dbg_read_mem), write_function(dbg_write_mem) } ns_mem[0x100000000];
+
+        fs_pl330::DMAC                         dmac;
+        pv::RandomContextTransactionGenerator* dbg_tg;
+
+
+#define REGISTER_OFFSETS                        \
+            (0x0,  "DSR")                       \
+            (0x4,  "DPC")                       \
+            (0x20,  "INTEN")                    \
+            (0x24,  "INT_EVENT_RIS")            \
+            (0x28,  "INTMIS")                   \
+            (0x2C,  "INTCLR")                   \
+            (0x30,  "FSRD")                     \
+            (0x34,  "FSRC")                     \
+            (0x38,  "FTRD")                     \
+            (0x40,  "FTR0")                     \
+            (0x44,  "FTR1")                     \
+            (0x48,  "FTR2")                     \
+            (0x4c,  "FTR3")                     \
+            (0x50,  "FTR4")                     \
+            (0x54,  "FTR5")                     \
+            (0x58,  "FTR6")                     \
+            (0x5C,  "FTR7")                     \
+            (0x100, "CSR0")                     \
+            (0x108, "CSR1")                     \
+            (0x110, "CSR2")                     \
+            (0x118, "CSR3")                     \
+            (0x120, "CSR4")                     \
+            (0x128, "CSR5")                     \
+            (0x130, "CSR6")                     \
+            (0x138, "CSR7")                     \
+            (0x100 + 4, "CPC0")                 \
+            (0x108 + 4, "CPC1")                 \
+            (0x110 + 4, "CPC2")                 \
+            (0x118 + 4, "CPC3")                 \
+            (0x120 + 4, "CPC4")                 \
+            (0x128 + 4, "CPC5")                 \
+            (0x130 + 4, "CPC6")                 \
+            (0x138 + 4, "CPC7")                 \
+                                                \
+            (0x400 + 0 * 0x20, "SAR0")          \
+            (0x400 + 1 * 0x20, "SAR1")          \
+            (0x400 + 2 * 0x20, "SAR2")          \
+            (0x400 + 3 * 0x20, "SAR3")          \
+            (0x400 + 4 * 0x20, "SAR4")          \
+            (0x400 + 5 * 0x20, "SAR5")          \
+            (0x400 + 6 * 0x20, "SAR6")          \
+            (0x400 + 7 * 0x20, "SAR7")          \
+                                                \
+            (0x404 + 0 * 0x20, "DAR0")          \
+            (0x404 + 1 * 0x20, "DAR1")          \
+            (0x404 + 2 * 0x20, "DAR2")          \
+            (0x404 + 3 * 0x20, "DAR3")          \
+            (0x404 + 4 * 0x20, "DAR4")          \
+            (0x404 + 5 * 0x20, "DAR5")          \
+            (0x404 + 6 * 0x20, "DAR6")          \
+            (0x404 + 7 * 0x20, "DAR7")          \
+                                                \
+            (0x408 + 0 * 0x20, "CCR0")          \
+            (0x408 + 1 * 0x20, "CCR1")          \
+            (0x408 + 2 * 0x20, "CCR2")          \
+            (0x408 + 3 * 0x20, "CCR3")          \
+            (0x408 + 4 * 0x20, "CCR4")          \
+            (0x408 + 5 * 0x20, "CCR5")          \
+            (0x408 + 6 * 0x20, "CCR6")          \
+            (0x408 + 7 * 0x20, "CCR7")          \
+                                                \
+            (0x40C + 0 * 0x20, "LC0_0")         \
+            (0x40C + 1 * 0x20, "LC0_1")         \
+            (0x40C + 2 * 0x20, "LC0_2")         \
+            (0x40C + 3 * 0x20, "LC0_3")         \
+            (0x40C + 4 * 0x20, "LC0_4")         \
+            (0x40C + 5 * 0x20, "LC0_5")         \
+            (0x40C + 6 * 0x20, "LC0_6")         \
+            (0x40C + 7 * 0x20, "LC0_7")         \
+                                                \
+            (0x410 + 0 * 0x20, "LC1_0")         \
+            (0x410 + 1 * 0x20, "LC1_1")         \
+            (0x410 + 2 * 0x20, "LC1_2")         \
+            (0x410 + 3 * 0x20, "LC1_3")         \
+            (0x410 + 4 * 0x20, "LC1_4")         \
+            (0x410 + 5 * 0x20, "LC1_5")         \
+            (0x410 + 6 * 0x20, "LC1_6")         \
+            (0x410 + 7 * 0x20, "LC1_7")         \
+                                                \
+            (0xD00, "DBGSTATUS")                \
+            (0xD04, "DBGCMD")                   \
+            (0xD08, "DBGINST0")                 \
+            (0xD0C, "DBGINST1")                 \
+                                                \
+            (0xE00, "CR0")                      \
+            (0xE04, "CR1")                      \
+            (0xE08, "CR2")                      \
+            (0xE0C, "CR3")                      \
+            (0xE10, "CR4")                      \
+            (0xE14, "CRD")                      \
+                                                \
+            (0xE80, "WD")                       \
+                                                \
+            (0xFE0, "periph_id_0")              \
+            (0xFE4, "periph_id_1")              \
+            (0xFE8, "periph_id_2")              \
+            (0xFEC, "periph_id_3")              \
+                                                \
+            (0xFF0, "pcell_id_0")               \
+            (0xFF4, "pcell_id_1")               \
+            (0xFF8, "pcell_id_2")               \
+            (0xFFC, "pcell_id_3")
+
+        
+
+        DEFINE_SIMPLE_TRACE_SOURCE(
+            register_read_trace,
+            "register_read",
+            "A register read occurred",
+            (bool, unsigned, bool, uint32_t),
+            (
+                "ns",
+                "The security state of the access",
+
+                "offset",
+                description("The offset of the register access") REGISTER_OFFSETS,
+
+                "error",
+                "An error is being returned",
+
+                "data",
+                "The data returned if not an error"
+                )
+            );
+
+        DEFINE_SIMPLE_TRACE_SOURCE(
+            register_write_trace,
+            "register_write",
+            "A register write occurred",
+            (bool, unsigned, bool, uint32_t),
+            (
+                "ns",
+                "The security state of the access",
+
+                "offset",
+                description("The offset of the register access") REGISTER_OFFSETS,
+
+                "error",
+                "An error is being returned",
+
+                "data",
+                "The write data set if not an error"
+                )
+            );
+
+#undef REGISTER_OFFSETS
+    }
+
+    connection
+    {
+        self.pvbus_s => busslave.pvbus_s;
+        self.pvbus_s_ns => busslave_ns.pvbus_s;
+        busslave.device => self.device_s;
+        busslave_ns.device => self.device_ns;
+
+        busmaster.pvbus_m => self.pvbus_m;
+
+        self.clk_in => timer.clk_in;
+        timer.timer_callback => self.dma_callback;
+    }
+
+
+////////////////////////////////////////////////////////////////////////////////
+// External ports
+////////////////////////////////////////////////////////////////////////////////
+
+    // slave port for register accesses
+    slave port<PVBus> pvbus_s;
+    slave port<PVBus> pvbus_s_ns;
+
+    // clock for driving timed behaviour
+    slave port<ClockSignal> clk_in;
+
+    // system reset
+    slave port<Signal> reset_in
+    {
+        behaviour setValue(sg::Signal::State state)
+        {
+            if (state == sg::Signal::Set)
+                reset(0);
+        }
+    }
+
+    // master ports for connection to devices
+    master port<PVBus> pvbus_m;
+
+    // Interrupt signals
+    master port<Signal> irq_master_port[32];
+    master port<Signal> irq_abort_master_port;
+
+    // request/response ports for communicating with devices
+    /*slave port<PL330_DMAC_DmaPortProtocol> dma_port[16] // number_of_DMA_ports
+    {
+        behaviour request(uint32_t index, uint32_t request) : void
+        {
+            dmac.dmaRequest(index, request);
+        }
+    }*/
+
+////////////////////////////////////////////////////////////////////////////////
+// Internal ports
+////////////////////////////////////////////////////////////////////////////////
+
+    // bus slave behaviour
+
+    internal slave port<PVDevice> device_ns
+    {
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) {
+                register_read_trace( /*is_non_secure_*/true, tx.getAddress() & 0xFFF, /*error*/true, 0xFAFAfafa );
+                return tx.generateAbort();
+            }
+            uint32_t const data = dmac.registerRead(tx.getAddress(),/*is_non_secure_*/true);
+            register_read_trace( /*is_non_secure_*/true, tx.getAddress() & 0xFFF, /*error*/false, data );
+            return tx.setReturnData32(data);
+        }
+
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) {
+                register_write_trace( /*is_non_secure_*/true, tx.getAddress() & 0xFFF, /*error*/true, 0xFAFAfafa );
+                return tx.generateAbort();
+            }
+            dmac.registerWrite(tx.getAddress(), tx.getData32(),/*is_non_secure_*/true);
+            register_write_trace( /*is_non_secure_*/true, tx.getAddress() & 0xFFF, /*error*/false, tx.getData32() );
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device_ns.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device_ns.write(tx);
+        }        
+    }
+    
+    internal slave port<PVDevice> device_s
+    {
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) {
+                register_read_trace( /*is_non_secure_*/false, tx.getAddress() & 0xFFF, /*error*/true, 0xFAFAfafa );
+                return tx.generateAbort();
+            }
+            uint32_t const data = dmac.registerRead(tx.getAddress(),/*is_non_secure_*/false);
+            register_read_trace( /*is_non_secure_*/false, tx.getAddress() & 0xFFF, /*error*/false, data );            
+            return tx.setReturnData32(data);
+        }
+
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) {
+                register_write_trace( /*is_non_secure_*/false, tx.getAddress() & 0xFFF, /*error*/true, 0xFAFAfafa );
+                return tx.generateAbort();
+            }
+            dmac.registerWrite(tx.getAddress(), tx.getData32(),/*is_non_secure_*/false);
+            register_write_trace( /*is_non_secure_*/false, tx.getAddress() & 0xFFF, /*error*/false, tx.getData32() );
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device_s.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device_s.write(tx);
+        }        
+    }
+
+    // callback from dma rate timer
+
+    internal slave port<TimerCallback> dma_callback
+    {
+        behaviour signal() : uint32_t
+        {
+            return dmac.runCallback();
+        }
+    }
+
+////////////////////////////////////////////////////////////////////////////////
+// Debug memory functions
+////////////////////////////////////////////////////////////////////////////////
+
+    behaviour space_id_to_ns( uint32_t space_id_ ) : bool { return (space_id_ & 1) != 0; }
+    behaviour space_id_to_stream_id( uint32_t space_id_ ) : uint32_t { return space_id_ >> 1;       }
+
+    behavior dbg_read_mem (uint32_t space_id,
+                           uint32_t block_id,
+                           uint64_t offset,
+                           uint32_t size_in_maus,
+                           uint64_t *data,
+                           bool side_effects,
+                           sg::MemoryAccessContext *mac) : AccessFuncResult
+    {
+        (void)block_id;
+        (void)side_effects;
+        
+        unsigned const stream_id = space_id_to_stream_id(space_id);
+        bool const     ns        = space_id_to_ns(space_id);
+        if (stream_id >= fs_pl330::DMAC::number_of_channels)
+        {
+            return ACCESS_FUNC_IllegalArgument;
+        }
+
+        // It is simpler to dump the returned data from the model into a new
+        // chunk of memory rather than try and de-interleave it into the
+        // expected output format.  Avoid allocating data into the big_buffer
+        // if the total size is small enough, avoiding the overhead associated
+        // with new/delete for the vector.
+        uint8_t               small_buffer[1024];
+        std::vector<uint8_t>  big_buffer;
+        std::size_t           total_size = mac->GetMauInBytes() * size_in_maus;
+        uint8_t*              sim_data   = (total_size <= sizeof(small_buffer)
+                                            ? small_buffer
+                                            : (big_buffer.resize(total_size), &big_buffer[0]));
+        
+
+        pv::RandomContextTransactionGenerator::buffer_t buffer(
+            pv::byteWidthToAccessWidth(mac->GetMauInBytes()),
+            sim_data,
+            size_in_maus
+            );
+
+        pv::TransactionAttributes attr;
+        attr.setMasterID(stream_id);
+        attr.setNormalWorld(ns);
+        attr.setPrivileged(true); // assumption
+        attr.setInstruction(false);
+        
+        attr.setDebug(true);
+
+        pv::ACERequest req;
+        req.set_ace_operation( ACE::DebugRead );
+
+        pv::Tx_Result const result = dbg_tg->read(&attr, &req, offset, &buffer);
+
+        if ( ! result.isOK() )
+            return ACCESS_FUNC_PermissionDenied;
+
+        // Now we have to de-interleave the result.
+        unsigned const mau_size = mac->GetMauInBytes();
+        for (unsigned i = 0; i != size_in_maus; ++ i)
+        {
+            uint64_t d = 0;
+            for (unsigned b = 0; b != mau_size; ++ b)
+            {
+                d <<= 8;
+                d  |= *sim_data;
+                ++ sim_data;
+            }
+            data[i] = d;
+        }
+
+        return ACCESS_FUNC_OK;
+    }
+    
+    behavior dbg_write_mem (uint32_t space_id,
+                            uint32_t block_id,
+                            uint64_t offset,
+                            uint32_t size_in_maus,
+                            const uint64_t *data,
+                            bool side_effects,
+                            sg::MemoryAccessContext *mac) : AccessFuncResult
+    {
+        (void)block_id;
+        (void)side_effects;
+
+        unsigned const stream_id = space_id_to_stream_id(space_id);
+        bool const     ns        = space_id_to_ns(space_id);
+        if (stream_id >= fs_pl330::DMAC::number_of_channels)
+        {
+            return ACCESS_FUNC_IllegalArgument;
+        }
+
+        // It is simpler to dump the returned data from the model into a new
+        // chunk of memory rather than try and de-interleave it into the
+        // expected output format.  Avoid allocating data into the big_buffer
+        // if the total size is small enough, avoiding the overhead associated
+        // with new/delete for the vector.
+        uint8_t               small_buffer[1024];
+        std::vector<uint8_t>  big_buffer;
+        std::size_t           total_size = mac->GetMauInBytes() * size_in_maus;
+        uint8_t*              sim_data   = (total_size <= sizeof(small_buffer)
+                                            ? small_buffer
+                                            : (big_buffer.resize(total_size), &big_buffer[0]));
+        
+
+        pv::RandomContextTransactionGenerator::buffer_t buffer(
+            pv::byteWidthToAccessWidth(mac->GetMauInBytes()),
+            sim_data,
+            size_in_maus
+            );
+
+        pv::TransactionAttributes attr;
+        attr.setMasterID(stream_id);
+        attr.setNormalWorld(ns);
+        attr.setPrivileged(true); // assumption
+        attr.setInstruction(false);
+        
+        attr.setDebug(true);
+
+        pv::ACERequest req;
+        req.set_ace_operation( ACE::DebugRead );
+
+        // Now we have to de-interleave the data.
+        unsigned const mau_size = mac->GetMauInBytes();
+        for (unsigned i = 0; i != size_in_maus; ++ i)
+        {
+            uint64_t d = data[i];
+            for (unsigned b = 0; b != mau_size; ++ b)
+            {
+                *sim_data = uint8_t(d & 0xFF);
+                d >>= 8;
+                ++ sim_data;
+            }
+        }
+        
+        pv::Tx_Result const result = dbg_tg->write(&attr, &req, offset, &buffer);
+
+        if ( ! result.isOK() )
+            return ACCESS_FUNC_PermissionDenied;
+
+
+        return ACCESS_FUNC_OK;
+    }
+    
+
+////////////////////////////////////////////////////////////////////////////////
+// General component configuration
+////////////////////////////////////////////////////////////////////////////////
+
+    behaviour init()
+    {
+        composition.init();
+
+        register_objects_with_component_trace( *cadi__ )
+            << register_read_trace
+            << register_write_trace
+            ;
+
+        std::vector<pv::TransactionGenerator*> read_transaction_generators;
+        std::vector<pv::TransactionGenerator*> write_transaction_generators;
+        pv::TransactionGenerator*              s_instruction_transaction_generator;
+        pv::TransactionGenerator*              ns_instruction_transaction_generator;
+
+        dbg_tg = busmaster.control.createRandomContextTransactionGenerator();
+        
+        for( unsigned channel = 0 ; channel < fs_pl330::DMAC::number_of_channels ; channel++ )
+        {
+            read_transaction_generators.push_back( busmaster.control.createTransactionGenerator() );
+            write_transaction_generators.push_back( busmaster.control.createTransactionGenerator() );
+
+            // Distinguish the different channels to the downstream system.
+            read_transaction_generators.back()->setMasterID(channel);
+            write_transaction_generators.back()->setMasterID(channel);
+        }
+        
+        s_instruction_transaction_generator = busmaster.control.createTransactionGenerator();
+        ns_instruction_transaction_generator = busmaster.control.createTransactionGenerator();
+// The DMAC will internally set this.  It will be overridden there.
+//        instruction_transaction_generator->setMasterID(0xFFFF);
+        
+        fs_pl330::dma_params_t dma_params;
+        
+        fs_pl330::pl330_revision revision_id = fs_pl330::PL330_RUNK;
+
+        if (revision_string=="r0p0") revision_id = fs_pl330::PL330_R0P0;
+        else if (revision_string=="r1p0") revision_id = fs_pl330::PL330_R1P0;
+        else if (revision_string=="r1p1") revision_id = fs_pl330::PL330_R1P1;
+        else if (revision_string=="r1p2") revision_id = fs_pl330::PL330_R1P2;
+        else
+            cout << " Unknown revision string "<<revision_string<<" for PL330" << endl;
+
+        dma_params.revision = revision_id;
+        dma_params.fifo_size = fifo_size;
+        dma_params.max_transfer = max_transfer;
+        dma_params.generate_clear = generate_clear;
+        dma_params.activate_delay = activate_delay;
+
+        dma_params.p_max_irqs = p_max_irqs;
+        dma_params.p_buffer_depth = p_buffer_depth;
+        dma_params.p_lsq_read_size = p_lsq_read_size;
+        dma_params.p_lsq_write_size = p_lsq_write_size;
+        dma_params.p_read_issuing_capability = p_read_issuing_capability;
+        dma_params.p_write_issuing_capability = p_write_issuing_capability;
+        dma_params.p_axi_bus_width_param = p_axi_bus_width_param;
+        dma_params.p_cache_line_words = p_cache_line_words;
+        dma_params.p_cache_lines = p_cache_lines;
+        dma_params.p_max_channels = p_max_channels;
+        dma_params.p_controller_nsecure = p_controller_nsecure;
+        dma_params.p_irq_nsecure = p_irq_nsecure;
+        dma_params.p_periph_nsecure = p_periph_nsecure;
+        dma_params.p_controller_boots = p_controller_boots;
+        dma_params.p_reset_pc = p_reset_pc;
+//        dma_params.p_apbs_base = p_apbs_base;
+//        dma_params.p_apbns_base = p_apbns_base;
+        dma_params.p_max_periph = p_max_periph;
+        dma_params.p_perip_request_acceptance_0 = p_perip_request_acceptance_0;
+        dma_params.p_perip_request_acceptance_1 = p_perip_request_acceptance_1;
+        dma_params.p_perip_request_acceptance_2 = p_perip_request_acceptance_2;
+        dma_params.p_perip_request_acceptance_3 = p_perip_request_acceptance_3;
+        dma_params.p_perip_request_acceptance_4 = p_perip_request_acceptance_4;
+        dma_params.p_perip_request_acceptance_5 = p_perip_request_acceptance_5;
+        dma_params.p_perip_request_acceptance_6 = p_perip_request_acceptance_6;
+        dma_params.p_perip_request_acceptance_7 = p_perip_request_acceptance_7;
+        dma_params.p_perip_request_acceptance_8 = p_perip_request_acceptance_8;
+        dma_params.p_perip_request_acceptance_9 = p_perip_request_acceptance_9;
+        dma_params.p_perip_request_acceptance_10 = p_perip_request_acceptance_10;
+        dma_params.p_perip_request_acceptance_11 = p_perip_request_acceptance_11;
+        dma_params.p_perip_request_acceptance_12 = p_perip_request_acceptance_12;
+        dma_params.p_perip_request_acceptance_13 = p_perip_request_acceptance_13;
+        dma_params.p_perip_request_acceptance_14 = p_perip_request_acceptance_14;
+        dma_params.p_perip_request_acceptance_15 = p_perip_request_acceptance_15;
+        dma_params.p_perip_request_acceptance_16 = p_perip_request_acceptance_16;
+        dma_params.p_perip_request_acceptance_17 = p_perip_request_acceptance_17;
+        dma_params.p_perip_request_acceptance_18 = p_perip_request_acceptance_18;
+        dma_params.p_perip_request_acceptance_19 = p_perip_request_acceptance_19;
+        dma_params.p_perip_request_acceptance_20 = p_perip_request_acceptance_20;
+        dma_params.p_perip_request_acceptance_21 = p_perip_request_acceptance_21;
+        dma_params.p_perip_request_acceptance_22 = p_perip_request_acceptance_22;
+        dma_params.p_perip_request_acceptance_23 = p_perip_request_acceptance_23;
+        dma_params.p_perip_request_acceptance_24 = p_perip_request_acceptance_24;
+        dma_params.p_perip_request_acceptance_25 = p_perip_request_acceptance_25;
+        dma_params.p_perip_request_acceptance_26 = p_perip_request_acceptance_26;
+        dma_params.p_perip_request_acceptance_27 = p_perip_request_acceptance_27;
+        dma_params.p_perip_request_acceptance_28 = p_perip_request_acceptance_28;
+        dma_params.p_perip_request_acceptance_29 = p_perip_request_acceptance_29;
+        dma_params.p_perip_request_acceptance_30 = p_perip_request_acceptance_30;
+        dma_params.p_perip_request_acceptance_31 = p_perip_request_acceptance_31;
+
+        dmac.init(  read_transaction_generators,
+                    write_transaction_generators, 
+                    s_instruction_transaction_generator,
+                    ns_instruction_transaction_generator,
+                    dma_params,
+                    cpp_to_lisa.getAbstractInterface(),
+                    cadi__ );
+    }
+
+    behaviour reset(int level)
+    {
+        uint32_t dmac_reset_return = dmac.reset( level );
+        if( dmac_reset_return > 0 )
+        {
+            timer.timer_control.set( dmac_reset_return );
+        }
+        
+        composition.reset( level );
+    }
+
+    behaviour common_reset()
+    {
+        dmac.common_reset();
+    }
+
+    behaviour terminate()
+    {
+        dmac.terminate();
+        composition.terminate();
+    }
+
+    
+
+////////////////////////////////////////////////////////////////////////////////
+// Bus slave implementation
+////////////////////////////////////////////////////////////////////////////////
+
+//    // Handle reads to the slave pvbus port
+//
+//    behavior registerRead(pv::bus_addr_t device_addr) : uint32_t
+//    {
+//        return dmac.registerRead( device_addr );
+//    }
+//
+//
+//    // Handle writes to the slave pvbus port
+//    behavior registerWrite(pv::bus_addr_t device_addr, uint32_t data)
+//    {
+//        dmac.registerWrite( device_addr, data );
+//    }
+
+    // debugger register support
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        // Pretend to be making secure accesses if we are a debug access
+        *datap = dmac.registerRead(reg_id, /*is_non_secure_*/false);
+
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        // Pretend to be making secure accesses if we are a debug access
+        dmac.registerWrite(reg_id, (uint32_t)*datap, /*is_non_secure_*/false);
+
+        return ACCESS_FUNC_OK;
+    }
+}

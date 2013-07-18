@@ -1,0 +1,47 @@
+files
+{
+    # fmruntime library
+    path = "../include/fmruntime/";
+
+    # have hostconf dir on the include path
+    path = "../include/fmruntime/eslapi/";
+    
+    path = "../lib/Linux_GCC-4.1/libfmruntime.a", platform="linux",compiler="gcc|gcc-4.1";
+    path = "../lib/Linux64_GCC-4.1/libfmruntime.a", platform="linux64",compiler="gcc|gcc-4.1";
+    
+    path = "../lib/Linux_GCC-4.4/libfmruntime.a", platform="linux",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+    path = "../lib/Linux64_GCC-4.4/libfmruntime.a", platform="linux64",compiler="gcc-4.4|gcc-4.5|gcc-4.6";
+
+    path = "../lib/Win32_VC2005/Release/fmruntime.lib", platform="win32",compiler="VC2005";
+    path = "../lib/Win32_VC2005/Debug/fmruntime.lib", platform="win32d",compiler="VC2005";
+    
+    path = "../lib/Win32_VC2008/Release/fmruntime.lib", platform="win32",compiler="VC2008";
+    path = "../lib/Win32_VC2008/Debug/fmruntime.lib", platform="win32d",compiler="VC2008";
+    path = "../lib/Win64_VC2008/Release/fmruntime.lib", platform="win64",compiler="VC2008";
+    path = "../lib/Win64_VC2008/Debug/fmruntime.lib", platform="win64d",compiler="VC2008";
+    
+    path = "../lib/Win32_VC2010/Release/fmruntime.lib", platform="win32",compiler="VC2010";
+    path = "../lib/Win32_VC2010/Debug/fmruntime.lib", platform="win32d",compiler="VC2010";
+    path = "../lib/Win64_VC2010/Release/fmruntime.lib", platform="win64",compiler="VC2010";
+    path = "../lib/Win64_VC2010/Debug/fmruntime.lib", platform="win64d",compiler="VC2010";
+
+
+    path = "../lib/Linux_GCC-4.1/libMAXCOREInitSimulationEngine.so.2", platform="linux",compiler="gcc|gcc-4.1",action="deploy";
+    path = "../lib/Linux64_GCC-4.1/libMAXCOREInitSimulationEngine.so.2", platform="linux64",compiler="gcc|gcc-4.1",action="deploy";
+
+    path = "../lib/Linux_GCC-4.4/libMAXCOREInitSimulationEngine.so.2", platform="linux",compiler="gcc-4.4|gcc-4.5|gcc-4.6",action="deploy";
+    path = "../lib/Linux64_GCC-4.4/libMAXCOREInitSimulationEngine.so.2", platform="linux64",compiler="gcc-4.4|gcc-4.5|gcc-4.6",action="deploy";
+    
+    path = "../lib/Win32_VC2005/Release/libMAXCOREInitSimulationEngine.2.dll", platform="win32",compiler="VC2005",action="deploy";
+    path = "../lib/Win32_VC2005/Debug/libMAXCOREInitSimulationEngine.2.dll", platform="win32d",compiler="VC2005",action="deploy";
+    
+    path = "../lib/Win32_VC2008/Release/libMAXCOREInitSimulationEngine.2.dll", platform="win32",compiler="VC2008",action="deploy";
+    path = "../lib/Win32_VC2008/Debug/libMAXCOREInitSimulationEngine.2.dll", platform="win32d",compiler="VC2008",action="deploy";
+    path = "../lib/Win64_VC2008/Release/libMAXCOREInitSimulationEngine.2.dll", platform="win64",compiler="VC2008",action="deploy";
+    path = "../lib/Win64_VC2008/Debug/libMAXCOREInitSimulationEngine.2.dll", platform="win64d",compiler="VC2008",action="deploy";
+
+    path = "../lib/Win32_VC2010/Release/libMAXCOREInitSimulationEngine.2.dll", platform="win32",compiler="VC2010",action="deploy";
+    path = "../lib/Win32_VC2010/Debug/libMAXCOREInitSimulationEngine.2.dll", platform="win32d",compiler="VC2010",action="deploy";
+    path = "../lib/Win64_VC2010/Release/libMAXCOREInitSimulationEngine.2.dll", platform="win64",compiler="VC2010",action="deploy";
+    path = "../lib/Win64_VC2010/Debug/libMAXCOREInitSimulationEngine.2.dll", platform="win64d",compiler="VC2010",action="deploy";
+}

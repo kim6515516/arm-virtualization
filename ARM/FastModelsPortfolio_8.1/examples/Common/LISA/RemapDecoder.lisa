@@ -1,0 +1,107 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// This component provides support for dynamically remappable regions of memory.
+//
+// It splits incoming bus requests to one of two slaves, based on the value provided
+// over the 'remap' port.
+//
+// If the remap port is given a value of sg::Signal::Set, then all transactions are
+// routed to the output_remap_set port.  Otherwise they go to the output_remap_clear port.
+//
+// Implementation notes:
+//
+// The dynamic routing functionality is provided by the TZSwitch component.
+// The TZSwitch component has dynamically programmable support for routing requests
+// to one of two output ports based on its current configuration and the value of
+// the TrustZone normal/secure access flag in each transaction.
+//
+// RemapDecoder only uses the dynamic configurability of TZSwitch, not the TrustZone
+// switching support.
+
+component RemapDecoder
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "The component that provides support for dynamically remappable regions of memory.";
+        documentation_file = "../../../#DUI0423#";
+    }
+
+    resources
+    {
+        sg::Signal::State current_state;
+    }
+
+    // Incoming bus transactions (connected straight to TZSwitch).
+    slave port<PVBus>      input;
+
+    // Outgoing bus transactions when remap is set.
+    master port<PVBus>     output_remap_set;
+
+    // Outgoing bus transactions when remap is clear.
+    master port<PVBus>     output_remap_clear;
+
+
+    // Internal port, used to take dynamic control of the TZSwitch's routing configuration.
+    port<TZSwitchControl> control;
+
+
+    composition
+    {
+        // Instantiate a TZSwitch to manage the dynamic bus remapping.
+        bus_switch : TZSwitch;
+    }
+
+    behaviour init
+    {
+        composition.init();
+        set_state(sg::Signal::Set);
+    }
+
+    behaviour set_state(sg::Signal::State new_state)
+    {
+        current_state = new_state;
+        TZSwitch_RouteOption dest;
+        
+        if (new_state == sg::Signal::Set) {
+            dest = TZROUTE_TO_PORT_A;
+        } else {
+            dest = TZROUTE_TO_PORT_B;
+        }
+        // Reconfigure the TZSwitch to route all accesses to the appropriate port.
+        control.routeAccesses(TZINPUT_ANY, dest);
+    }
+
+    slave port<StateSignal> remap 
+    {
+        // Handle changing the state of the remap setting.
+        behavior setValue(sg::Signal::State new_state) 
+        {
+            if (new_state != current_state) {
+                set_state(new_state);
+            }
+        }
+
+        behavior getValue() : sg::Signal::State
+        {
+            return current_state;
+        }
+    } // slave port remap
+    
+    connection
+    {
+        // inputs to TZSwitch.
+        self.input => bus_switch.pvbus_input;
+
+        // outputs from TZSwitch.
+        bus_switch.pvbus_port_a => self.output_remap_set;
+        bus_switch.pvbus_port_b => self.output_remap_clear;
+
+        // internal control of the TZSwitch.
+        self.control => bus_switch.control;
+    }
+}

@@ -1,0 +1,91 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    FVP_VE_Cortex_A9x1.sgcanvas
+#//  Created: Tue Nov  3 11:48:29 2009
+#//  By: Fast Models  System Canvas 5.1.024  (Sep 23 2009)
+#//
+# *  Do NOT modify this file. It is for internal use by System Canvas only.
+#//
+#//  Copyright (c) 2004-2008 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Helvetica";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+    )
+    ports
+    (
+    )
+    connections
+    (
+    )
+    portmaps
+    (
+    )
+    labels
+    (
+        instance "Label 0"
+        (
+            text  = "Label";
+            x = -520;
+            y = -350;
+            width = 711;
+            height = 591;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8349258;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 1;
+            shadow = 0;
+            draw_below = true;
+        )
+    )
+)

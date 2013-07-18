@@ -1,0 +1,997 @@
+//
+// v7_VGIC
+//
+// Copyright 2010 ARM Limited. All rights reserved.
+//
+// VGIC that implements the v7 VGIC architecture.
+//
+// CAVEATS:
+//    * The system must arrange that the bottom three bits of master-ids of the
+//      transactions determine core number that is talking to it, or it must
+//      use the configuration port to tell it the mapping of master id to cpu interface.
+//
+component v7_VGIC
+{
+
+    properties {
+        executes_software = 0;
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "System VGIC architecture version v7";
+    }
+
+    includes
+    {
+#include "hostconf/zinttypes.h"
+#include <vector>
+#include <cassert>
+#include <map>
+#include <cstdio>
+#include <iostream>
+#include <sstream>
+#define TRACE_ARGS_v7_GIC(format) stderr, "%s:%d:%s: "format, __FILE__, __LINE__, getInstancePath().c_str()
+#define TRACE_VERBOSE_v7_GIC  if (1) ; else std::fprintf
+#define TRACE_v7_GIC          if (1) ; else std::fprintf
+#define TRACE_REGISTER_v7_GIC if (1) ; else std::fprintf
+    }
+
+    resources
+    {
+        PARAMETER { name("number-of-ints"), description("number of interrupt pins"), type(uint32_t),  default(224),   min(0),  max(998)   } number_of_ints;
+        PARAMETER { name("number-of-lrs"), description("number of list registers"), type(uint32_t),  default(64),   min(1),  max(64)   } number_of_lrs;
+        PARAMETER { name("number-of-cores"), description("number of core interfaces to present"), type(uint32_t), default(8), min(1), max(8) } number_of_cores;
+        PARAMETER { name("vgic-version"), description("Version number of the VGIC interface"), type(uint32_t), default(11), min(1), max(0xFF) } vgic_version;
+        PARAMETER { name("core-impl-id"), description("Implemention ID to present for the cores"), type(uint32_t), default(0x3902043B) } core_impl_id;
+
+        PARAMETER {
+            name("enabled"),
+            description("Enable the component.  If it is disabled then all register writes will have no effect."),
+            type(bool),
+            default(true),
+            runtime(true),
+            write_function( write_enabled ),
+            read_function( read_enabled )
+        } enabled;
+
+        PARAMETER {
+            name( "enable_log_warnings" ),
+            type( bool ),
+            write_function( write_enable_log_warnings ),
+            read_function( read_enable_log_warnings ),
+            runtime(true),
+            default(false)
+        } enable_log_warnings;
+        PARAMETER {
+            name( "enable_log_errors" ),
+            type( bool ),
+            write_function( write_enable_log_errors ),
+            read_function( read_enable_log_errors ),
+            runtime(true),
+            default(false)
+        } enable_log_errors;
+        PARAMETER {
+            name( "enable_log_fatal" ),
+            type( bool ),
+            write_function( write_enable_log_fatal ),
+            read_function( read_enable_log_fatal ),
+            runtime(true),
+            default(false)
+        } enable_log_fatal;
+
+        bool first_reset;
+
+        bool     raw_enabled;
+
+        /// This is used during parameter setting.  This means that
+        /// it is used uninitialised.  So we create a more interesting object
+        /// that initialises it on construction.
+        struct log_enables_t {
+            uint32_t v;
+
+            log_enables_t() : v(0) {}
+            operator uint32_t&      ()       { return v; }
+            operator uint32_t const&() const { return v; }
+
+            void operator = (uint32_t v_) { v = v_; }
+        };
+
+        log_enables_t log_enables;
+
+
+        struct record_t {
+            record_t()
+                : master_id(~0u),
+                  master_id_mask(0)
+            {
+            }
+
+            uint32_t master_id;
+            uint32_t master_id_mask;
+            unsigned cluster_number;
+        };
+
+        bool       default_mapping_of_master_id;
+        record_t   core_number_to_master_id[/*VGIC_MAX_CPUS*/8];
+        unsigned   ppi_core_interface_number_to_cpu_interface[/*VGIC_MAX_CPUS*/8];
+        unsigned   cpu_interface_to_external_mapping[/*VGIC_MAX_CPUS*/8];
+    }
+
+    slave port<v7_VGIC_Configuration_Protocol> configuration
+    {
+        behaviour getNumberOfCores() : unsigned
+        {
+            return number_of_cores;
+        }
+
+        behaviour setMasterIdToCoreNumberMapping(
+            uint32_t master_id_,
+            uint32_t master_id_mask_,
+            unsigned cpu_interface_number_,
+            unsigned inout_cluster_number_,
+            unsigned inout_cpu_number_in_cluster_
+            ) : bool
+        {
+            unsigned const max_number_of_cores = sizeof(core_number_to_master_id)/sizeof(core_number_to_master_id[0]);
+            if (cpu_interface_number_ >= max_number_of_cores
+                || cpu_interface_number_ >= number_of_cores)
+                return false;
+
+            if (default_mapping_of_master_id)
+            {
+                // as soon as we see the first configuration command then we zap
+                // the default mappings.
+                default_mapping_of_master_id = false;
+
+                for (unsigned i = 0; i != sizeof(core_number_to_master_id)/sizeof(core_number_to_master_id[0]); ++ i)
+                {
+                    // default construct to no access
+                    core_number_to_master_id[i]                   = record_t();
+                    ppi_core_interface_number_to_cpu_interface[i] = ~0u;
+                    cpu_interface_to_external_mapping[i]          = ~0u;
+                }
+            }
+
+            //
+            // Assumption made is that the interfaces are densely packed from
+            // the clusters and that cluster cpu numbers are always densely
+            // packed as well.
+            //
+            core_number_to_master_id[ cpu_interface_number_ ].master_id      = master_id_;
+            core_number_to_master_id[ cpu_interface_number_ ].master_id_mask = master_id_mask_;
+
+            {
+                unsigned const ppi_interface_number = inout_cluster_number_ * 4 + inout_cpu_number_in_cluster_;
+                assert( ppi_interface_number < /*VGIC_MAX_CPUS*/8);
+                ppi_core_interface_number_to_cpu_interface[ ppi_interface_number ] = cpu_interface_number_;
+                cpu_interface_to_external_mapping[ cpu_interface_number_ ] = ppi_interface_number;
+                TRACE_VERBOSE_v7_GIC(TRACE_ARGS_v7_GIC("PPI mapping : %d --> %d\n"), ppi_interface_number,  cpu_interface_number_);
+            }
+
+
+            TRACE_VERBOSE_v7_GIC(TRACE_ARGS_v7_GIC("Setting mapping of (%d & %d) == %d maps to cpu%d\n"), master_id_, master_id_mask_, master_id_, cpu_interface_number_);
+
+//            dump();
+            return true;
+        }
+    }
+
+
+    behaviour write_enabled(uint32_t id_, const int64_t* data_) : AccessFuncResult
+    {
+        bool const old_raw_enabled = raw_enabled;
+        raw_enabled = *data_ != 0;
+        if (reporting_interface.setEnables.implemented())
+        {
+            if ( ! raw_enabled )
+            {
+                // disable logging if VGIC disabled.
+                log_enables = 0;
+
+                if (raw_enabled != old_raw_enabled)
+                {
+                    message( MSG_WARNING, "VGIC disabled so no messages will be output from it" );
+                }
+            }
+            reporting_interface.setEnables( log_enables );
+            TRACE_VERBOSE_v7_GIC(TRACE_ARGS_v7_GIC("raw_enabled = %s setting enables to %d\n"), (raw_enabled?"1":"0"), log_enables.v);
+        }
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour read_enabled(uint32_t id_, int64_t* data_) : AccessFuncResult
+    {
+        *data_ = raw_enabled;
+        return ACCESS_FUNC_OK;
+    }
+
+
+    behaviour write_enables( const int64_t* data_, unsigned bit_pos ) : void
+    {
+        if (reporting_interface.setEnables.implemented())
+        {
+            bool           raw_value = *data_ != 0 ;
+            bool const     new_value = raw_value && raw_enabled;
+
+            log_enables = (log_enables & ~(1u << bit_pos)) | (unsigned(new_value) << bit_pos);
+
+            if (new_value != raw_value)
+            {
+                message( MSG_WARNING, "VGIC disabled so no messages will be output from it" );
+            }
+
+            reporting_interface.setEnables( log_enables );
+        }
+    }
+
+    behaviour write_enable_log_warnings(uint32_t id_, const int64_t* data_) : AccessFuncResult
+    {
+        write_enables( data_, 0 );
+        return ACCESS_FUNC_OK;
+    }
+    behaviour write_enable_log_errors(uint32_t id_, const int64_t* data_) : AccessFuncResult
+    {
+        write_enables( data_, 1 );
+        return ACCESS_FUNC_OK;
+    }
+    behaviour write_enable_log_fatal(uint32_t id_, const int64_t* data_) : AccessFuncResult
+    {
+        write_enables( data_, 2 );
+        return ACCESS_FUNC_OK;
+    }
+
+
+    behaviour read_enable_log_warnings(uint32_t id_, int64_t* data_) : AccessFuncResult
+    {
+        *data_ = 0;
+        if (reporting_interface.setEnables.implemented())
+        {
+            uint32_t const old       = reporting_interface.setEnables(0);
+            reporting_interface.setEnables( old );
+            *data_ = (old & 1u << 0) != 0;
+            TRACE_VERBOSE_v7_GIC(TRACE_ARGS_v7_GIC("read_enable_log_warnings -> %"PRId64"\n"), *data_);
+        }
+
+        return ACCESS_FUNC_OK;
+    }
+    behaviour read_enable_log_errors(uint32_t id_, int64_t* data_) : AccessFuncResult
+    {
+        *data_ = 0;
+        if (reporting_interface.setEnables.implemented())
+        {
+            uint32_t const old       = reporting_interface.setEnables(0);
+            reporting_interface.setEnables( old );
+            *data_ = (old & 1u << 1) != 0;
+            TRACE_VERBOSE_v7_GIC(TRACE_ARGS_v7_GIC("read_enable_log_errors -> %"PRId64"\n"), *data_);
+        }
+
+        return ACCESS_FUNC_OK;
+    }
+    behaviour read_enable_log_fatal(uint32_t id_, int64_t* data_) : AccessFuncResult
+    {
+        *data_ = 0;
+        if (reporting_interface.setEnables.implemented())
+        {
+            uint32_t const old       = reporting_interface.setEnables(0);
+            reporting_interface.setEnables( old );
+            *data_ = (old & 1u << 2) != 0;
+            TRACE_VERBOSE_v7_GIC(TRACE_ARGS_v7_GIC("read_enable_log_fatal -> %"PRId64"\n"), *data_);
+        }
+
+        return ACCESS_FUNC_OK;
+    }
+
+    composition
+    {
+        // NOTE that we don't export the trace sources to the CADI interface of
+        // the VGIC_Component as we are going to export them to _this_
+        // component's CADI source.
+    vgic : VGIC_Component( "number-of-ints"=number_of_ints,
+                           "number-of-lrs"=number_of_lrs,
+                           "number-of-cores"=number_of_cores,
+                           "core-impl-id"=core_impl_id,
+                           "vgic-version"=vgic_version,
+                           "vgic-style"="generic",
+                           "export_trace_to_cadi"=false);
+    pvbusslave : PVBusSlave;
+
+    }
+
+    debug
+    {
+        composition.unpublish;
+        composition.import;
+    }
+
+    master port<VGICComponentTraceExport> export_trace;
+
+    behaviour init
+    {
+        // Our debug {} section unpublishes the CADI interface of the
+        // sub-component VGIC_Component.  It then re-imports the CADI registers
+        // from the VGIC_Component.  However, this fails to import the trace
+        // sources from VGIC_Component.  Instead as a work around we have to
+        // structure the sub-component so that it can register the trace sources
+        // directly to this LISA component's CADI interface and not to its own.
+        //
+        // As such it has to occur _before_ composition.init().
+        export_trace.exportTrace( static_cast<sg::ComponentTrace*>(cadi__) );
+        composition.init(); // after exportTrace
+        first_reset = true;
+
+        raw_enabled = enabled;
+
+        default_mapping_of_master_id = true;
+        for (unsigned i = 0; i != sizeof(core_number_to_master_id)/sizeof(core_number_to_master_id[0]); ++ i)
+        {
+            core_number_to_master_id[i].master_id         = i;
+            core_number_to_master_id[i].master_id_mask    = i;
+            ppi_core_interface_number_to_cpu_interface[i] = i;
+            cpu_interface_to_external_mapping[i]          = i;
+        }
+
+        log_enables
+            = raw_enabled
+            ? (unsigned(enable_log_warnings)   << 0
+               | unsigned(enable_log_errors)   << 1
+               | unsigned(enable_log_fatal)    << 2)
+            : 0
+            ;
+    }
+
+    slave port<VGICReportingProtocol> reporting_interface
+    {
+        behaviour logWarnings( const char* buffer_ ) : void
+        {
+            message( MSG_WARNING, "%s", buffer_ );
+        }
+        behaviour logErrors( const char* buffer_ ) : void
+        {
+            message( MSG_ERROR, "%s", buffer_ );
+        }
+        behaviour logFatal( const char* buffer_ ) : void
+        {
+            message( MSG_FATAL_ERROR, "%s", buffer_ );
+        }
+    }
+
+    connection
+    {
+        self.pvbus_s => pvbusslave.pvbus_s;
+        pvbusslave.device => self.device;
+
+        // Connect the pass through legacy IRQ/FIQs through
+        self.irq_in_passhrough_to_vgic => vgic.irq_in;
+        self.fiq_in_passhrough_to_vgic => vgic.fiq_in;
+
+        // Connect the reporting stream from the VGIC to our messaging functions
+        vgic.reporting_interface => self.reporting_interface;
+
+        // All the Shared Peripheral Interrupts are passed through
+        self.spi => vgic.spi;
+
+        // Resets get passed straight through
+        self.reset_signal => vgic.reset_signal;
+
+        // Connect the IRQ/FIQ outputs from the VGIC to our remapping system.
+        vgic.irq_out  => self.internal_irq_out;
+        vgic.fiq_out  => self.internal_fiq_out;
+        vgic.wakeup_irq => self.internal_wakeup_irq;
+        vgic.wakeup_fiq => self.internal_wakeup_fiq;
+        vgic.virq     => self.internal_virq_out;
+        vgic.vfiq     => self.internal_vfiq_out;
+
+        // LISA doesn't deal with talking to array ports in sub-components, bind
+        // to local ports.
+        self.vgic_cpu_if         => vgic.cpu_if         ;
+        self.vgic_distributor_if => vgic.distributor_if ;
+        self.vgic_vcpu_if_vm     => vgic.vcpu_if_vm     ;
+        self.vgic_vcpu_if_hyp    => vgic.vcpu_if_hyp    ;
+        self.vgic_ppi16          => vgic.ppi16          ;
+        self.vgic_ppi17          => vgic.ppi17          ;
+        self.vgic_ppi18          => vgic.ppi18          ;
+        self.vgic_ppi19          => vgic.ppi19          ;
+        self.vgic_ppi20          => vgic.ppi20          ;
+        self.vgic_ppi21          => vgic.ppi21          ;
+        self.vgic_ppi22          => vgic.ppi22          ;
+        self.vgic_ppi23          => vgic.ppi23          ;
+        self.vgic_ppi24          => vgic.ppi24          ;
+        self.vgic_ppi25          => vgic.ppi25          ;
+        self.vgic_ppi26          => vgic.ppi26          ;
+        self.vgic_ppi27          => vgic.ppi27          ;
+        self.vgic_ppi28          => vgic.ppi28          ;
+        self.vgic_ppi29          => vgic.ppi29          ;
+        self.vgic_ppi30          => vgic.ppi30          ;
+        self.vgic_ppi31          => vgic.ppi31          ;
+
+
+        self.export_trace        => vgic.export_trace;
+    }
+
+    behaviour reset(int level)
+    {
+        if (first_reset && reporting_interface.setEnables.implemented())
+        {
+            // At reset we are guaranteed to be connected to the reporting
+            // interface if it exists.  At init() time we may not be so we defer
+            // until this time the initialisation of the reporting interface.
+
+            reporting_interface.setEnables(log_enables);
+        }
+
+        composition.reset(level);
+        first_reset = false;
+    }
+
+    //
+    // ----------------------------------------------------------------------
+    //                Print out the remapping of the signals
+    // ----------------------------------------------------------------------
+    //
+    behaviour dump()
+    {
+        unsigned const VGIC_MAX_CPUS = 8;
+
+        std::cerr << "irq_in/fiq_in suffer the transformation:-\n";
+        for (unsigned port_number = 0; port_number != VGIC_MAX_CPUS; ++ port_number)
+        {
+            std::cerr << "    irq_in/fiq_in[" << port_number << "] -> cpu interface " << remap(port_number) << "\n";
+        }
+
+        std::cerr << "irq_out/fiq_out suffer the transformation:-\n";
+        for (unsigned cpu_interface = 0; cpu_interface != VGIC_MAX_CPUS; ++ cpu_interface)
+        {
+            std::cerr << "    irq_out/fiq_out[cpu interface" << cpu_interface << "] -> port number " << remap_to_ext(cpu_interface) << "\n";
+        }
+
+        std::cerr << "ppi_coreN in suffer the transformation:-\n";
+        for (unsigned port_number = 0; port_number != VGIC_MAX_CPUS; ++ port_number)
+        {
+            std::cerr << "    ppi_coreN[" << port_number << "] -> cpu interface " << remap(port_number) << "\n";
+        }
+
+        std::cerr << "master_id on PVTransaction to cpu_interface identification:-\n";
+        for (unsigned core_number = 0; core_number != VGIC_MAX_CPUS; ++ core_number)
+        {
+            std::cerr << "    (master_id:" << core_number_to_master_id[core_number].master_id
+                      << " & " << core_number_to_master_id[core_number].master_id_mask
+                      << ") -> cpu interface " << core_number << "\n";
+        }
+    }
+
+    //
+    // ----------------------------------------------------------------------
+    //                       Legacy IRQ/FIQ inputs
+    // ----------------------------------------------------------------------
+    //
+    // We assume that the external irq/fiq pins are mapped in the same way
+    // as PPIs.
+    //
+    // We can't drive a pin on the 'vgic' directly instead we have to go via
+    // a pass through.
+    //
+    internal port<Signal> irq_in_passhrough_to_vgic[/*VGIC_MAX_CPUS*/ 8];
+    internal port<Signal> fiq_in_passhrough_to_vgic[/*VGIC_MAX_CPUS*/ 8];
+
+    slave port<Signal> irq_in[/*VGIC_MAX_CPUS*/ 8]
+    {
+        behaviour setValue( MxU32 port_index_, sg::Signal::State state_ )
+        {
+            unsigned cpu_interface_number = remap( port_index_ );
+            if (cpu_interface_number != ~0u)
+                irq_in_passhrough_to_vgic[cpu_interface_number].setValue( state_ );
+        }
+    }
+    slave port<Signal> fiq_in[/*VGIC_MAX_CPUS*/ 8]
+    {
+        behaviour setValue( MxU32 port_index_, sg::Signal::State state_ )
+        {
+            unsigned cpu_interface_number = remap( port_index_ );
+            if (cpu_interface_number != ~0u)
+                fiq_in_passhrough_to_vgic[cpu_interface_number].setValue( state_ );
+        }
+    }
+
+    //
+    // ----------------------------------------------------------------------
+    //                   Shared Peripheral Interrupts (SPIs)
+    // ----------------------------------------------------------------------
+    //
+    slave port<Signal> spi[/*VGIC_MAX_SPIS*/ 988];
+
+    //
+    // ----------------------------------------------------------------------
+    //                    Only a single reset signal
+    // ----------------------------------------------------------------------
+    //
+
+    slave port<Signal> reset_signal;
+
+    //
+    // ----------------------------------------------------------------------
+    // CFGSDISABLE prevents some registers being changed even by Secure mode
+    // ----------------------------------------------------------------------
+    //
+    slave port<Signal> cfgsdisable;
+
+    //
+    // ----------------------------------------------------------------------
+    //            Export the actual interrupts back to the core
+    // ----------------------------------------------------------------------
+    //
+    master port<Signal> irq_out[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> fiq_out[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> virq_out[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> vfiq_out[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> wakeup_irq[/*VGIC_MAX_CPUS*/ 8];
+    master port<Signal> wakeup_fiq[/*VGIC_MAX_CPUS*/ 8];
+
+    // But we have to internally rewire the irq/fiq/etc. signals from underlying
+    // VGIC back to our fixed platform wiring, so we need some internal nodes
+    // to do this.
+    internal port<Signal> internal_irq_out[/*VGIC_MAX_CPUS*/ 8]
+    {
+        behaviour setValue( MxU32 port_index_, sg::Signal::State state_ )
+        {
+            unsigned const ext_core_number = remap_to_ext( port_index_ );
+            if (ext_core_number != ~0u
+                && irq_out[ext_core_number].setValue.implemented())
+                irq_out[ext_core_number].setValue( state_ );
+        }
+    }
+    internal port<Signal> internal_fiq_out[/*VGIC_MAX_CPUS*/ 8]
+    {
+        behaviour setValue( MxU32 port_index_, sg::Signal::State state_ )
+        {
+            unsigned const ext_core_number = remap_to_ext( port_index_ );
+            if (ext_core_number != ~0u
+                && fiq_out[ext_core_number].setValue.implemented())
+                fiq_out[ext_core_number].setValue( state_ );
+        }
+    }
+
+    internal port<Signal> internal_wakeup_irq[/*VGIC_MAX_CPUS*/ 8]
+    {
+        behaviour setValue( MxU32 port_index_, sg::Signal::State state_ )
+        {
+            unsigned const ext_core_number = remap_to_ext( port_index_ );
+            if (ext_core_number != ~0u
+                && wakeup_irq[ext_core_number].setValue.implemented())
+                wakeup_irq[ext_core_number].setValue( state_ );
+        }
+    }
+    internal port<Signal> internal_wakeup_fiq[/*VGIC_MAX_CPUS*/ 8]
+    {
+        behaviour setValue( MxU32 port_index_, sg::Signal::State state_ )
+        {
+            unsigned const ext_core_number = remap_to_ext( port_index_ );
+            if (ext_core_number != ~0u
+                && wakeup_fiq[ext_core_number].setValue.implemented())
+                wakeup_fiq[ext_core_number].setValue( state_ );
+        }
+    }
+
+    internal port<Signal> internal_virq_out[/*VGIC_MAX_CPUS*/ 8]
+    {
+        behaviour setValue( MxU32 port_index_, sg::Signal::State state_ )
+        {
+            unsigned const ext_core_number = remap_to_ext( port_index_ );
+            if (ext_core_number != ~0u
+                && virq_out[ext_core_number].setValue.implemented())
+                virq_out[ext_core_number].setValue( state_ );
+        }
+    }
+    internal port<Signal> internal_vfiq_out[/*VGIC_MAX_CPUS*/ 8]
+    {
+        behaviour setValue( MxU32 port_index_, sg::Signal::State state_ )
+        {
+            unsigned const ext_core_number = remap_to_ext( port_index_ );
+            if (ext_core_number != ~0u
+                && vfiq_out[ext_core_number].setValue.implemented())
+                vfiq_out[ext_core_number].setValue( state_ );
+        }
+    }
+
+    behaviour remap_to_ext(unsigned int_cpu_interface_number_ ) : unsigned
+    {
+        assert( int_cpu_interface_number_ < /*VGIC_MAX_CPUS*/8 );
+        return cpu_interface_to_external_mapping[ int_cpu_interface_number_ ];
+    }
+
+
+    //
+    // ----------------------------------------------------------------------
+    // For ppi's then they are wired as though for the full 8 core
+    // configuration.  So if we have few than eight cores then we have
+    // to remap the core number
+    // ----------------------------------------------------------------------
+    //
+    behaviour remap(unsigned ppi_core_interface_number_) : unsigned
+    {
+        assert( ppi_core_interface_number_ < 8 );
+        return ppi_core_interface_number_to_cpu_interface[ ppi_core_interface_number_ ];
+    }
+
+    //
+    // ----------------------------------------------------------------------
+    //                 Private Peripheral Interrupt Connectors
+    // ----------------------------------------------------------------------
+    //
+    // The core's private peripherals export a series of events that can
+    // be connected to the VGIC.
+    //
+    slave port<Signal>  ppi_core0[/*number-of-ppis-per-core*/ 16]
+    {
+        behaviour setValue(MxU32 interface_number_, sg::Signal::State s_ )
+        {
+            unsigned const core_number = remap(0);
+            if (core_number == ~0u)
+                return;
+            interface_number_ += 16;
+
+            TRACE_v7_GIC(TRACE_ARGS_v7_GIC("cpu%d : ppi%d -> %s\n"), core_number, interface_number_, (s_ == sg::Signal::Set ? "1" : "0"));
+            switch (interface_number_)
+            {
+#define S(N) case N: vgic_ppi##N[core_number].setValue( s_ ); return;
+                S(16); S(17); S(18); S(19); S(20); S(21); S(22); S(23);
+                S(24); S(25); S(26); S(27); S(28); S(29); S(30); S(31);
+#undef S
+            }
+            assert(0);
+        }
+    }
+
+    slave port<Signal>  ppi_core1[/*number-of-ppis-per-core*/ 16]
+    {
+        behaviour setValue(MxU32 interface_number_, sg::Signal::State s_ )
+        {
+            unsigned const core_number = remap(1);
+            if (core_number == ~0u)
+                return;
+            interface_number_ += 16;
+
+            TRACE_v7_GIC(TRACE_ARGS_v7_GIC("cpu%d : ppi%d -> %s\n"), core_number, interface_number_, (s_ == sg::Signal::Set ? "1" : "0"));
+            switch (interface_number_)
+            {
+#define S(N) case N: vgic_ppi##N[core_number].setValue( s_ ); return;
+                S(16); S(17); S(18); S(19); S(20); S(21); S(22); S(23);
+                S(24); S(25); S(26); S(27); S(28); S(29); S(30); S(31);
+#undef S
+            }
+            assert(0);
+        }
+    }
+
+    slave port<Signal>  ppi_core2[/*number-of-ppis-per-core*/ 16]
+    {
+        behaviour setValue(MxU32 interface_number_, sg::Signal::State s_ )
+        {
+            unsigned const core_number = remap(2);
+            if (core_number == ~0u)
+                return;
+            interface_number_ += 16;
+
+            TRACE_v7_GIC(TRACE_ARGS_v7_GIC("cpu%d : ppi%d -> %s\n"), core_number, interface_number_, (s_ == sg::Signal::Set ? "1" : "0"));
+            switch (interface_number_)
+            {
+#define S(N) case N: vgic_ppi##N[core_number].setValue( s_ ); return;
+                S(16); S(17); S(18); S(19); S(20); S(21); S(22); S(23);
+                S(24); S(25); S(26); S(27); S(28); S(29); S(30); S(31);
+#undef S
+            }
+            assert(0);
+        }
+    }
+
+    slave port<Signal>  ppi_core3[/*number-of-ppis-per-core*/ 16]
+    {
+        behaviour setValue(MxU32 interface_number_, sg::Signal::State s_ )
+        {
+            unsigned const core_number = remap(3);
+            if (core_number == ~0u)
+                return;
+            interface_number_ += 16;
+
+            TRACE_v7_GIC(TRACE_ARGS_v7_GIC("cpu%d : ppi%d -> %s\n"), core_number, interface_number_, (s_ == sg::Signal::Set ? "1" : "0"));
+            switch (interface_number_)
+            {
+#define S(N) case N: vgic_ppi##N[core_number].setValue( s_ ); return;
+                S(16); S(17); S(18); S(19); S(20); S(21); S(22); S(23);
+                S(24); S(25); S(26); S(27); S(28); S(29); S(30); S(31);
+#undef S
+            }
+            assert(0);
+        }
+    }
+
+    slave port<Signal>  ppi_core4[/*number-of-ppis-per-core*/ 16]
+    {
+        behaviour setValue(MxU32 interface_number_, sg::Signal::State s_ )
+        {
+            unsigned const core_number = remap(4);
+            if (core_number == ~0u)
+                return;
+            interface_number_ += 16;
+
+            TRACE_v7_GIC(TRACE_ARGS_v7_GIC("cpu%d : ppi%d -> %s\n"), core_number, interface_number_, (s_ == sg::Signal::Set ? "1" : "0"));
+            switch (interface_number_)
+            {
+#define S(N) case N: vgic_ppi##N[core_number].setValue( s_ ); return;
+                S(16); S(17); S(18); S(19); S(20); S(21); S(22); S(23);
+                S(24); S(25); S(26); S(27); S(28); S(29); S(30); S(31);
+#undef S
+            }
+            assert(0);
+        }
+    }
+
+    slave port<Signal>  ppi_core5[/*number-of-ppis-per-core*/ 16]
+    {
+        behaviour setValue(MxU32 interface_number_, sg::Signal::State s_ )
+        {
+            unsigned const core_number = remap(5);
+            if (core_number == ~0u)
+                return;
+            interface_number_ += 16;
+
+            TRACE_v7_GIC(TRACE_ARGS_v7_GIC("cpu%d : ppi%d -> %s\n"), core_number, interface_number_, (s_ == sg::Signal::Set ? "1" : "0"));
+            switch (interface_number_)
+            {
+#define S(N) case N: vgic_ppi##N[core_number].setValue( s_ ); return;
+                S(16); S(17); S(18); S(19); S(20); S(21); S(22); S(23);
+                S(24); S(25); S(26); S(27); S(28); S(29); S(30); S(31);
+#undef S
+            }
+            assert(0);
+        }
+    }
+
+    slave port<Signal>  ppi_core6[/*number-of-ppis-per-core*/ 16]
+    {
+        behaviour setValue(MxU32 interface_number_, sg::Signal::State s_ )
+        {
+            unsigned const core_number = remap(6);
+            if (core_number == ~0u)
+                return;
+            interface_number_ += 16;
+
+            TRACE_v7_GIC(TRACE_ARGS_v7_GIC("cpu%d : ppi%d -> %s\n"), core_number, interface_number_, (s_ == sg::Signal::Set ? "1" : "0"));
+            switch (interface_number_)
+            {
+#define S(N) case N: vgic_ppi##N[core_number].setValue( s_ ); return;
+                S(16); S(17); S(18); S(19); S(20); S(21); S(22); S(23);
+                S(24); S(25); S(26); S(27); S(28); S(29); S(30); S(31);
+#undef S
+            }
+            assert(0);
+        }
+    }
+
+    slave port<Signal>  ppi_core7[/*number-of-ppis-per-core*/ 16]
+    {
+        behaviour setValue(MxU32 interface_number_, sg::Signal::State s_ )
+        {
+            unsigned const core_number = remap(7);
+            if (core_number == ~0u)
+                return;
+            interface_number_ += 16;
+
+            TRACE_v7_GIC(TRACE_ARGS_v7_GIC("cpu%d : ppi%d -> %s\n"), core_number, interface_number_, (s_ == sg::Signal::Set ? "1" : "0"));
+            switch (interface_number_)
+            {
+#define S(N) case N: vgic_ppi##N[core_number].setValue( s_ ); return;
+                S(16); S(17); S(18); S(19); S(20); S(21); S(22); S(23);
+                S(24); S(25); S(26); S(27); S(28); S(29); S(30); S(31);
+#undef S
+            }
+            assert(0);
+        }
+    }
+
+    //
+    // ----------------------------------------------------------------------
+    //                  Internal implementation details
+    // ----------------------------------------------------------------------
+    //
+
+    internal master port<PVDevice>  vgic_cpu_if[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<PVDevice>  vgic_distributor_if[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<PVDevice>  vgic_vcpu_if_vm[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<PVDevice>  vgic_vcpu_if_hyp[/*VGIC_MAX_CPUS*/ 8];
+
+    internal master port<Signal>  vgic_ppi16[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi17[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi18[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi19[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi20[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi21[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi22[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi23[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi24[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi25[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi26[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi27[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi28[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi29[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi30[/*VGIC_MAX_CPUS*/ 8];
+    internal master port<Signal>  vgic_ppi31[/*VGIC_MAX_CPUS*/ 8];
+
+    //
+    // This component has a single PV bus port in that then decodes it to one of
+    // several device ports.
+    //
+    slave port<PVBus>             pvbus_s;
+
+    internal slave port<PVDevice> device
+    {
+        //
+        // Forward the device request on.
+        //
+
+        behaviour read(pv::ReadTransaction tx_) : pv::Tx_Result
+        {
+            return do_read(tx_, false);
+        }
+
+        behaviour debugRead(pv::ReadTransaction tx_) : pv::Tx_Result
+        {
+            return do_read(tx_, true);
+        }
+
+        behaviour write(pv::WriteTransaction tx_) : pv::Tx_Result
+        {
+            return do_write(tx_, false);
+        }
+        
+        behaviour debugWrite(pv::WriteTransaction tx_) : pv::Tx_Result
+        {
+            return do_write(tx_, true);
+        }
+    }
+
+    behaviour do_read(pv::ReadTransaction tx_, bool dbg_) : pv::Tx_Result
+    {
+        unsigned const core = get_core_num(tx_);
+
+        if (core == ~0u || ! enabled)
+        {
+            if (! dbg_ && enable_log_warnings)
+            {
+                message( MSG_WARNING, "ignoring access to GIC" );
+            }
+            return tx_.setReturnData32(0);
+        }
+
+        std::pair<unsigned, unsigned> const p = decode_region(core, tx_, dbg_);
+        unsigned const decode        = p.first;
+        unsigned const remapped_core = p.second;
+
+        TRACE_REGISTER_v7_GIC(TRACE_ARGS_v7_GIC(":master_id=%dcpu%d: read cpu%d %s -> address %s%"PRIx64"\n"), tx_.getMasterID(), core, remapped_core, from_decode_region_number_to_string(decode), (tx_.isNonSecure() ? "ns-" : "s-"), tx_.getAddress());
+
+            
+        assert( remapped_core < sizeof(vgic_distributor_if)/sizeof(vgic_distributor_if[0]) ); // all interfaces should be same width, just choose the distributor one for no reason.
+
+        // NOTE that we lose the distinction between debug and non-debug methods from now on!
+        switch (decode)
+        {
+        case 0:                                  return tx_.setReturnData32(0);
+        case 1: assert( remapped_core == core ); return vgic_distributor_if[remapped_core].read(tx_);
+        case 2: assert( remapped_core == core ); return vgic_cpu_if        [remapped_core].read(tx_);
+        case 3:                                  return vgic_vcpu_if_hyp   [remapped_core].read(tx_);
+        case 4: assert( remapped_core == core ); return vgic_vcpu_if_vm    [remapped_core].read(tx_);
+        }
+
+        assert(0);
+        return tx_.setReturnData32(0);
+    }
+
+    behaviour do_write(pv::WriteTransaction tx_, bool dbg_) : pv::Tx_Result
+    {
+        unsigned const core        = get_core_num(tx_);
+
+        if (core == ~0u || ! enabled)
+        {
+            if (! dbg_ && enable_log_warnings)
+            {
+                message( MSG_WARNING, "ignoring access to GIC" );
+            }
+            return tx_.writeComplete();
+        }
+
+        std::pair<unsigned, unsigned> const p = decode_region(core, tx_, dbg_);
+        unsigned const decode        = p.first;
+        unsigned const remapped_core = p.second;
+
+        TRACE_REGISTER_v7_GIC(TRACE_ARGS_v7_GIC(":master_id=%dcpu%d: write cpu%d %s -> address %s%"PRIx64"\n"), tx_.getMasterID(), core, remapped_core, from_decode_region_number_to_string(decode), (tx_.isNonSecure() ? "ns-" : "s-"), tx_.getAddress());
+    
+        assert( remapped_core < sizeof(vgic_distributor_if)/sizeof(vgic_distributor_if[0]) ); // all interfaces should be same width, just choose the distributor one for no reason.
+
+        // NOTE that we lose the distinction between debug and non-debug methods from now on!
+        switch (decode)
+        {
+        case 0:
+            return tx_.writeComplete();
+        case 1: assert( remapped_core == core );
+            return dbg_
+                ? vgic_distributor_if[remapped_core].debugWrite(tx_)
+                : vgic_distributor_if[remapped_core].write(tx_);
+        case 2:
+            return dbg_
+                ? vgic_cpu_if[remapped_core].debugWrite(tx_)
+                : vgic_cpu_if[remapped_core].write(tx_);
+        case 3: assert( remapped_core == core );
+            return dbg_
+                ? vgic_vcpu_if_hyp[remapped_core].debugWrite(tx_)
+                : vgic_vcpu_if_hyp[remapped_core].write(tx_);
+        case 4: assert( remapped_core == core );
+            return dbg_
+                ? vgic_vcpu_if_vm[remapped_core].debugWrite(tx_)
+                : vgic_vcpu_if_vm[remapped_core].write(tx_);
+        }
+
+        assert(0);
+        return tx_.writeComplete();
+    }
+
+    behaviour get_core_num(pv::Transaction tx_) : unsigned
+    {
+        unsigned const master_id = tx_.getMasterID();
+        unsigned i = 0;
+        while (i != number_of_cores)
+        {
+            if ((master_id & core_number_to_master_id[i].master_id_mask)
+                == core_number_to_master_id[i].master_id)
+            {
+                return i;
+            }
+            ++ i;
+        }
+        return ~0u; // invalid core!
+    }
+
+    behaviour from_decode_region_number_to_string(unsigned i_) : const char*
+    {
+        switch (i_)
+        {
+        case 0: return "<unmapped region!>";
+        case 1: return "distributor_if";
+        case 2: return "cpu_if";
+        case 3: return "vcpu_if_hyp";
+        case 4: return "vcpu_if_vm";
+        }
+        assert(0);
+        return "<unknown>";
+    }
+
+    /// Decode to one of the interfaces and also some interfaces can present the
+    /// view of core different to the one that is generating the transaction.
+    behaviour decode_region(unsigned originating_core_, pv::Transaction tx_, bool dbg_) : std::pair<unsigned, unsigned>
+    {
+        uint32_t const device_addr = (uint32_t)tx_.getAddress() & 0x7FFF;
+
+        if (device_addr >= 0x1000 && device_addr <= 0x1FFF) // distributor
+            return std::make_pair(1, originating_core_);
+        else if (device_addr >= 0x2000 && device_addr <= 0x3FFF) // cpu_if
+            return std::make_pair(2, originating_core_);
+        else if (device_addr >= 0x4000 && device_addr <= 0x4FFF) // vcpu_if_hyp for requesting core
+            return std::make_pair(3, originating_core_);
+        else if (device_addr >= 0x5000 && device_addr <= 0x5FFF) // aliases of vcpu_if_hyp for other cores
+        {
+            unsigned const core = (device_addr >> 9) & 0x7;
+            return std::make_pair(3, core);
+        }
+        else if (device_addr >= 0x6000 && device_addr <= 0x7FFF) // vcpu_if_vm
+            return std::make_pair(4, originating_core_);
+        else
+        {
+            if (! dbg_ && tx_.hasSideEffect())
+            {
+                std::ostringstream os;
+                os << getInstanceName() << " : (" << getInstancePath() << ") : "
+                   << "VGIC received a transaction with address " << tx_.getAddress()
+                   << " but this region is undecoded.\n";
+                message( os.str(), MSG_ERROR );
+            }
+            return std::make_pair(0, originating_core_);
+        }
+    }
+}

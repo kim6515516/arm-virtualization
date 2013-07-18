@@ -1,0 +1,76 @@
+/* -*- c++ -*- */
+/* vim: syntax=cpp
+ */
+/*!
+ *  \file   SystemC2CounterInterface.lisa
+ *  \brief  
+ *  \date   Copyright ARM Limited 2012 All Rights Reserved.
+ *  
+ *  
+ */
+
+component SystemC2CounterInterface 
+{
+    properties {
+        version = "8.1.37";
+        component_type = "System";
+        dso_safe = 0;
+        description = "SystemC to CounterInterface Converter";
+    }
+    
+    behaviour init()
+    {
+        composition.init();
+    }
+
+    master port<CounterInterface> cntvalueb
+    {
+        master behaviour getCounterValue() : uint64_t
+        {
+            return self.amba_pv_getCounterValue_m.get_state(0,NULL);
+        }
+
+        master behaviour requestSignalUpdate(uint64_t at) : void
+        {
+            self.amba_pv_requestSignalUpdate_m.set_state(0,at);
+        }
+
+        master behaviour requestEventUpdate(uint64_t at) : void
+        {
+            self.amba_pv_requestEventUpdate_m.set_state(0,at);
+        }
+    }
+
+    // Interface in from SystemC
+    master port<AMBAPVValueState64> amba_pv_getCounterValue_m;
+    master port<AMBAPVValue64>      amba_pv_requestSignalUpdate_m;
+
+    slave port<AMBAPVValue>         amba_pv_signalUpdate_s
+    {
+         behavior set_state(int /*export_id*/,
+                            const uint32_t & /*value*/) {
+            cntvalueb.signalUpdate();
+         }
+    }
+    
+    slave port<AMBAPVValue>         amba_pv_setEnabled_s
+    {
+        behavior set_state(int /*export_id*/,
+                           const uint32_t & value) {
+            cntvalueb.setEnabled(value != 0);
+        }
+    }
+    
+    master port<AMBAPVValue64>      amba_pv_requestEventUpdate_m;
+
+    slave port<AMBAPVValue>         amba_pv_eventUpdate_s
+    {
+        behavior set_state(int /*export_id*/,
+                           const uint32_t & /*value*/) {
+            cntvalueb.eventUpdate();
+        }
+    }
+}
+
+
+/* eof SystemC2CounterInterface.lisa */

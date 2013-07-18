@@ -1,0 +1,84 @@
+/*
+ * Copyright 2009 ARM Limited. All rights reserved.
+ */
+
+// Dummy for USB
+
+component EB_USB
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "EB USB Dummy";
+        documentation_file = "../../../#DUI0423#";
+    }
+    
+    includes
+    {
+        #define EB_USB_TRACE if (!0) ; else printf
+    }
+    
+    resources
+    {
+    }
+    
+    composition
+    {
+        busslave : PVBusSlave(size = 0x10000);
+    }
+    
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+    }
+    
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return tx.setReturnData32(0xffffffff);
+        }
+        
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    slave port<PVBus> pvbus;
+
+  
+    behavior init()
+    {
+        composition.init();
+    }
+    
+    behavior reset(int level)
+    {
+        composition.reset(level);
+    }
+                                                                         
+    // debugger register access support
+    behaviour debug_read(uint32_t /*reg_id*/, uint64_t* /*datap*/, bool /*side_effects*/) : CADIReturn_t
+    {
+        return eslapi::CADI_STATUS_OK;
+    }
+
+    behaviour debug_write(uint32_t /*reg_id*/, const uint64_t* /*datap*/, bool /*side_effects*/) : CADIReturn_t
+    {
+        return eslapi::CADI_STATUS_OK;
+    }
+}

@@ -1,0 +1,51 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ */
+
+// This protocol exists to allow bus masters to instantiate TransactionGenerator
+// objects on the control port of a PVBusMaster subcomponent.
+//
+// Any number of TransactionGenerator objects can be created from a single PVBusMaster.
+// They should be allocated at startup: allocating a new TransactionGenerator for each
+// transaction will be expensive.
+//
+// It is most efficient to have one TransactionGenerator for each data stream that
+// is being accessed.  For example, a DMA memory transfer should use one generator
+// for the reads and one for the writes to get maximum efficiency from the PVBus
+// system.
+//
+// The TransactionGenerator object supports the following operations:
+//
+// Set the type of transactions to be generated (can be changed at any time):
+//    setNonSecure(bool ns = true);     // Drive the TrustZone NS bit
+//
+// Generate a read transaction:
+//    read(pv::bus_addr_t, int width, uint32_t *return_data);
+//    read8(pv::bus_addr_t, uint8_t *return_data);
+//    read16(pv::bus_addr_t, uint16_t *return_data);
+//    read32(pv::bus_addr_t, uint32_t *return_data);
+
+protocol PVTransactionMaster
+{
+    includes
+    {
+#include "pv/PVBus.h"
+#include "pv/PVBusMaster.h"
+
+        namespace pv
+        {
+            class RandomContextTransactionGenerator;
+        }
+    }
+
+    properties {
+        version = "8.1.37";
+        description = "PVTransactionMaster Protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    // Return a new instance of a TransactionGenerator object
+    slave  behavior createTransactionGenerator() : pv::TransactionGenerator *;
+    slave  behavior createRandomContextTransactionGenerator() : pv::RandomContextTransactionGenerator *;
+}

@@ -1,0 +1,1277 @@
+/*!
+ * \file  DMC_400.lisa
+ * \brief LISA Implementation of the DMC400.
+ * \date Copyright 2012-2012 ARM Limited. All rights reserved.
+ */
+
+component DMC_400
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell Dynamic Memory Controller(DMC400)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #include <sstream>
+        #include <iomanip>
+        #include "components/DMC400.h"
+
+        #define DMC400_TRACE(x) if (diagnostics>1) { message((x)+string("\n"), MSG_INFO); }
+        #define DMC400_WARN(x) {message(getInstancePath()+": "+(x)+string("\n"), MSG_WARNING);}
+    }
+
+
+    slave  port<PVBus> axi_if_in[4] ;             // receive the axi reads/writes here; up to four chips can be connected
+    slave  port<PVBus> apb_interface;             // receive the apb config read/writes here
+
+    master port<PVBus> axi_if_out[4];             // the output ports where the actual mem chips are connected.
+
+
+    composition
+    {
+        apb_slave : PVBusSlave(size = 0x10000);
+    }
+
+    connection
+    {
+        self.axi_if_in[0]    =>    self.axi_if_out[0];      // connect the incoming devices to the out going devices
+        self.axi_if_in[1]    =>    self.axi_if_out[1];
+        self.axi_if_in[2]    =>    self.axi_if_out[2];
+        self.axi_if_in[3]    =>    self.axi_if_out[3];
+
+        self.apb_interface   =>    apb_slave.pvbus_s;     // connect the external slave interface to the PVBusSlave's slave port
+        apb_slave.device     =>    self.register_model;   // connect the PVBusSlave's device port to DMC400's device port, so that we can model the regs
+    }
+
+    internal slave port<PVDevice> register_model
+    {
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            uint32_t data = 0x0;
+            DMC400_TRACE("Read called");
+
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            do_reg_read(tx.getAddress() & ~3, &data);
+            return tx.setReturnData32(data);
+        }
+
+
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            uint32_t data = tx.getData32();
+            DMC400_TRACE("Write called");
+
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            do_reg_write(tx.getAddress(), &data);
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return register_model.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return register_model.write(tx);
+        }
+    }
+
+    behavior do_reg_read(pv::bus_addr_t address, uint32_t *data)
+    {
+        uint32_t offset = address & 0xfff;
+
+        switch(offset)
+        {
+            case DMC400_MEMC_STATUS:
+                *data = memc_status;
+                break;
+            case DMC400_MEMC_CONFIG:
+                *data = memc_config;
+                break;
+            case DMC400_MEMC_CMD:
+                DMC400_WARN("unexpected read of MEMC_CMD");
+                break;
+            case DMC400_ADDRESS_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = address_control;
+                else DMC400_WARN(" can read ADDRESS_CONTROL register in config or low power state only");
+                break;
+            case DMC400_DECODE_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = decode_control;
+                else DMC400_WARN(" can read DECODE_CONTROL register in config or low power state only");
+                break;
+            case DMC400_FORMAT_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = format_control;
+                else DMC400_WARN(" can read FORMAT_CONTROL register in config or low power state only");
+                break;
+            case DMC400_LOWPOWER_CONTROL:
+                if( (memc_state == DMC400_CONFIG)) *data = low_power_control;
+                else DMC400_WARN(" can read LOWPOWER_CONTROL register in config state only");
+                break;
+            case DMC400_TURNAROUND_PRIORITY:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED) ) *data = turnaround_priority;
+                else DMC400_WARN(" can read TURNAROUND_PRIORITY register in config, low power or paused state only");
+                break;
+            case DMC400_HIT_PRIORITY:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED) ) *data = hit_priority;
+                else DMC400_WARN(" can read HIT_PRIORITY register in config, low power or paused state only");
+                break;
+            case DMC400_QOS0_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos0_control;
+                else DMC400_WARN(" can read QOS0_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS1_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos1_control;
+                else DMC400_WARN(" can read QOS1_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS2_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos2_control;
+                else DMC400_WARN(" can read QOS2_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS3_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos3_control;
+                else DMC400_WARN(" can read QOS3_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS4_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos4_control;
+                else DMC400_WARN(" can read QOS4_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS5_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos5_control;
+                else DMC400_WARN(" can read QOS5_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS6_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos6_control;
+                else DMC400_WARN(" can read QOS6_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS7_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos7_control;
+                else DMC400_WARN(" can read QOS7_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS8_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos8_control;
+                else DMC400_WARN(" can read QOS8_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS9_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos9_control;
+                else DMC400_WARN(" can read QOS9_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS10_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos10_control;
+                else DMC400_WARN(" can read QOS10_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS11_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos11_control;
+                else DMC400_WARN(" can read QOS11_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS12_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos12_control;
+                else DMC400_WARN(" can read QOS12_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS13_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos13_control;
+                else DMC400_WARN(" can read QOS13_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS14_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos14_control;
+                else DMC400_WARN(" can read QOS14_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS15_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = qos15_control;
+                else DMC400_WARN(" can read QOS15_CONTROL register in config or low power state only");
+                break;
+            case DMC400_TIMEOUT_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = timeout_control;
+                else DMC400_WARN(" can read TIMEOUT_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QUEUE_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = queue_control;
+                else DMC400_WARN(" can read QUEUE_CONTROL register in config or low power state only");
+                break;
+            case DMC400_WRITE_PRIORITY_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = write_priority_control;
+                else DMC400_WARN(" can read WRITE_PRIORITY_CONTROL register in config or low power state only");
+                break;
+            case DMC400_WRITE_PRIORITY_CONTROL2:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = write_priority_control2;
+                else DMC400_WARN(" can read WRITE_PRIORITY_CONTROL2 register in config or low power state only");
+                break;
+            case DMC400_READ_PRIORITY_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = read_priority_control;
+                else DMC400_WARN(" can read READ_PRIORITY_CONTROL register in config or low power state only");
+                break;
+            case DMC400_READ_PRIORITY_CONTROL2:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = read_priority_control2;
+                else DMC400_WARN(" can read READ_PRIORITY_CONTROL2 register in config or low power state only");
+                break;
+            case DMC400_ACCESS_ADDRESS_MATCH:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = access_address_match;
+                else DMC400_WARN(" can read ACCESS_ADDRESS_MATCH register in config or low power state only");
+                break;
+            case DMC400_ACCESS_ADDRESS_MATCH_63_32:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = access_address_match_63_32;
+                else DMC400_WARN(" can read ACCESS_ADDRESS_MATCH_63_32 register in config or low power state only");
+                break;
+            case DMC400_ACCESS_ADDRESS_MASK:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = access_address_mask;
+                else DMC400_WARN(" can read ACCESS_ADDRESS_MASK register in config or low power state only");
+                break;
+            case DMC400_ACCESS_ADDRESS_MASK_63_32:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = access_address_mask_63_32;
+                else DMC400_WARN(" can read ACCESS_ADDRESS_MASK_63_32 register in config or low power state only");
+                break;
+            case DMC400_CHANNEL_STATUS:
+                *data = channel_status;
+                break;
+            case DMC400_DIRECT_CMD:
+                DMC400_WARN("unexpected read of DIRECT_CMD register");
+                break;
+            case DMC400_MR_DATA:
+                *data = mr_data;
+                break;
+            case DMC400_REFRESH_CONTROL:
+                if( (memc_state == DMC400_CONFIG)) *data = refresh_control;
+                else DMC400_WARN(" can read REFRESH_CONTROL register in config state only");
+                break;
+            case DMC400_INTERRUPT_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = interrupt_control;
+                else DMC400_WARN(" can read INTERRUPT_CONTROL register in config state only");
+                break;
+            case DMC400_INTERRUPT_CLR:
+                DMC400_WARN("unexpected read of INTERRUPT_CLR register");
+                break;
+            case DMC400_INTERRUPT_STATUS:
+                *data = interrupt_status;
+                break;
+            case DMC400_INTERRUPT_INFO:
+                *data = interrupt_info;
+                break;
+            case DMC400_MODE_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = mode_control;
+                else DMC400_WARN(" can read MODE_CONTROL register in config or low power state only");
+                break;
+            case DMC400_T_REFI:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_refi;
+                else DMC400_WARN(" can read T_REFI register in config, low power or paused state only");
+                break;
+            case DMC400_T_RFC:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_rfc;
+                else DMC400_WARN(" can read T_RFC register in config, low power or paused state only");
+                break;
+            case DMC400_T_MRR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_mrr;
+                else DMC400_WARN(" can read T_MRR register in config, low power or paused state only");
+                break;
+            case DMC400_T_MRW:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_mrw;
+                else DMC400_WARN(" can read T_MRW register in config, low power or paused state only");
+                break;
+            case DMC400_T_RCD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_rcd;
+                else DMC400_WARN(" can read T_RCD register in config, low power or paused state only");
+                break;
+            case DMC400_T_RAS:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_ras;
+                else DMC400_WARN(" can read T_RAS register in config, low power or paused state only");
+                break;
+            case DMC400_T_RP:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_rp;
+                else DMC400_WARN(" can read T_RP register in config, low power or paused state only");
+                break;
+            case DMC400_T_RPALL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_rpall;
+                else DMC400_WARN(" can read T_RPALL register in config, low power or paused state only");
+                break;
+            case DMC400_T_RRD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_rrd;
+                else DMC400_WARN(" can read T_RRD register in config, low power or paused state only");
+                break;
+            case DMC400_T_FAW:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_faw;
+                else DMC400_WARN(" can read T_FAW register in config, low power or paused state only");
+                break;
+            case DMC400_READ_LATENCY:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = read_latency;
+                else DMC400_WARN(" can read READ_LATENCY register in config, low power or paused state only");
+                break;
+            case DMC400_T_RTR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_rtr;
+                else DMC400_WARN(" can read T_RTR register in config, low power or paused state only");
+                break;
+            case DMC400_T_RTW:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_rtw;
+                else DMC400_WARN(" can read T_RTW register in config, low power or paused state only");
+                break;
+            case DMC400_T_RTP:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_rtp;
+                else DMC400_WARN(" can read T_RTP register in config, low power or paused state only");
+                break;
+            case DMC400_WRITE_LATENCY:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = write_latency;
+                else DMC400_WARN(" can read WRITE_LATENCY register in config, low power or paused state only");
+                break;
+            case DMC400_T_WR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_wr;
+                else DMC400_WARN(" can read T_WR register in config, low power or paused state only");
+                break;
+            case DMC400_T_WTR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_wtr;
+                else DMC400_WARN(" can read T_WTR register in config, low power or paused state only");
+                break;
+            case DMC400_T_WTW:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_wtw;
+                else DMC400_WARN(" can read T_WTW register in config, low power or paused state only");
+                break;
+            case DMC400_T_ECKD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_eckd;
+                else DMC400_WARN(" can read T_ECKD register in config, low power or paused state only");
+                break;
+            case DMC400_T_XCKD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_xckd;
+                else DMC400_WARN(" can read T_XCKD register in config, low power or paused state only");
+                break;
+            case DMC400_T_EP:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_ep;
+                else DMC400_WARN(" can read T_EP register in config, low power or paused state only");
+                break;
+            case DMC400_T_XP:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_xp;
+                else DMC400_WARN(" can read T_XP register in config, low power or paused state only");
+                break;
+            case DMC400_T_ESR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_esr;
+                else DMC400_WARN(" can read T_ESR register in config, low power or paused state only");
+                break;
+            case DMC400_T_XSR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_xsr;
+                else DMC400_WARN(" can read T_XSR register in config, low power or paused state only");
+                break;
+            case DMC400_T_SRCKD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_srckd;
+                else DMC400_WARN(" can read T_SRCKD register in config, low power or paused state only");
+                break;
+            case DMC400_T_CKSRD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_cksrd;
+                else DMC400_WARN(" can read T_CKSRD register in config, low power or paused state only");
+                break;
+            case DMC400_T_RDDATA_EN:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_rddata_en;
+                else DMC400_WARN(" can read T_RDDATA_EN register in config, low power or paused state only");
+                break;
+            case DMC400_T_PHYWRLAT:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED )) *data = t_phywrlat;
+                else DMC400_WARN(" can read T_PHYWRLAT register in config, low power or paused state only");
+                break;
+            case DMC400_RDLVL_CONTROL:
+                if( (memc_state == DMC400_CONFIG)) *data = rdlvl_control;
+                else DMC400_WARN(" can read RDLVL_CONTROL register in config, or low power state only");
+                break;
+            case DMC400_RDLVL_MRS:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER)) *data = rdlvl_mrs;
+                else DMC400_WARN(" can read RDLVL_MRS register in config, or low power state only");
+                break;
+            case DMC400_RDLVL_DIRECT:
+            DMC400_WARN(" Read to RDLVL direct not supported ");
+                break;
+            case DMC400_T_RDLVL_EN:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER)) *data = t_rdlvl_en;
+                else DMC400_WARN(" can read T_RDLVL_EN register in config, or low power state only");
+                break;
+            case DMC400_T_RDLVL_RR:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER)) *data = t_rdlvl_rr;
+                else DMC400_WARN(" can read T_RDLVL_RR register in config, or low power state only");
+                break;
+            case DMC400_WRLVL_CONTROL:
+                if( (memc_state == DMC400_CONFIG)) *data = wrlvl_control;
+                else DMC400_WARN(" can read WRLVL_CONTROL register in config, or low power state only");
+                break;
+            case DMC400_WRLVL_MRS:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER)) *data = wrlvl_mrs;
+                else DMC400_WARN(" can read WRLVL_MRS register in config, or low power state only");
+                break;
+            case DMC400_WRLVL_DIRECT:
+            DMC400_WARN(" Read to WRLVL direct not supported ");
+                break;
+            case DMC400_T_WRLVL_EN:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER)) *data = t_wrlvl_en;
+                else DMC400_WARN(" can read T_WRLVL_EN register in config, or low power state only");
+                break;
+            case DMC400_T_WRLVL_WW:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER)) *data = t_wrlvl_ww;
+                else DMC400_WARN(" can read T_WRLVL_WW register in config, or low power state only");
+                break;
+            case DMC400_PHY_POWER_CONTROL:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER)) *data = phy_power_control;
+                else DMC400_WARN(" can read PHY_POWER_CONTROL register in config, or low power state only");
+                break;
+            case DMC400_PHY_UPDATE_CONTROL:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER)) *data = phy_update_control;
+                else DMC400_WARN(" can read PHY_UPDATE_CONTROL register in config, or low power state only");
+                break;
+            case DMC400_T_LPRESP:
+                if (the_revision == DMC400_REVISION_R0P1)
+                {
+                    DMC400_WARN(" trying to read T_LPRESP which is not defined in this revision of the DMC400");
+                }
+                else
+                {
+                    if ((memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) *data = t_lpresp;
+                    else DMC400_WARN(" can read T_LPRESP register in config, or low power state only");
+                }
+                break;
+            case DMC400_USER_STATUS:
+                *data = user_status;
+                break;
+            case DMC400_USER_CONFIG0:
+                *data = user_config0;
+                break;
+            case DMC400_USER_CONFIG1:
+                *data = user_config1;
+                break;
+            case DMC400_INTEG_CFG:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER)) *data = integ_cfg;
+                else DMC400_WARN(" can read INTEG_CFG register in config, or low power state only");
+                break;
+            case DMC400_INTEG_OUTPUTS:
+                DMC400_WARN(" attempt to read write-only INTEG_OUTPUTS register");
+                *data=0;
+                break;
+
+            case DMC400_PERIPH_ID_4:
+                *data = periph_id_4;
+                break;
+            case DMC400_PERIPH_ID_0:
+                *data = periph_id_0;
+                break;
+            case DMC400_PERIPH_ID_1:
+                *data = periph_id_1;
+                break;
+            case DMC400_PERIPH_ID_2:
+                *data = periph_id_2;
+                break;
+            case DMC400_PERIPH_ID_3:
+                *data = periph_id_3;
+                break;
+
+
+            case DMC400_PCELL_ID_0:
+                *data = pcell_id_0;
+                break;
+            case DMC400_PCELL_ID_1:
+                *data = pcell_id_1;
+                break;
+            case DMC400_PCELL_ID_2:
+                *data = pcell_id_2;
+                break;
+            case DMC400_PCELL_ID_3:
+                *data = pcell_id_3;
+                break;
+
+            default :
+                ostringstream S;
+                S << " Read of unknown register at " << hex << setfill('0') << setw(3) << offset << " called";
+                DMC400_WARN(S.str());
+                *data = 0x0;
+                break;
+        }
+    }
+
+    behavior do_reg_write(pv::bus_addr_t address, uint32_t *data)
+    {
+        uint32_t offset = address & 0xfff;
+        if (diagnostics>1)
+        {
+            ostringstream S;
+            S << "DMC400 " << getInstancePath() << ": write " << setfill('0') << setw(8) << *data << " to offset " << address << endl;
+            message(S.str(),MSG_INFO);
+        }
+        uint32_t mask = write_masks[offset];
+        uint32_t mdata = (*data) & mask;
+        switch(offset)
+        {
+            case DMC400_MEMC_STATUS:
+                DMC400_WARN("We do not expect a write to MEMC_STATUS");
+                break;
+            case DMC400_MEMC_CONFIG:
+                DMC400_WARN("We do not expect a write to MEMC_CONFIG ");
+                break;
+            case DMC400_MEMC_CMD:
+                revman->handleTransition(mdata, memc_state, memc_status);
+                break;
+
+            case DMC400_ADDRESS_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) address_control = mdata;
+                else DMC400_WARN(" can write ADDRESS_CONTROL register in config or low power state only");
+                break;
+            case DMC400_DECODE_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) decode_control = mdata;
+                else DMC400_WARN(" can write DECODE_CONTROL register in config or low power state only");
+                break;
+            case DMC400_FORMAT_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER)) format_control = mdata;
+                else DMC400_WARN(" can write FORMAT_CONTROL register in config or low power state only");
+                break;
+            case DMC400_LOWPOWER_CONTROL:
+                if( (memc_state == DMC400_CONFIG)) low_power_control = mdata;
+                else DMC400_WARN(" can write FORMAT_CONTROL register in config state only");
+                break;
+            case DMC400_TURNAROUND_PRIORITY:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED) ) turnaround_priority = mdata;
+                else DMC400_WARN(" can write TURNAROUND_PRIORITY register in config, low power or paused state only");
+                break;
+            case DMC400_HIT_PRIORITY:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED) ) hit_priority = mdata;
+                else DMC400_WARN(" can write HIT_PRIORITY register in config, low power or paused state only");
+                break;
+            case DMC400_QOS0_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos0_control = mdata;
+                else DMC400_WARN(" can write QOS0_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS1_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos1_control = mdata;
+                else DMC400_WARN(" can write QOS1_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS2_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos2_control = mdata;
+                else DMC400_WARN(" can write QOS2_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS3_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos3_control = mdata;
+                else DMC400_WARN(" can write QOS3_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS4_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos4_control = mdata;
+                else DMC400_WARN(" can write QOS4_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS5_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos5_control = mdata;
+                else DMC400_WARN(" can write QOS5_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS6_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos6_control = mdata;
+                else DMC400_WARN(" can write QOS6_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS7_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos7_control = mdata;
+                else DMC400_WARN(" can write QOS7_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS8_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos8_control = mdata;
+                else DMC400_WARN(" can write QOS8_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS9_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos9_control = mdata;
+                else DMC400_WARN(" can write QOS9_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS10_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos10_control = mdata;
+                else DMC400_WARN(" can write QOS10_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS11_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos11_control = mdata;
+                else DMC400_WARN(" can write QOS11_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS12_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos12_control = mdata;
+                else DMC400_WARN(" can write QOS12_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS13_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos13_control = mdata;
+                else DMC400_WARN(" can write QOS13_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS14_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos14_control = mdata;
+                else DMC400_WARN(" can write QOS14_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QOS15_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  qos15_control = mdata;
+                else DMC400_WARN(" can write QOS15_CONTROL register in config or low power state only");
+                break;
+            case DMC400_TIMEOUT_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  timeout_control = mdata;
+                else DMC400_WARN(" can write TIMEOUT_CONTROL register in config or low power state only");
+                break;
+            case DMC400_QUEUE_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  queue_control = mdata;
+                else DMC400_WARN(" can write QUEUE_CONTROL register in config or low power state only");
+                break;
+            case DMC400_WRITE_PRIORITY_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  write_priority_control = mdata;
+                else DMC400_WARN(" can write WRITE_PRIORITY_CONTROL register in config or low power state only");
+                break;
+            case DMC400_WRITE_PRIORITY_CONTROL2:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  write_priority_control2 = mdata;
+                else DMC400_WARN(" can write WRITE_PRIORITY_CONTROL2 register in config or low power state only");
+                break;
+            case DMC400_READ_PRIORITY_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  read_priority_control = mdata;
+                else DMC400_WARN(" can write WRITE_PRIORITY_CONTROL register in config or low power state only");
+                break;
+            case DMC400_READ_PRIORITY_CONTROL2:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  read_priority_control2 = mdata;
+                else DMC400_WARN(" can write WRITE_PRIORITY_CONTROL2 register in config or low power state only");
+                break;
+            case DMC400_ACCESS_ADDRESS_MATCH:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  access_address_match = mdata;
+                else DMC400_WARN(" can write ACCESS_ADDRESS_MATCH register in config or low power state only");
+                break;
+            case DMC400_ACCESS_ADDRESS_MATCH_63_32:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  access_address_match_63_32 = mdata;
+                else DMC400_WARN(" can write ACCESS_ADDRESS_MATCH_63_32 register in config or low power state only");
+                break;
+            case DMC400_ACCESS_ADDRESS_MASK:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  access_address_mask = mdata;
+                    
+                else DMC400_WARN(" can write ACCESS_ADDRESS_MASK register in config or low power state only");
+                break;
+            case DMC400_ACCESS_ADDRESS_MASK_63_32:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  access_address_mask_63_32 = mdata;
+                else DMC400_WARN(" can write ACCESS_ADDRESS_MASK_63_32 register in config or low power state only");
+                break;
+            case DMC400_CHANNEL_STATUS:
+                DMC400_WARN(" attempt to write read-only CHANNEL_STATUS register");
+                break;
+            case DMC400_DIRECT_CMD:
+                direct_cmd  = mdata;
+                break;
+            case DMC400_MR_DATA:
+                DMC400_WARN(" attempt to write read-only MR_DATA register");
+                break;
+            case DMC400_REFRESH_CONTROL:
+                if( (memc_state == DMC400_CONFIG))  refresh_control = mdata;
+                else DMC400_WARN(" can write REFRESH_CONTROL register in config state only");
+                break;
+            case DMC400_INTERRUPT_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                  (memc_state == DMC400_PAUSED ))  interrupt_control = mdata;
+                else DMC400_WARN(" can write INTERRUPT_CONTROL register in config state only");
+                break;
+            case DMC400_INTERRUPT_CLR:
+                // clear bits in interrupt_status
+                interrupt_status &= ~mdata;
+                break;
+            case DMC400_INTERRUPT_STATUS:
+                DMC400_WARN(" attempt to write read-only INTERRUPT_STATUS register");
+            case DMC400_INTERRUPT_INFO:
+                break;
+            case DMC400_MODE_CONTROL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))  mode_control = mdata;
+                else DMC400_WARN(" can write MODE_CONTROL register in config or low power state only");
+                break;
+            case DMC400_T_REFI:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_refi = mdata;
+                else DMC400_WARN(" can write T_REFI register in config, low power or paused state only");
+                break;
+            case DMC400_T_RFC:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_rfc = mdata;
+                else DMC400_WARN(" can write T_RFC register in config, low power or paused state only");
+                break;
+            case DMC400_T_MRR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_mrr = mdata;
+                else DMC400_WARN(" can write T_MRR register in config, low power or paused state only");
+                break;
+            case DMC400_T_MRW:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_mrw = mdata;
+                else DMC400_WARN(" can write T_MRW register in config, low power or paused state only");
+                break;
+            case DMC400_T_RCD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_rcd = mdata;
+                else DMC400_WARN(" can write T_RCD register in config, low power or paused state only");
+                break;
+            case DMC400_T_RAS:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_ras = mdata;
+                else DMC400_WARN(" can write T_RAS register in config, low power or paused state only");
+                break;
+            case DMC400_T_RP:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_rp = mdata;
+                else DMC400_WARN(" can write T_RP register in config, low power or paused state only");
+                break;
+            case DMC400_T_RPALL:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_rpall = mdata;
+                else DMC400_WARN(" can write T_RPALL register in config, low power or paused state only");
+                break;
+            case DMC400_T_RRD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_rrd = mdata;
+                else DMC400_WARN(" can write T_RRD register in config, low power or paused state only");
+                break;
+            case DMC400_T_FAW:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_faw = mdata;
+                else DMC400_WARN(" can write T_FAW register in config, low power or paused state only");
+                break;
+            case DMC400_READ_LATENCY:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  read_latency = mdata;
+                else DMC400_WARN(" can write READ_LATENCY register in config, low power or paused state only");
+                break;
+            case DMC400_T_RTR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_rtr = mdata;
+                else DMC400_WARN(" can write T_RTR register in config, low power or paused state only");
+                break;
+            case DMC400_T_RTW:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_rtw = mdata;
+                else DMC400_WARN(" can write T_RTW register in config, low power or paused state only");
+                break;
+            case DMC400_T_RTP:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_rtp = mdata;
+                else DMC400_WARN(" can write T_RTP register in config, low power or paused state only");
+                break;
+            case DMC400_WRITE_LATENCY:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  write_latency = mdata;
+                else DMC400_WARN(" can write WRITE_LATENCY register in config, low power or paused state only");
+                break;
+            case DMC400_T_WR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_wr = mdata;
+                else DMC400_WARN(" can write T_WR register in config, low power or paused state only");
+                break;
+            case DMC400_T_WTR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_wtr = mdata;
+                else DMC400_WARN(" can write T_WTR register in config, low power or paused state only");
+                break;
+            case DMC400_T_WTW:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_wtw = mdata;
+                else DMC400_WARN(" can write T_WTW register in config, low power or paused state only");
+                break;
+            case DMC400_T_ECKD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_eckd = mdata;
+                else DMC400_WARN(" can write T_ECKD register in config, low power or paused state only");
+                break;
+            case DMC400_T_XCKD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_xckd = mdata;
+                else DMC400_WARN(" can write T_XCKD register in config, low power or paused state only");
+                break;
+            case DMC400_T_EP:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_ep = mdata;
+                else DMC400_WARN(" can write T_EP register in config, low power or paused state only");
+                break;
+            case DMC400_T_XP:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_xp = mdata;
+                else DMC400_WARN(" can write T_XP register in config, low power or paused state only");
+                break;
+            case DMC400_T_ESR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_esr = mdata;
+                else DMC400_WARN(" can write T_ESR register in config, low power or paused state only");
+                break;
+            case DMC400_T_XSR:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_xsr = mdata;
+                else DMC400_WARN(" can write T_XSR register in config, low power or paused state only");
+                break;
+            case DMC400_T_SRCKD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_srckd = mdata;
+                else DMC400_WARN(" can write T_SRCKD register in config, low power or paused state only");
+                break;
+            case DMC400_T_CKSRD:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_cksrd = mdata;
+                else DMC400_WARN(" can write T_CKSRD register in config, low power or paused state only");
+                break;
+            case DMC400_T_RDDATA_EN:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_rddata_en = mdata;
+                else DMC400_WARN(" can write T_RDDATA_EN register in config, low power or paused state only");
+                break;
+            case DMC400_T_PHYWRLAT:
+                if( (memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER) ||
+                    (memc_state == DMC400_PAUSED ))  t_phywrlat = mdata;
+                else DMC400_WARN(" can write T_PHYWRLAT register in config, low power or paused state only");
+                break;
+            case DMC400_RDLVL_CONTROL:
+                if( (memc_state == DMC400_CONFIG))  rdlvl_control = mdata;
+                else DMC400_WARN(" can write RDLVL_CONTROL register in config, or low power state only");
+                break;
+            case DMC400_RDLVL_MRS:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER))  rdlvl_mrs = mdata;
+                else DMC400_WARN(" can write RDLVL_MRS register in config, or low power state only");
+                break;
+
+            case DMC400_RDLVL_DIRECT:
+                if (the_revision == DMC400_REVISION_R1P0 && memc_state != DMC400_CONFIG)
+                {
+                    DMC400_WARN(" can write RDLVL_DIRECT only in config in r1p0");
+                }
+                else
+                    rdlvl_direct = mdata;
+                break;
+            case DMC400_T_RDLVL_EN:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER))  t_rdlvl_en = mdata;
+                else DMC400_WARN(" can write T_RDLVL_EN register in config, or low power state only");
+                break;
+            case DMC400_T_RDLVL_RR:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER))  t_rdlvl_rr = mdata;
+                else DMC400_WARN(" can write T_RDLVL_RR register in config, or low power state only");
+                break;
+            case DMC400_WRLVL_CONTROL:
+                if( (memc_state == DMC400_CONFIG))  wrlvl_control = mdata;
+                else DMC400_WARN(" can write WRLVL_CONTROL register in config state only");
+                break;
+            case DMC400_WRLVL_MRS:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER))  wrlvl_mrs = mdata;
+                else DMC400_WARN(" can write WRLVL_MRS register in config, or low power state only");
+                break;
+            case DMC400_WRLVL_DIRECT:
+                if (the_revision == DMC400_REVISION_R1P0 && memc_state != DMC400_CONFIG)
+                {
+                    DMC400_WARN(" can write WRLVL_DIRECT only in config in r1p0");
+                }
+                else
+                    wrlvl_direct = mdata;
+                break;
+            case DMC400_T_WRLVL_EN:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER))  t_wrlvl_en = mdata;
+                else DMC400_WARN(" can write T_WRLVL_EN register in config, or low power state only");
+                break;
+            case DMC400_T_WRLVL_WW:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER))  t_wrlvl_ww = mdata;
+                else DMC400_WARN(" can write T_WRLVL_WW register in config, or low power state only");
+                break;
+            case DMC400_PHY_POWER_CONTROL:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER))  phy_power_control = mdata;
+                else DMC400_WARN(" can write PHY_POWER_CONTROL register in config, or low power state only");
+                break;
+            case DMC400_PHY_UPDATE_CONTROL:
+                if( (memc_state == DMC400_CONFIG) ||  (memc_state == DMC400_LOWPOWER))  phy_update_control = mdata;
+                else DMC400_WARN(" can write PHY_UPDATE_CONTROL register in config, or low power state only");
+                break;
+            case DMC400_T_LPRESP:
+                if( the_revision == DMC400_REVISION_R0P1)
+                {
+                    DMC400_WARN(" trying to write T_LPRESP which is not defined in this revision of the DMC400");
+                }
+                else
+                {
+                    if ((memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))
+                        t_lpresp = mdata;
+                    else
+                    {
+                        DMC400_WARN(" can write  T_LPRESP register in config, or low power state only");
+                    }
+                }
+                break;
+            case DMC400_USER_STATUS:
+                DMC400_WARN(" attempt to write read-only USER_STATUS register");
+                break;
+            case DMC400_USER_CONFIG0:
+                user_config0 = mdata;
+                break;
+            case DMC400_USER_CONFIG1:
+                user_config1 = mdata;
+                break;
+
+            case DMC400_INTEG_CFG:
+                if ((memc_state == DMC400_CONFIG) || (memc_state == DMC400_LOWPOWER))
+                    integ_cfg = mdata;
+                else
+                {
+                    DMC400_WARN(" can write INTEG_CFG register in config, or low power state only");
+                }
+                break;
+            case DMC400_INTEG_OUTPUTS:
+                {
+                    ostringstream Q;
+                    Q << " write 0x" << hex << setw(8) << mdata << " to write-only INTEG_OUTPUTS register";
+                    DMC400_TRACE(Q.str());
+                }
+                break;
+                
+
+            case DMC400_PERIPH_ID_0:
+                DMC400_WARN("We do not expect a write to PERIPH_ID_0");
+                break;
+            case DMC400_PERIPH_ID_1:
+                DMC400_WARN("We do not expect a write to PERIPH_ID_1");
+                break;
+            case DMC400_PERIPH_ID_2:
+                DMC400_WARN("We do not expect a write to PERIPH_ID_2");
+                break;
+            case DMC400_PERIPH_ID_3:
+                DMC400_WARN("We do not expect a write to PERIPH_ID_3");
+                break;
+
+
+            case DMC400_PCELL_ID_0:
+                DMC400_WARN("We do not expect a write to COMPONENT_ID_0");
+                break;
+            case DMC400_PCELL_ID_1:
+                DMC400_WARN("We do not expect a write to COMPONENT_ID_1");
+                break;
+            case DMC400_PCELL_ID_2:
+                DMC400_WARN("We do not expect a write to COMPONENT_ID_2");
+                break;
+            case DMC400_PCELL_ID_3:
+                DMC400_WARN("We do not expect a write to COMPONENT_ID_3");
+                break;
+            default :
+                ostringstream S;
+                S << " Ignoring write of " << hex << setfill('0') << setw(8) << *data;
+                S << " to unknown register " << hex << setfill('0') << setw(3) << offset;
+                DMC400_WARN(S.str());
+                break;
+        }
+    }
+
+
+    resources
+    {
+        PARAMETER { description("Set this parameter to 0 if memory is connected"), type(int), default(-1) }  IF_CHIP0;   // default to -1 for not connected
+        PARAMETER { description("Set this parameter to 0 if memory is connected"), type(int), default(-1) }  IF_CHIP1;
+        PARAMETER { description("Set this parameter to 0 if memory is connected"), type(int), default(-1) }  IF_CHIP2;
+        PARAMETER { description("Set this parameter to 0 if memory is connected"), type(int), default(-1) }  IF_CHIP3;
+        PARAMETER { description("Valid widths are 16, 32 or 64 bits"), type(int), default(32) }  MEMORY_WIDTH;
+        PARAMETER { description("Does the controller support ECC?"),type(bool),default(true) } ECC_SUPPORT;
+
+        uint32_t  chips_connected[4];    // DMC400 DMC allows a maximum of 4 chips to be connected
+
+
+        DMC400_MEMC_STATES memc_state;                    // use this variable to track the current state of the memory controller
+                                                // one of: DMC400_MEMC_STATES
+
+
+
+        // some variables to maintain the current state of the memory manager
+        uint32_t num_chips_connected;
+        uint32_t memory_width;
+
+        // the status of the memory controller.
+        // used to transition the states of the memory controller
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x000), reset_value(0x000) } memc_status;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x004), reset_value(0x000) } memc_config;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x008), reset_value(0x000) } memc_cmd;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x010), reset_value(0x00030200) } address_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x014), reset_value(0x00000050) } decode_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x018), reset_value(0x22000200) } format_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x020), reset_value(0x00000010) } low_power_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x030), reset_value(0x00000000) } turnaround_priority;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x034), reset_value(0x00000000) } hit_priority;
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x038), reset_value(0x00000000) } qos0_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x03C), reset_value(0x00000001) } qos1_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x040), reset_value(0x00000002) } qos2_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x044), reset_value(0x00000003) } qos3_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x048), reset_value(0x00000004) } qos4_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x04C), reset_value(0x00000005) } qos5_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x050), reset_value(0x00000006) } qos6_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x054), reset_value(0x00000007) } qos7_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x058), reset_value(0x00000008) } qos8_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x05C), reset_value(0x00000009) } qos9_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x060), reset_value(0x0000000A) } qos10_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x064), reset_value(0x0000000B) } qos11_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x068), reset_value(0x0000000C) } qos12_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x070), reset_value(0x0000000D) } qos13_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x074), reset_value(0x0000000E) } qos14_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x078), reset_value(0x0000000F) } qos15_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x07C), reset_value(0x00000001) } timeout_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x080), reset_value(0x00000000) } queue_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x088), reset_value(0x00000000) } write_priority_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x08C), reset_value(0x00000000) } write_priority_control2;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x090), reset_value(0x00000000) } read_priority_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x094), reset_value(0x00000000) } read_priority_control2;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x098), reset_value(0x00000000) } access_address_match;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x09C), reset_value(0x00000000) } access_address_match_63_32;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x0A0), reset_value(0x00000000) } access_address_mask;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x0A4), reset_value(0x00000000) } access_address_mask_63_32;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x100), reset_value(0x00000000) } channel_status;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x108), reset_value(0x00000000) } direct_cmd;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x110), reset_value(0x00000000) } mr_data;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x120), reset_value(0x00000000) } refresh_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x128), reset_value(0x00000000) } interrupt_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x138), reset_value(0x00000000) } interrupt_status;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x140), reset_value(0x00000000) } interrupt_info;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x148), reset_value(0x00000000) } mode_control;
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x200), reset_value(0x00000100) } t_refi;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x204), reset_value(0x00230023) } t_rfc;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x208), reset_value(0x00000002) } t_mrr;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x20C), reset_value(0x00000002) } t_mrw;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x218), reset_value(0x00000005) } t_rcd;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x21C), reset_value(0x0000000E) } t_ras;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x220), reset_value(0x00000005) } t_rp;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x224), reset_value(0x00000005) } t_rpall;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x228), reset_value(0x00000004) } t_rrd;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x22C), reset_value(0x00000014) } t_faw;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x230), reset_value(0x00000005) } read_latency;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x234), reset_value(0x00000004) } t_rtr;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x238), reset_value(0x00000006) } t_rtw;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x23C), reset_value(0x00000000) } t_rtp;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x240), reset_value(0x00000004) } write_latency;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x244), reset_value(0x00000005) } t_wr;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x248), reset_value(0x00040004) } t_wtr;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x24C), reset_value(0x00040000) } t_wtw;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x250), reset_value(0x00000005) } t_eckd;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x254), reset_value(0x00000005) } t_xckd;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x258), reset_value(0x00000002) } t_ep;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x25C), reset_value(0x00020002) } t_xp;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x260), reset_value(0x0000000E) } t_esr;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x264), reset_value(0x01000100) } t_xsr;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x268), reset_value(0x00000005) } t_srckd;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x26C), reset_value(0x00000005) } t_cksrd;
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x300), reset_value(0x00000001) } t_rddata_en;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x304), reset_value(0x00000101) } t_phywrlat;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x308), reset_value(0x00001000) } rdlvl_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x30C), reset_value(0x00000004) } rdlvl_mrs;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x310), reset_value(0x00000000) } rdlvl_direct;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x318), reset_value(0x00000001) } t_rdlvl_en;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x31C), reset_value(0x00000004) } t_rdlvl_rr;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x328), reset_value(0x00001000) } wrlvl_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x32C), reset_value(0x00000086) } wrlvl_mrs;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x330), reset_value(0x00000000) } wrlvl_direct;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x338), reset_value(0x00000001) } t_wrlvl_en;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x33C), reset_value(0x00000004) } t_wrlvl_ww;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x348), reset_value(0x00000000) } phy_power_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x350), reset_value(0x00000000) } phy_update_control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x358), reset_value(0x00000007) } t_lpresp; // r1p0 only
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x400), reset_value(0x00000000) } user_status;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x404), reset_value(0x00000000) } user_config0;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x408), reset_value(0x00000000) } user_config1;
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xE00), reset_value(0x00000000) } integ_cfg;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xE08), reset_value(0x00000000) } integ_outputs;
+
+        uint32_t periph_id_0;
+        uint32_t periph_id_1;
+        uint32_t periph_id_2;
+        uint32_t periph_id_3;
+        uint32_t periph_id_4;
+
+        uint32_t pcell_id_0;
+        uint32_t pcell_id_1;
+        uint32_t pcell_id_2;
+        uint32_t pcell_id_3;
+
+        PARAMETER { description("Diagnostics"), type(uint32_t), default(0), min(0), max(4) } diagnostics;
+        PARAMETER { description("Revision"), type(string), default("r0p1") } revision_string;
+
+        DMC400_REVISION the_revision;
+        DMC400_revision_manager* revman;
+
+        vector<uint32_t> write_masks;
+    }
+
+    behavior init_or_reset(bool true_if_init)
+    {
+        // figure out what revision of the DMC400 we're modelling
+        the_revision = DMC400_REVISION_INVALID;
+        if (revision_string == "r0p1") { the_revision = DMC400_REVISION_R0P1; }
+        if (revision_string == "r1p0") { the_revision = DMC400_REVISION_R1P0; }
+        if (revision_string == "r1p1") { the_revision = DMC400_REVISION_R1P1; }
+        if (the_revision == DMC400_REVISION_INVALID)
+        {
+            message(getInstancePath()+": revision "+revision_string+" not known", MSG_FATAL_ERROR);
+        }
+        
+        if (true_if_init)
+        {
+            revman = new DMC400_revision_manager(this, getInstanceName());
+            revman->fillMaskInformation(the_revision,ECC_SUPPORT,write_masks);
+        }
+
+        int i = 0x0;
+
+        chips_connected[0] = IF_CHIP0;
+        chips_connected[1] = IF_CHIP1;
+        chips_connected[2] = IF_CHIP2;
+        chips_connected[3] = IF_CHIP3;
+
+        num_chips_connected = 0x0;
+        for(i = 0; i < 4; i++ )
+        {
+            if(chips_connected[i] == DMC400_NOT_CONNECTED ) continue;
+            if(chips_connected[i] == DMC400_CONNECTED) num_chips_connected++;   // increment the number of chips connected
+                                                                          // ignore others.. hmmmph
+        }
+
+        if( num_chips_connected == 0x0)
+        {
+            // DMC400_WARN(" There are no chips connected to this DMC400: are you sure this is what you wanted to do?");
+        }
+
+        switch(MEMORY_WIDTH)
+        {
+            case 16:
+                    memory_width = 0x0;
+                    break;
+            case 32:
+                    memory_width = 0x1;
+                    break;
+            case 64:
+                    memory_width = 0x2;
+                    break;
+            default:
+                ostringstream S;
+                S << "Invalid MEMORY_WIDTH " << memory_width << " specified ... defaulting to 32";
+                DMC400_WARN(S.str());
+                memory_width = 0x1;
+        }
+
+        memc_state = DMC400_CONFIG;    // we should be in config mode after the reset.
+
+        // this gives the current status of the memory controller.
+        memc_status   = ( 4<<10 ) | ( 1 << 9) | (4 << 7) | (1 << 4) | (memory_width << 2) | ((uint32_t)memc_state & 0x3);
+        memc_config                = 0x0;
+        memc_cmd                   = 0x0;
+        address_control            = 0x00030200;
+        decode_control             = 0x00000050;
+        format_control             = 0x22000200 | (1+memory_width);
+        low_power_control          = 0x00000010;
+        turnaround_priority        = 0x0;
+        hit_priority               = 0x0;
+        qos0_control               = 0x0;
+        qos1_control               = 0x1;
+        qos2_control               = 0x2;
+        qos3_control               = 0x3;
+        qos4_control               = 0x4;
+        qos5_control               = 0x5;
+        qos6_control               = 0x6;
+        qos7_control               = 0x7;
+        qos8_control               = 0x8;
+        qos9_control               = 0x9;
+        qos10_control              = 0xA;
+        qos11_control              = 0xB;
+        qos12_control              = 0xC;
+        qos13_control              = 0xD;
+        qos14_control              = 0xE;
+        qos15_control              = 0xF;
+        timeout_control            = 0x1;
+        queue_control              = 0x0;
+        write_priority_control     = 0x0;
+        write_priority_control2    = 0x0;
+        read_priority_control      = 0x2;
+        read_priority_control2     = 0x0;
+        access_address_match       = 0x0;
+        access_address_match_63_32 = 0x0;
+        access_address_mask        = 0x0;
+        access_address_mask_63_32  = 0x0;
+        channel_status             = 0x0;
+        direct_cmd                 = 0x0;
+        mr_data                    = 0x0;
+        interrupt_control          = 0x0;
+        interrupt_status           = 0x0;
+        interrupt_info             = 0x0;
+        mode_control               = 0x0;
+
+        // Leave the T_* registers to be initialised/reset by the REGISTER{} resources
+
+        periph_id_0  = 0x40;
+        periph_id_1  = 0xB4;
+
+        switch(the_revision)
+        {
+        case DMC400_REVISION_R0P1:
+            periph_id_2 = 0x1B;
+            break;
+        case DMC400_REVISION_R1P0:
+            periph_id_2 = 0x2B;
+            break;
+        case DMC400_REVISION_R1P1:
+            periph_id_2 = 0x3B;
+            break;
+        default:
+            message(getInstancePath()+": reached impossible path in switch", MSG_FATAL_ERROR);
+            break;
+        }
+
+        periph_id_3  = 0x0;
+        periph_id_4  = 0x4;
+
+        pcell_id_0   = 0x0D;
+        pcell_id_1   = 0xF0;
+        pcell_id_2   = 0x05;
+        pcell_id_3   = 0xB1;
+    }
+
+
+    behavior init()
+    {
+        composition.init();
+        init_or_reset(true);
+    }
+
+    behavior reset(int T)
+    {
+        composition.reset(T);
+        init_or_reset(false);
+    }
+
+    behavior terminate()
+    {
+        composition.terminate();
+        delete revman;
+    }
+
+    // debugger register access support
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        do_reg_read(reg_id, (uint32_t*)datap);
+
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        do_reg_write( reg_id, (uint32_t *) datap);
+
+        return ACCESS_FUNC_OK;
+    }
+}

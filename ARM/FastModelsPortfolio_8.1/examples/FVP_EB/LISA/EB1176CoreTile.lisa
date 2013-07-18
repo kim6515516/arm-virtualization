@@ -1,0 +1,40 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component EB1176CoreTile
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "ARM1176 Core Tile for Emulation Baseboard.";
+    }
+
+    composition
+    {
+        clockdivider : ClockDivider(div=24,mul=100);
+        fvp_gic : FVP_GIC();
+        pvbusdecoder_0 : PVBusDecoder();
+        connector : EBConnector();
+        core : ARM1176CT();
+    }
+    connection
+    {
+        core.ticks => self.ticks;
+        connector.connector => self.hdr;
+        core.pvbus_m => pvbusdecoder_0.pvbus_s;
+        pvbusdecoder_0.pvbus_m_range[0x0..0xffffffff] => connector.pvbus;
+        pvbusdecoder_0.pvbus_m_range[0x10041000..0x10041fff] => fvp_gic.pvbus_distributor;
+        pvbusdecoder_0.pvbus_m_range[0x10040000..0x10040fff] => fvp_gic.pvbus_core;
+        fvp_gic.irq => core.irq;
+        fvp_gic.fiq => core.fiq;
+        connector.intr_num => fvp_gic.int_num;
+        connector.intr => fvp_gic.int_in;
+        connector.clk_bus => clockdivider.clk_in;
+        clockdivider.clk_out => core.clk_in;
+    }
+    master port<InstructionCount> ticks;
+    master port<CompoundPortLisa> hdr;
+}

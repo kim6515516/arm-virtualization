@@ -1,0 +1,843 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+ 
+/*
+ * 2nd generation virtual file system
+ *
+ * This component can be added to any model to provide a virtual device with
+ * access to one or more directories on the host filing system. As this is a
+ * virtual device it requires a custom target OS device driver.
+ *
+ * This component requires that VFS.cpp/h, MessageBox.h and
+ * VFSFileSystem.cpp/h be added to the platform
+ *
+ * Implementation details:
+ *
+ * The VFS2.lisa component acts as a virtual device that can be dropped into
+ * any platform model and will provide, in concert with a target OS driver,
+ * access to designated parts of the host filing system. This effectively
+ * provides shared, persistent storage from within the target OS.
+ *
+ * The VFS2 component uses a MessageBox component to connect to the PVBus and
+ * allow the receipt and sending of blocks of data as 'messages'. On receipt of
+ * a message it will use a MessageDecomposer to extract arguments to be used to
+ * compose a call to the VFS support class to perform an filing system
+ * operation. When that operation completes, a MessageComposer is used to
+ * convert returned data and arguments into a message to send back to the
+ * target driver.
+ *
+ */
+
+component VFS2
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Virtual Filesystem Device";
+    }
+    
+    includes
+    {
+        #include "hostconf/zinttypes.h"
+        #include "VFS.h"
+        #include "VFSOps.h"
+        
+        #include "MessageCodec.h"
+        
+        // these are only necessary if backgrounding is enabled
+        #include "TxLib/TxLib.h"
+        #include "sg/SGScheduler.h"
+        
+        #define vfs_trace           if (!0) ; else printf
+        #define vfs_trace_op        if (!0) ; else printf
+        #define vfs_trace_debug     if (!0) ; else printf
+        #define vfs_trace_worker    if (!0) ; else printf
+        // Set this to 'if (1)' to trace messages when a client OS
+        // driver bug results in an ill-formed messagebox packet
+        #define vfs_trace_clienterr if (!0) ; else printf
+    }
+    
+    resources
+    {
+        PARAMETER { type(string), default(""), description("Path to host system folder to make accessible to target OS") } mount; 
+        
+        // simple worker thread class to move simulation work to the background
+        class WorkerThread : public TxRunnable
+        {
+            TxThread *thread;              // actual thread
+            TxEvent   work_ready;          // set when work is available to do
+            sg::AsyncSignal async;         // object to generate callbacks in the simulation thread
+            bool quit;                     // terimination flag
+            
+            virtual void runThread()
+            {
+                vfs_trace_worker("WorkerThread(back)::init\n");
+                
+                while (1)
+                {
+                    // wait for a message to become ready
+                    work_ready.Wait();
+                    work_ready.ResetEvent();
+                    
+                    if (quit)
+                        break;
+                    
+                    vfs_trace_worker("WorkerThread(back)::start work\n");
+                    
+                    doWork();
+
+                    vfs_trace_worker("WorkerThread(back)::end work\n");
+                    
+                    // schedule a callback in the simulation thread to indicate that
+                    // async processing is complete
+                    async.signal();
+                }
+                
+                vfs_trace_worker("WorkerThread(back)::terminate\n");
+            }
+            
+            void async_callback()
+            {
+                vfs_trace_worker("WorkerThread(fore)::end work\n");
+                
+                workComplete();
+            }
+     
+        protected:
+
+            WorkerThread(sg::SimulationContext *simulationContext):
+            async("async", simulationContext)
+            {
+                quit = false;
+                thread = 0;
+                
+                // C++ equivalent of binding a behaviour to a port
+                bind_method(async.async_callback, signal, &WorkerThread::async_callback, this);
+            }
+            
+        public:
+        
+            virtual ~WorkerThread()
+            {
+                quit = true;
+                work_ready.SetEvent();
+                
+                if (thread != NULL)
+                {
+                    thread->join(NULL);
+                }
+                
+                delete thread;
+            }
+            
+            // user method to queue work for background processing
+            void startWork()
+            {
+                vfs_trace_worker("WorkerThread(fore)::start work\n");
+                
+                if (thread == NULL)
+                {
+                    thread = new TxThread(this);
+                }
+                work_ready.SetEvent();
+            }
+           
+            // user callback in worker thread when work is available
+            virtual void doWork() = 0;
+           
+            // user callback in simulation thread when work is complete 
+            virtual void workComplete() = 0;
+        };
+        
+        
+        // C++ action class handling processing of messages, optionally using a background thread
+        class ProcessMessage : public WorkerThread
+        {
+            // locals for passing message parameters to the background thread
+            
+            const void* async_data_in;
+            uint32_t    async_len_in;
+            void*       async_data_out;
+            uint32_t    async_len_out;
+            
+            protocol_Value* completion;     // completion port
+            
+            // shared transfer buffer that can be used for read/write/other data
+            // this could be done inline in the message
+            uint8_t transfer_buffer[VFS_MAX_TRANSFER];
+            
+        public:
+            VFS vfs;     
+            
+            
+        public:
+            ProcessMessage(sg::SimulationContext *simulationContext): 
+            WorkerThread(simulationContext)
+            {
+                completion = NULL;
+            }
+            
+            virtual ~ProcessMessage()
+            {
+            }
+            
+            virtual void doWork()
+            {
+                process_message(async_data_in, async_len_in, async_data_out, &async_len_out);
+            }
+            
+            virtual void workComplete()
+            {
+                // signal completion to the lisa port so it can complete the message handling
+                if (completion)
+                    completion->setValue(async_len_out);
+            }
+            
+            
+            void setCompletionPort(protocol_Value* completion_port)
+            {
+                completion = completion_port;
+            }
+            
+            // process a message using the background thread. 
+            void async_message(const void* data_in, uint32_t len_in, void* data_out, uint32_t* len_out)
+            {
+                // save the parameters for the background thread
+                async_data_in  = data_in;
+                async_len_in   = len_in;
+                async_data_out = data_out;
+                async_len_out  = *len_out;  // value is returned by completion
+                
+                // wake up the background thread to process the message
+                startWork();
+            }
+            
+            
+            // process a message immediately (in the caller thread). No asynchronous signal will be sent
+            void sync_message(const void* data_in, uint32_t len_in, void* data_out, uint32_t* len_out)
+            {
+                process_message(data_in, len_in, data_out, len_out);
+            }
+        
+        private:
+
+            bool check_get(MessageComposer& rmsg, bool result, const char *what)
+            {
+                if (!result)
+                {
+                    vfs_trace_clienterr("VFS CLIENT BUG: %s\n", what);
+                    rmsg.put_uint32(VFS_ERR_INVALID);
+                }
+                return result;
+            }
+            
+            // routine to process a message
+            // receive a message from the vm (buffered in the message box)
+            // extract arguments from the message
+            // invoke the correct vfs behaviour
+            // compose a reply message
+            // send it back to the driver
+            void process_message(const void* data_in, uint32_t len_in, void* data_out, uint32_t* len_out)
+            {
+                MessageDecomposer msg(data_in, len_in);
+                
+                // VFS messages consist of:
+                //  uint32_t driver_id; 
+                //  uint32_t vfs_op;  
+                //  operation dependent arguments
+                
+                // VFS replies consist of:
+                //  uint32_t driver_id;
+                //  int32_t return value (typically)
+                //  operation dependent arguments
+                
+                // for now, all VFS ops are atomic, in future they won't be
+                // but that requires copying parameters (or more easily messages)
+                // to a background thread and processing the fs request there.
+                
+                // Note that it is important not to trust data from the client!
+
+                uint32_t id = 0;
+                uint32_t vfsop = 0xFFFFFFFF;
+                bool failed = false;
+                
+                if (!msg.get_uint32(&id))
+                {
+                    failed = true;
+                    vfs_trace_clienterr("VFS CLIENT BUG: no ID\n");
+                }
+                else if (!msg.get_uint32(&vfsop))
+                {
+                    failed = true;
+                    vfs_trace_clienterr("VFS CLIENT BUG: no vfsop\n");
+                }
+                
+                // as we've pulled the id and op, the buffer can be shared providing all the 
+                
+                MessageComposer rmsg(data_out, *len_out);
+                rmsg.put_uint32(id);
+                if (failed)
+                {
+                    rmsg.put_uint32(VFS_ERR_INVALID);
+                    return;
+                }
+                
+                switch (vfsop)
+                {
+                    case VFS_OPENMOUNTS: // in: void, out: int handle
+                    {                    
+                        vfs_trace_op("vfs_openmounts()");
+                        
+                        int32_t ret = vfs.openmounts();
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        rmsg.put_int32(ret);
+                        
+                    }    
+                    break;
+                    
+                    case VFS_READMOUNTS: // in: int32 handle, uint32 attr, uint32 attrlen, out: result, attribute data
+                    {
+                        int32_t handle;
+                        uint32_t attr;
+                        uint8_t* attrdata = transfer_buffer;
+                        uint32_t attrdatalen;
+                        
+                        if (!check_get(rmsg, msg.get_int32(&handle), "readmounts(handle)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint32(&attr), "readmounts(attr)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint32(&attrdatalen), "readmounts(attrdatalen)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_readmounts(handle=%d, attr=0x%x, attrlen=%d)", handle, attr, attrdatalen); 
+                        
+                        if (attrdatalen > VFS_MAX_TRANSFER)
+                            attrdatalen = VFS_MAX_TRANSFER;
+                        
+                        int32_t ret = vfs.readmounts(handle, attr, attrdata, attrdatalen);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        // could use varargs for the result
+                        rmsg.put_int32(ret);
+                        rmsg.put_data(attrdata, attrdatalen);
+                    }
+                    break;
+                    
+                    case VFS_CLOSEMOUNTS: // in: int32 out: void
+                    {
+                        int32_t handle;
+                        
+                        if (!check_get(rmsg, msg.get_int32(&handle), "closemounts(handle)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_closemounts(%d)", handle);
+                        
+                        int32_t ret = vfs.closemounts(handle);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                    
+                    case VFS_OPENDIR: // in: cstr path out: int32 handle
+                    {
+                        uint32_t plen = VFS_MAX_PATH;
+                        char path[VFS_MAX_PATH];
+                        
+                        if (!check_get(rmsg, msg.get_cstr(path, &plen), "opendir(path)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_opendir(path=%s)", path);
+                        
+                        int32_t ret = vfs.opendir(path);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                    
+                    case VFS_READDIR: // in: int32 handle, uint32 attrs, uint32 attrlen, out: int32 result, attr data
+                    {
+                        int32_t handle;
+                        uint32_t attrs;
+                        uint32_t attrdatalen;
+                        uint8_t* attrdata = transfer_buffer;
+                        
+                        if (!check_get(rmsg, msg.get_int32(&handle), "readdir(handle)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint32(&attrs), "readdir(attrs)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint32(&attrdatalen), "readdir(attrdatalen)"))
+                            return;
+                        
+                        if (attrdatalen > VFS_MAX_TRANSFER)
+                            attrdatalen = VFS_MAX_TRANSFER;
+                            
+                        vfs_trace_op("vfs_readdir(handle=%d, attr=0x%x, attrlen=%d)", handle, attrs, attrdatalen);
+                            
+                        int32_t ret = vfs.readdir(handle, attrs, attrdata, attrdatalen);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+
+                        rmsg.put_int32(ret);
+                        rmsg.put_data(attrdata, attrdatalen);   
+                    }
+                    break;
+                     
+                    case VFS_CLOSEDIR: // in: int32 handle out: int32 result
+                    {
+                        int32_t handle;
+                        
+                        if (!check_get(rmsg, msg.get_int32(&handle), "closedir(handle)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_closedir(handle=%d)", handle);
+                        
+                        int32_t ret = vfs.closedir(handle);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_MKDIR: // in: cstr dirname out: int32 result 
+                    {
+                        uint32_t namelen = VFS_MAX_PATH;
+                        char dirname[VFS_MAX_PATH];
+                        
+                        if (!check_get(rmsg, msg.get_cstr(dirname, &namelen), "mkdir(dirname)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_mkdir(name=%s)", dirname);
+                        
+                        int32_t ret = vfs.mkdir(dirname);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_RMDIR: // in: cstr dirname out: int32 result 
+                    {
+                        uint32_t namelen = VFS_MAX_PATH;
+                        char dirname[VFS_MAX_PATH];
+                        
+                        if (!check_get(rmsg, msg.get_cstr(dirname, &namelen), "rmdir(dirname)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_rmdir(name=%s)", dirname);
+                        
+                        int32_t ret = vfs.rmdir(dirname);
+                        
+                        vfs_trace_op(" -> %d\n", ret);                
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_REMOVE: // in: out: 
+                    {
+                        uint32_t namelen = VFS_MAX_PATH;
+                        char filename[VFS_MAX_PATH];
+                        
+                        if (!check_get(rmsg, msg.get_cstr(filename, &namelen), "remove(filename)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_remove(name=%s)", filename);
+                        
+                        int32_t ret = vfs.remove(filename);
+                        
+                        vfs_trace_op(" -> %d\n", ret);                
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_RENAME: // in: cstr filename1, cstr filename2 out: int32 result 
+                    {
+                        uint32_t namelen1 = VFS_MAX_PATH;
+                        char filename1[VFS_MAX_PATH];
+                        uint32_t namelen2 = VFS_MAX_PATH;
+                        char filename2[VFS_MAX_PATH];
+                        
+                        if (!check_get(rmsg, msg.get_cstr(filename1, &namelen1), "rename(filename1)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_cstr(filename2, &namelen2), "rename(filename2"))
+                            return;
+                        
+                        vfs_trace_op("vfs_rename(oldname=%s, newname=%s)", filename1, filename2);
+                        
+                        int32_t ret = vfs.rename(filename1, filename2);
+                        
+                        vfs_trace_op(" -> %d\n", ret);                
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_GETATTR: // in: cstr filename, uint32 attr, uint32 attrlen out: int32 result, attr data 
+                    {
+                        uint32_t namelen = VFS_MAX_PATH;
+                        char filename[VFS_MAX_PATH];
+                        uint32_t attrs;
+                        uint32_t attrdatalen;
+                        uint8_t* attrdata = transfer_buffer;
+                        
+                        if (!check_get(rmsg, msg.get_cstr(filename, &namelen), "getattr(filename)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint32(&attrs), "getattr(attrs)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint32(&attrdatalen), "getattr(attrdatalen)"))
+                            return;
+                        
+                        if (attrdatalen > VFS_MAX_TRANSFER)
+                            attrdatalen = VFS_MAX_TRANSFER;
+                            
+                        vfs_trace_op("vfs_getattr(name=%s, attr=0x%x, attrlen=%d)", filename, attrs, attrdatalen);
+                            
+                        int32_t ret = vfs.getattr(filename, attrs, attrdata, attrdatalen);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+
+                        rmsg.put_int32(ret);
+                        rmsg.put_data(attrdata, attrdatalen);
+                    }
+                    break;
+                     
+                    case VFS_SETATTR: // in: cstr filename, uint32 attr, void* attrdata, out: result 
+                    {
+                        uint32_t namelen = VFS_MAX_PATH;
+                        char filename[VFS_MAX_PATH];
+                        uint32_t attrs;
+                        uint32_t attrdatalen = VFS_MAX_TRANSFER;  // maybe this should be passed in?
+                        uint8_t* attrdata = transfer_buffer;
+                        
+                        if (!check_get(rmsg, msg.get_cstr(filename, &namelen), "setattr(filename)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint32(&attrs), "setattr(attrs)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_data(attrdata, &attrdatalen), "setattr(attrdatalen)"))
+                            return; // this doesn't have to be copied
+                        
+                        if (attrdatalen > VFS_MAX_TRANSFER)
+                            attrdatalen = VFS_MAX_TRANSFER;
+                            
+                        vfs_trace_op("vfs_setattr(name=%s, attr=0x%x, attrlen=%d)", filename, attrs, attrdatalen);
+                        
+                        int32_t ret = vfs.setattr(filename, attrs, attrdata, attrdatalen);
+
+                        vfs_trace_op(" -> %d\n", ret);
+
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_OPENFILE: // in: cstr filename, uint32 flags out: handle
+                    {
+                        uint32_t namelen = VFS_MAX_PATH;
+                        char filename[VFS_MAX_PATH];
+                        uint32_t flags;
+                        
+                        if (!check_get(rmsg, msg.get_cstr(filename, &namelen), "openfile(filename"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint32(&flags), "openfile(flags)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_openfile(name=%s, flags=0x%x)", filename, flags);
+                        
+                        int32_t ret = vfs.openfile(filename, flags);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_CLOSEFILE: // in: int32 handle out: int32_t result
+                    {
+                        int32_t handle;
+                        
+                        if (!check_get(rmsg, msg.get_int32(&handle), "closefile(handle)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_closefile(%d)", handle);
+                        
+                        int32_t ret = vfs.closefile(handle);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_WRITEFILE: // in: int32 handle, uint64_t offset, int32_t len, void* data, out: int32_t result
+                    {
+                        int32_t handle;
+                        uint64_t offset;
+                        void* data = transfer_buffer;       // todo - shared buffer for now 
+                        uint32_t len = VFS_MAX_TRANSFER;
+                        
+                        if (!check_get(rmsg, msg.get_int32(&handle), "writefile(handle)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint64(&offset), "writefile(offset)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_data(data, &len), "writefile(data)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint32(&len), "writefile(len)"))
+                            return;
+                        
+                        if (len > VFS_MAX_TRANSFER)
+                            len = VFS_MAX_TRANSFER;
+                        
+                        vfs_trace_op("vfs_writefile(handle=%d, offset=%"PRId64", len=%d)", handle, offset, len);
+                        
+                        int32_t ret = vfs.writefile(handle, offset, data, len);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_READFILE: // in: int32 handle, uint64_t offset, int32_t len, out: int32_t result, void* data 
+                    {
+                        int32_t handle;
+                        uint64_t offset;
+                        void* data = transfer_buffer; 
+                        uint32_t len;
+                        
+                        if (!check_get(rmsg, msg.get_int32(&handle), "readfile(handle)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint64(&offset), "readfile(offset)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint32(&len), "readfile(len)"))
+                            return;
+                        
+                        if (len > VFS_MAX_TRANSFER)
+                            len = VFS_MAX_TRANSFER;
+                        
+                        vfs_trace_op("vfs_readfile(handle=%d, offset=%"PRId64", len=%d)", handle, offset, len);
+
+                        int32_t ret = vfs.readfile(handle, offset, data, len);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        rmsg.put_int32(ret);
+                        rmsg.put_data(data, len);
+                    }
+                    break;
+                     
+                    case VFS_GETFILESIZE: // in: int32_t handle out: int32_t ret, uint64_t size 
+                    {
+                        int32_t handle;
+                        uint64_t size;
+                        
+                        if (!check_get(rmsg, msg.get_int32(&handle), "getfilesize(handle)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_getfilesize(handle=%d)", handle);
+                        
+                        int32_t ret = vfs.getfilesize(handle, &size);
+                        
+                        vfs_trace_op(" -> (%d, size=%"PRId64")\n", ret, size);
+                        
+                        rmsg.put_int32(ret);
+                        rmsg.put_uint64(size);
+                    }
+                    break;
+                     
+                    case VFS_SETFILESIZE: // in: int32_t handle, uint64_t size out: int32_t ret
+                    {
+                        int32_t handle;
+                        uint64_t size;
+                        
+                        if (!check_get(rmsg, msg.get_int32(&handle), "setfilesize(handle)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_uint64(&size), "setfilesize(size)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_setfilesize(handle=%d, size=%"PRIu64")", handle, size);
+                        
+                        int32_t ret = vfs.setfilesize(handle, size);
+
+                        vfs_trace_op(" -> %d\n", ret);
+                                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_FILESYNC: // in: int32_t handle out: int32_t result 
+                    {
+                        int32_t handle;
+                        
+                        if (!check_get(rmsg, msg.get_int32(&handle), "filesync(handle)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_filesync(handle=%d)", handle);
+                        
+                        int32_t ret = vfs.filesync(handle);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_SYMLINK: // in: cstr filename, cstr symlink out: int32_t result
+                    {
+                        uint32_t namelen1 = VFS_MAX_PATH;
+                        char filename[VFS_MAX_PATH];
+                        uint32_t namelen2 = VFS_MAX_PATH;
+                        char symlink[VFS_MAX_PATH];
+                        
+                        if (!check_get(rmsg, msg.get_cstr(filename, &namelen1), "symlink(filename)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_cstr(symlink, &namelen2), "symlink(symlink)"))
+                            return;
+                        
+                        vfs_trace_op("vfs_symlink(path=%s, symlink=%s)", filename, symlink);
+                        
+                        int32_t ret = vfs.symlink(filename, symlink);
+                        
+                        vfs_trace_op(" -> %d\n", ret);
+                        
+                        rmsg.put_int32(ret);
+                    }
+                    break;
+                     
+                    case VFS_READLINK: // in: cstr filename, int32 bufsiz out: cstr in buf 
+                    {
+                        uint32_t namelen = VFS_MAX_PATH;
+                        char filename[VFS_MAX_PATH];
+                        char* buf = (char*)transfer_buffer;
+                        int bufsiz;
+                        
+                        if (!check_get(rmsg, msg.get_cstr(filename, &namelen), "readlink(filename)"))
+                            return;
+                        if (!check_get(rmsg, msg.get_int32(&bufsiz), "readlink(bufsiz)"))
+                            return;
+                        
+                        // could use the transfer buffer
+                        if (bufsiz > VFS_MAX_TRANSFER)
+                            bufsiz = VFS_MAX_TRANSFER;
+                        
+                        vfs_trace_op("vfs_readlink(path=%s, bufsiz=%d)", filename, bufsiz);
+                        
+                        int32_t ret = vfs.readlink(filename, buf, bufsiz);
+                        
+                        vfs_trace_op(" -> (%d, buf=%s)\n", ret, buf);
+                        
+                        rmsg.put_int32(ret);
+                        rmsg.put_data(buf, bufsiz);
+                    }
+                    break;
+                    
+                    default:
+                        vfs_trace("Undefined VFS operation %d\n", vfsop);
+                    break;            
+                }
+                
+                *len_out = rmsg.get_size();                
+            }
+        };
+        
+        ProcessMessage *action;
+        
+        bool background;
+    }
+    
+    composition
+    {
+        messagebox : MessageBox(id = 0x56465332); // 'VFS2'
+    }
+    
+    connection
+    {
+        self.pvbus_s => messagebox.pvbus_s;
+        self.message => messagebox.message;
+        
+        messagebox.intr => self.intr;
+    }
+    
+// external ports
+
+    slave port<PVBus> pvbus_s;
+    
+    master port<Signal> intr;
+    
+// internal ports
+
+    internal master port<MessageBoxProtocol> message
+    {
+        // called when a message has been received from the virtual machine
+        // this hands off the processing to an action object either
+        // synchronously or asynchronously. On an asynchronous call there will be a
+        // callback to signal that the asynchronous processing has finished
+        behaviour handle_message(const void* data, uint32_t len) : int32_t
+        {
+            void* data_out;
+            uint32_t len_out = 8192;
+            
+            message.begin_msg(&data_out, len_out);
+
+            if (background)
+            {
+                // process the message in the background. when it is complete, the
+                // action will raise the completion signal
+                action->async_message(data, len, data_out, &len_out);
+            }
+            else
+            {
+                // process the message in the foreground. this will not signal completion
+                action->sync_message(data, len, data_out, &len_out);
+                
+                // invoke the completion handler directly
+                self.complete.setValue(len_out);
+            }
+            
+            // ignored
+            return 0;
+        }
+    }
+    
+    // port used to signal completion of message processing (both background and foreground)
+    internal slave port<Value> complete
+    {
+        behavior setValue(uint32_t reply_len)
+        {
+            // end the message. this will cause interrupts/status to be set appropriately
+            message.end_msg(reply_len);
+        }
+    }
+    
+// implementation
+
+    behaviour init()
+    {
+        action = new ProcessMessage(getSimulationContext());
+        composition.init();
+        
+        // temporarily support a single mount called 'A'
+        if (mount != "")
+            action->vfs.addMount("A", mount.c_str());
+        
+        background = true;
+        
+        action->setCompletionPort(complete.getAbstractInterface());
+    }
+    
+    behavior terminate
+    {
+        composition.terminate();
+        delete action;
+    }
+}

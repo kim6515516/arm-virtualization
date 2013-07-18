@@ -1,0 +1,35 @@
+/*!
+ *  \file   CounterInterface.lisa
+ *  \brief  Counter Interface protocol spoken between counter interfaces and
+ *          SoC Level memory mapped counter implementations.
+ *  \date   Copyright ARM Limited 2011 All Rights Reserved.
+ * 
+ * This interface may change in future versions of Fast Models.
+ */
+
+protocol CounterInterface
+{
+    properties {
+        version = "8.1.37";
+        description = "Interface between SoC Counter modules and cluster interfaces";
+    }
+
+    // Get the absolute value of the physical timer
+    master behavior getCounterValue() : uint64_t;
+    // Request a signalUpdate at a particular time
+    master behavior requestSignalUpdate(uint64_t at) : void;
+    // Callback into counter clients. May be called at any time. It is the
+    // client's responsibility to interrogate the physical counter to determine
+    // if its timers should be signaled in response to the callback.
+    slave behavior signalUpdate(void) : void;
+    // Communicate to the client if the counter module is enabled or not
+    slave behavior setEnabled(bool) : void;
+    // Request an eventUpdate at a particular time
+    master behavior requestEventUpdate(uint64_t at) : void;
+    // Callback into event clients. May be called at any time. It is the
+    // client's responsibility to interrogate the physical counter to determine
+    // if its event should have been fired.
+    slave behavior eventUpdate() : void;
+}
+
+/* eof CounterInterface.lisa */

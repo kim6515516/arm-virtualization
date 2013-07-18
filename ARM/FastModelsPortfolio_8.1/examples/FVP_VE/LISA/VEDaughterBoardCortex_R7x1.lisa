@@ -1,0 +1,46 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+ 
+ component VEDaughterBoardCortex_R7x1
+ {
+     properties
+     {
+         version = "8.1.37";
+         component_type = "System";
+         description = "Cortex_R7x1 DaughterBoard for Versatile Express";
+     }
+     
+     composition
+     {
+         pl310_l2cc : PL310_L2CC();
+         core : ARMCortexR7x1CT();
+         dram : RAMDevice("size"=0x40000000);
+         veinterruptmapper : VEInterruptMapper();
+         pvbusdecoder : PVBusDecoder();
+         periph_clockdivider : ClockDivider("div"=2);
+     }
+     
+     connection
+     {
+         self.clk_in => core.clk_in;
+         self.clk_in => periph_clockdivider.clk_in;
+         periph_clockdivider.clk_out => core.periphclk_in;
+         
+         self.interrupts => veinterruptmapper.irq_in;
+         veinterruptmapper.irq_out => core.ints;
+
+         core.pvbus_m0 => pvbusdecoder.pvbus_s;
+
+         core.ticks[0] => self.ticks[0];
+         pl310_l2cc.pvbus_m => self.pvbus_m0;
+         pvbusdecoder.pvbus_m_range[0x0..0xffffffff] => self.pvbus_m0;
+         pvbusdecoder.pvbus_m_range[0x0..0x3fffffff] => dram.pvbus;
+         pvbusdecoder.pvbus_m_range[0xae000000..0xaeffffff] => pl310_l2cc.pvbus_s;
+     }
+     
+     slave port<ClockSignal> clk_in;
+     slave port<Signal> interrupts[48];
+     master port<PVBus> pvbus_m0;
+     master port<InstructionCount> ticks[2];
+ }

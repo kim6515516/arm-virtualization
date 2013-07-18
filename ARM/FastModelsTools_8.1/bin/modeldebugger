@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# add libstdc++.so.6 to LD_LIBRARY_PATH
+# call this script "./modeldebugger" when calling from same directory!!!
+LD_LIBRARY_PATH=`echo $0|sed 's,modeldebugger$,../lib,g'`:${LD_LIBRARY_PATH}
+
+export LD_LIBRARY_PATH
+
+#echo LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+
+# start the modeldebugger.exec binary:
+exec $0.exec "$@"

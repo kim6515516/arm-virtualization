@@ -1,0 +1,19 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+extern component SerialCrossover
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Implement an equivalent to a null-modem cable, swapping over serial transmit and receive signals.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    slave port<SerialData> port_a;
+    slave port<SerialData> port_b;
+}
+

@@ -1,0 +1,186 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+
+///
+/// Allow the remapping of connections through the component.
+///
+/// When a transaction is made to a 4 KiB then it makes it through a channel,
+/// and if one doesn't exist then it must create one.  The channel creation
+/// request is made with the specific attributes of the transaction and it is
+/// up to the system to determine where the end point of that channel should be.
+///
+/// This component allows us to intercept the channel creation process and
+/// change the attributes for that channel as it flows through this component.
+///
+/// For example, we could remap the address, or the attributes, or both!
+///
+/// This component also allows us to remap to any one of the downstream ports.
+///
+/// NOTE that channels are created and destroyed for any reason and so for a
+/// simulation to be deterministic then the component should always remap
+/// channels idempotently.
+///
+
+protocol PVBusMapperControl
+{
+    properties { 
+        version = "8.1.37";
+        description = "PVBusMapperControl Protocol";
+    }
+
+    includes
+    {
+        #include "pv/TransactionAttributes.h"
+        #include "pv/PVBusMapper.h"
+        #include "pv/DVM.h"
+        #include "pv/RemapRequest.h"
+        #include "pv/DVMNodeRecord.h"
+    }
+
+    ///
+    /// Return the port that this should be filtered to based on the attributes
+    /// and the address information held in the RemapRequest object.  You may
+    /// also indicate a remapping of the attributes and address in this call.
+    ///
+    /// You may tag this decision with zero, one or more objects of type
+    /// deriving from RemapDecisionGroup that can be used to revoke all
+    /// decisions tagged with the same RemapDecisionGroup object which is
+    /// allocated and owned by the component implementing the remap() function.
+    /// (See the RemapDecisionGroup class for more details.)
+    ///
+    /// The remapper must be consistent w.r.t. its decisions and so they
+    /// essentially have to be statically determined.
+    ///
+    /// The return number is a port number of pvbus_m, or the special values:
+    ///     * PVBUSMAPPER_ABORT -- abort all accesses
+    ///     * PVBUSMAPPER_IGNORE -- ignore all accesses read-as-zero/write-ignored (RAZ/WI)
+    ///
+    /// Any other value is considered an error.
+    ///
+    slave behavior remap(
+        pv::RemapRequest& req_
+        ) : unsigned;
+
+    ///
+    /// We allow something connected to the control port to generate an event to
+    /// the upstream that indicates the bus map is changing and to ask for all
+    /// requests to be remapped again.
+    ///
+    master behaviour allBusMapChanging() : void;
+
+    ///
+    /// If handling_of_dvm_messages_from_upstream is set to 'handle' then this behaviour
+    /// will be called when a DVM message from upstream is received.
+    ///
+    /// You get told the port_index_ that the DVM message came from and an
+    /// opaque pointer to the upstream master within that connection.  This
+    /// pointer will be the same one returned in the DVMNodeRecord obtained from
+    /// getDVMNodesCanSendTo().
+    ///
+    /// BEWARE: If you may _not_ alter message_ and forward it!
+    ///         You must first copy it and then forward the copy.
+    ///         The actually message may be being used (or will be used) by
+    ///         multiple components and you altering it will alter their
+    ///         version as well.
+    ///
+    /// NOTE that this is a message received _from_ Upstream and so it is a
+    /// Downstream DVM message.
+    optional slave behaviour handleDownstreamDVMMessageFromUpstream(
+        unsigned             upstream_port_index_,
+        void*                arc_within_port_,
+        DVM::Message*        message_
+        ) : DVM::error_response_t;
+    
+    ///
+    /// If handling_of_dvm_messages_from_downstream is set to 'handle' then this behaviour
+    /// will be called when a DVM message from downstream is received.
+    ///
+    /// You get told the port_index_ that the DVM message came from and an
+    /// opaque pointer to the upstream master within that connection.  This
+    /// pointer will be the same one returned in the DVMNodeRecord obtained from
+    /// getDVMNodesCanSendTo().
+    ///
+    /// BEWARE: If you may _not_ alter message_ and forward it!
+    ///         You must first copy it and then forward the copy.
+    ///         The actually message may be being used (or will be used) by
+    ///         multiple components and you altering it will alter their
+    ///         version as well.
+    ///
+    /// NOTE that this is a message received _from_ Downstream and so it is a
+    /// Upstream DVM message.
+    optional slave behaviour handleUpstreamDVMMessageFromDownstream(
+        unsigned             downstream_port_index_,
+        void*                arc_within_port_,
+        DVM::Message*        message_
+        ) : DVM::error_response_t;
+
+    ///
+    /// If you wish to send DVM messages then you have to have a description of
+    /// where to send it.
+    ///
+    /// You can ask PVBusMapper() to give you a vector of records containing
+    /// all upstream and downstream nodes.  This records set is only available
+    /// after first reset.  You pass in a vector that you want filled out with
+    /// the appropriate nodes.
+    ///
+    /// It will return true if the lists are valid (even if emtpy()), otherwise
+    /// it will return false and you should try again later.  Once the lists
+    /// become valid then the expectation is that they will remain valid and
+    /// there is no need to call again.
+    ///
+    /// The PVBusMapper will always discover up and downstream DVM nodes --
+    /// however, there may be a logical inconsistency if you use these records
+    /// to send DVM messages if you are not handling DVM messages being send to
+    /// you.
+    ///
+    /// You may send a DVMMessage using the records returned.
+    ///
+    /// It is expected that if you receive a DVM message and are forwarding it
+    /// to other DVM nodes that you _must_ take care not to forward it to the
+    /// DVM node that gave you it!  For this purpose, us the getPortIndex()
+    /// and getArcWithinPort() methods and compare the results to the
+    /// port_index_ and arc_within_port_ given to you via the handle*DVMMessage()
+    /// calls.
+    ///
+    master behaviour getDVMNodesCanSendTo(
+        std::vector<pv::DVMNodeRecord>&  upstream_nodes_,
+        std::vector<pv::DVMNodeRecord>&  downstream_nodes_
+        ) : bool;
+
+    ///
+    /// This returns the arc identifier (arc_within_port_) that will be seen by
+    /// a DVM node if we send a DVM message from this node.
+    ///
+    master behaviour getMyArcIdentifier()
+        : void*;
+
+    ///
+    /// This will print to the stream a text description of the nodes that it
+    /// has currently found.
+    ///
+    master behaviour printDVMNodes(std::ostream&, const std::string& indent_);
+}
+
+extern component PVBusMapper
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "Allow transactions to be remapped arbitrarily.";
+    }
+
+    resources
+    {
+        // No registers
+        PARAMETER { default("forward"), description("What to do with DVM (Distributed Virtual Memory) messages received from upstream.  The options are to 'forward' them downstream unaltered, to 'terminate' them, or to 'handle' them locally and get called through handleUpstreamDVMMessage()"), type(string), runtime(false) } handling_of_dvm_messages_from_upstream;
+        PARAMETER { default("forward"), description("What to do with DVM (Distributed Virtual Memory) messages received from downstream.  The options are to 'forward' them upstream unaltered, to 'terminate' them, or to 'handle' them locally and get called through handleDownstreamDVMMessage()"), type(string), runtime(false) } handling_of_dvm_messages_from_downstream;
+
+        PARAMETER { default("forward"), description("What to do with snoop requests from downstream.  The options are to 'forward' or to 'terminate'.  NOTE that currently the snoop request addresses are _not_ translated and so if your device alters the address translation then you will almost certainly want to 'terminate'."), type(string), runtime(false) } handling_of_upstream_snoop_requests;
+    }
+
+    slave  port<PVBus>                pvbus_s;
+    master port<PVBusMapperControl>   control;
+    master port<PVBus>                pvbus_m[64];
+}

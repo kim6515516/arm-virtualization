@@ -1,0 +1,20 @@
+/*
+ *  Copyright ARM Limited 2011 All Rights Reserved.
+ */
+
+extern component MemoryMappedCounterSocket
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Component for aggregating connections for \
+        MemoryMappedCounterModule implementations.";        
+    }
+
+    master port<CounterInterface> iface;
+    master port<ClockSignal>      clk;
+
+    slave port<CompoundPortLisa>  connector;
+}
+
+/* eof MemoryMappedCounterSocket.lisa */

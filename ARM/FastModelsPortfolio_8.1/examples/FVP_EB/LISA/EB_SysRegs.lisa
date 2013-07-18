@@ -1,0 +1,896 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// The model of EB system registers
+
+component EB_SysRegs
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "EB system registers";
+        documentation_file = "../../../#DUI0423#";
+    }
+    
+    includes
+    {
+        #define EBSYSREG_TRACE if (!0) ; else printf
+        #define ebsysreg_mask(s, e) (0xffffffff>>(31-(s)) & (0xffffffff << (e)))
+        #define ebsysreg_bit(b) (1<<(b))
+    }
+    
+    resources
+    {
+        enum {
+            DIVIDE_MASK = ebsysreg_mask(18,16),
+            DIVIDE_SHIFT = 16,
+            RDW_MASK = ebsysreg_mask(15,9),
+            RDW_SHIFT = 9,
+            VDW_MASK = ebsysreg_mask(8,0),
+            VDW_SHIFT = 0,
+            CLCDID_MASH = ebsysreg_mask(12,8),
+            CLCDID_SHIFT = 8
+        };
+
+        enum {
+            MISC_TILE1_SHIFT = 12,
+            MISC_TILE2_SHIFT = 13
+        };
+        
+        PARAMETER { description("System Identification Register."), type(uint32_t), default(0x01400400) } sys_id;
+        PARAMETER { description("Processor ID Register."), type(uint32_t), default(0x04000000) } proc_id_tile_site1;
+        PARAMETER { description("Processor ID Register."), type(uint32_t), default(0x04000000) } proc_id_tile_site2;
+        PARAMETER { description("User switches."), type(uint32_t), default(0x0) } user_switches_value;
+        PARAMETER { description("Boot select switch."), type(uint32_t), default(0x0) } boot_switch_value;
+        PARAMETER { description("CLCDID."), type(uint32_t), default(0x1) } clcdid;
+        PARAMETER { description("Tile 1 fitted."), type(bool), default("true") } tile1;
+        PARAMETER { description("Tile 2 fitted."), type(bool), default("false") } tile2;
+        
+        REGISTER { description("System Identity (RO)"),                             bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x00) } SYS_ID;
+        REGISTER { description("Bits[7:0] map to S6(user switches) (RO)"),          bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x04) } SYS_SW;
+        REGISTER { description("Bits[7:0] map to user LEDs (RW)"),                  bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x08) } SYS_LED;
+        REGISTER { description("Settings for the ICS307 OSC0 (RW)"),                bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0C) } SYS_OSC0;
+        REGISTER { description("Settings for the ICS307 OSC1 (RW)"),                bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x10) } SYS_OSC1;
+        REGISTER { description("Settings for the ICS307 OSC2 (RW)"),                bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x14) } SYS_OSC2;
+        REGISTER { description("Settings for the ICS307 OSC3 (RW)"),                bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x18) } SYS_OSC3;
+        REGISTER { description("Settings for the ICS307 OSC4 (RW)"),                bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x1C) } SYS_OSC4;
+        REGISTER { description("Write 0xA05F to unlock (RW)"),                      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x20) } SYS_LOCK;
+        REGISTER { description("100Hz counter (RO)"),                               bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x24) } SYS_100HZ;
+        REGISTER { description("Reserved for configuring clock domain"),            bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x28) } SYS_CONFIGDATA1;
+        REGISTER { description("Reserved for configuring clock domain"),            bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x2C) } SYS_CONFIGDATA2;
+        REGISTER { description("General-purpose flags(RW)"),                        bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x30) } SYS_FLAGS;
+       // REGISTER { description("Set bits in general-purpose flags"),                bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x30) } SYS_FLAGSSET;
+        REGISTER { description("Clear bits in general-purpose flags"),              bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x34) } SYS_FLAGSCLR;
+        REGISTER { description("General-purpose nonvolatile flags (RW)"),           bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x38) } SYS_NVFLAGS;
+        //REGISTER { description("Set bits in general-purpose nonvolatile flags"),    bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x38) } SYS_NVFLAGSSET;
+        REGISTER { description("Clear bits in general-purpose nonvolatile flags"),  bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x3C) } SYS_NVFLAGSCLR;
+        REGISTER { description("PCI control (RW)"),                                 bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x44) } SYS_PCICTL;
+        REGISTER { description("MCI (RO)"),                                         bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x48) } SYS_MCI;
+        REGISTER { description("Flash control (RW)"),                               bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x4C) } SYS_FLASH;
+        REGISTER { description("Controls LCD power and multiplexing (RW)"),         bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x50) } SYS_CLCD;
+        REGISTER { description("LCD control (RW)"),                                 bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x54) } SYS_CLCDSER;
+        REGISTER { description("Boot select switch (RO)"),                          bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x58) } SYS_BOOTCS;
+        REGISTER { description("24MHz Counter (RO)"),                               bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x5C) } SYS_24MHZ;
+        REGISTER { description("Miscellaneous control flags (RO)"),                 bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x60) } SYS_MISC;
+        REGISTER { description("DMA peripheral map (RW)"),                          bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x64) } SYS_DMAPSR0;
+        REGISTER { description("DMA peripheral map (RW)"),                          bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x68) } SYS_DMAPSR1;
+        REGISTER { description("DMA peripheral map (RW)"),                          bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x6C) } SYS_DMAPSR2;
+        REGISTER { description("Peripheral I/O select (RW)"),                       bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x70) } SYS_IOSEL;
+        REGISTER { description("Configure the attached core tiles (RW)"),           bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x74) } SYS_PLDCTL1;
+        REGISTER { description("Configure the attached core tiles (RW)"),           bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x78) } SYS_PLDCTL2;
+        REGISTER { description("Bus ID (RO)"),                                      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x80) } SYS_BUSID;
+        REGISTER { description("Processor ID (RO)"),                                bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x84) } SYS_PROCID0;
+        REGISTER { description("Processor ID (RO)"),                                bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x88) } SYS_PROCID1;
+        REGISTER { description("Oscillator reset (RW)"),                            bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x8C) } SYS_OSCRESET0;
+        REGISTER { description("Oscillator reset (RW)"),                            bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x90) } SYS_OSCRESET1;
+        REGISTER { description("Oscillator reset (RW)"),                            bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x94) } SYS_OSCRESET2;
+        REGISTER { description("Oscillator reset (RW)"),                            bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x98) } SYS_OSCRESET3;
+        REGISTER { description("Oscillator reset (RW)"),                            bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x9C) } SYS_OSCRESET4;
+        REGISTER { description("Core Tile configuration (RW)"),                     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xA0) } SYS_VOLTAGE0;
+        REGISTER { description("Core Tile configuration (RW)"),                     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xA4) } SYS_VOLTAGE1;
+        REGISTER { description("Core Tile configuration (RW)"),                     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xA8) } SYS_VOLTAGE2;
+        REGISTER { description("Core Tile configuration (RW)"),                     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xAC) } SYS_VOLTAGE3;
+        REGISTER { description("Core Tile configuration (RW)"),                     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xB0) } SYS_VOLTAGE4;
+        REGISTER { description("Core Tile configuration (RW)"),                     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xB4) } SYS_VOLTAGE5;
+        REGISTER { description("Core Tile configuration (RW)"),                     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xB8) } SYS_VOLTAGE6;
+        REGISTER { description("Core Tile configuration (RW)"),                     bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xBC) } SYS_VOLTAGE7;
+        REGISTER { description("Oscillator test (RO)"),                             bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC0) } SYS_TEST_OSC0;
+        REGISTER { description("Oscillator test (RO)"),                             bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC4) } SYS_TEST_OSC1;
+        REGISTER { description("Oscillator test (RO)"),                             bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC8) } SYS_TEST_OSC2;
+        REGISTER { description("Oscillator test (RO)"),                             bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xCC) } SYS_TEST_OSC3;
+        REGISTER { description("Oscillator test (RO)"),                             bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xD0) } SYS_TEST_OSC4;
+        REGISTER { description("PLD Configuration (RW)"),                           bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xE0) } SYS_T1_PLD_DATA;
+        REGISTER { description("PLD Configuration (RW)"),                           bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xE4) } SYS_T2_PLD_DATA;
+        REGISTER { description("GPIO (RW)"),                                        bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xE8) } SYS_GPIO;
+    
+        uint32_t RESET_TIME_24MHZ;
+        uint32_t RESET_TIME_100HZ;
+    }
+    
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+        timer_24mhz : ClockTimer;
+        timer_100hz : ClockTimer;
+    }
+    
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        self.clk_in_24mhz => timer_24mhz.clk_in;
+        self.clk_in_100hz => timer_100hz.clk_in;
+        timer_24mhz.timer_callback => self.timer_callback_handler_24mhz;
+        timer_100hz.timer_callback => self.timer_callback_handler_100hz;
+    }
+    
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        // DUI 0303D sec 4.3 says all registers are 32 bit, and don't support byte writes.
+        // Since we don't model the hardware's (odd) behaviour of non-word aligned 8 & 16 bit
+        // reads, make these abort, but allow word-aligned 32-bit or less reads.
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || (tx.getAddress() & 3) != 0) return tx.generateAbort();
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32(registerRead(tx.getAddress() & ~3));
+        }
+
+        // We don't model the hardware's (odd) behaviour of non-word aligned 8 & 16 bit
+        // writes make these abort, but allow word-aligned 32-bit or less writes.
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || (tx.getAddress() & 3) != 0) return tx.generateAbort();
+            registerWrite(tx.getAddress(),tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    slave port<PVBus> pvbus;
+    slave port<ClockSignal> clk_in_24mhz;
+    slave port<ClockSignal> clk_in_100hz;
+    master port<ValueState> user_switches
+    {
+        behavior getValue() : uint32_t
+        {
+            return SYS_SW;
+        }
+        behavior setValue(uint32_t data)
+        {
+            SYS_SW = data;
+        }
+    }
+    master port<ValueState> boot_switch
+    {
+        behavior getValue() : uint32_t
+        {
+            return SYS_BOOTCS;
+        }
+        behavior setValue(uint32_t data)
+        {
+            SYS_BOOTCS = data;
+            SYS_SW |= data<<8;
+            if (boot_control.setValue.implemented())
+                boot_control.setValue(data);
+        }
+    }
+    master port<ValueState> boot_control
+    {
+        behavior getValue() : uint32_t
+        {
+             return SYS_BOOTCS;
+        }
+    }
+    master port<ValueState> leds
+    {
+        behavior getValue() : uint32_t
+        {
+             return SYS_LED;
+        }
+    }   
+    
+    master port<ICS307Configuration> osc0;
+    master port<ICS307Configuration> osc1;
+    master port<ICS307Configuration> osc2;
+    master port<ICS307Configuration> osc3;      
+    master port<ICS307Configuration> osc4;
+
+    master port<EBSysRegs> sysreg_overrides;
+    
+    slave port<StateSignal> mmc_card_present
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            if (state == sg::Signal::Set)
+                SYS_MCI |= 0x1;
+            else
+                SYS_MCI &= ~0x1;
+        }
+    }
+
+    
+    // Handle event notifications from the timer.
+    internal slave port<TimerCallback> timer_callback_handler_24mhz
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            return timer_callback_24mhz();
+        }
+    }
+    internal slave port<TimerCallback> timer_callback_handler_100hz
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            return timer_callback_100hz();
+        }
+    }
+    
+    behavior init()
+    {
+        composition.init();
+        RESET_TIME_24MHZ = 24000000;
+        RESET_TIME_100HZ = 100;
+        timer_24mhz.timer_control.set(RESET_TIME_24MHZ);
+        timer_100hz.timer_control.set(RESET_TIME_100HZ);
+    }
+    
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        timer_24mhz.timer_control.cancel();
+        timer_100hz.timer_control.cancel();
+        SYS_ID = sys_id;
+        SYS_SW = user_switches_value;
+        SYS_LED = user_switches_value & 0xFF;
+        SYS_OSC0 = 0x00000000;
+        SYS_OSC1 = 0x00000000;
+        SYS_OSC2 = 0x00000000;
+        SYS_OSC3 = 0x00000000;
+        SYS_OSC4 = 0x00000000;
+        SYS_LOCK = 0x00000000;
+        SYS_100HZ = 0x00000000;
+        SYS_CONFIGDATA1 = 0x00000000;
+        SYS_CONFIGDATA2 = 0x00000000;
+        SYS_FLAGS = 0x00000000;
+//        SYS_FLAGSSET = 0x00000000;
+        SYS_FLAGSCLR = 0x00000000;
+        SYS_NVFLAGS = 0x00000000;
+//        SYS_NVFLAGSSET = 0x00000000;
+        SYS_NVFLAGSCLR = 0x00000000;
+        SYS_PCICTL = 0x00000000;
+        if (mmc_card_present.getValue() == sg::Signal::Set)
+            SYS_MCI = 0x00000001;
+        else
+            SYS_MCI = 0x00000000;
+        SYS_FLASH = 0x00000000;
+        SYS_CLCD = 0x00000000 | clcdid << CLCDID_SHIFT;
+        SYS_CLCDSER = 0x00000000;
+        SYS_BOOTCS = boot_switch_value;
+        SYS_24MHZ = 0x00000000;
+        SYS_MISC = 0x00000000;
+        if(!tile1) SYS_MISC |= 0x1 << MISC_TILE1_SHIFT;
+        if(!tile2) SYS_MISC |= 0x1 << MISC_TILE2_SHIFT;
+        SYS_DMAPSR0 = 0x00000000;
+        SYS_DMAPSR1 = 0x00000000;
+        SYS_DMAPSR2 = 0x00000000;
+        SYS_IOSEL = 0x00000000;
+        SYS_PLDCTL1 = 0x00000000;
+        SYS_PLDCTL2 = 0x00000000;
+        SYS_BUSID = 0x00000000;
+        SYS_PROCID0 = 0x00000000;
+        SYS_PROCID1 = 0x00000000;
+        SYS_OSCRESET0 = 0x00000000;
+        SYS_OSCRESET1 = 0x00000000;
+        SYS_OSCRESET2 = 0x00000000;                                                                        
+        SYS_OSCRESET3 = 0x00000000;
+        SYS_OSCRESET4 = 0x00000000;
+        SYS_VOLTAGE0 = 0x00000000;
+        SYS_VOLTAGE1 = 0x00000000;
+        SYS_VOLTAGE2 = 0x00000000;
+        SYS_VOLTAGE3 = 0x00000000;
+        SYS_VOLTAGE4 = 0x00000000;
+        SYS_VOLTAGE5 = 0x00000000;
+        SYS_VOLTAGE6 = 0x00000000;
+        SYS_VOLTAGE7 = 0x00000000;
+        SYS_TEST_OSC0 = 0x00000000;
+        SYS_TEST_OSC1 = 0x00000000;
+        SYS_TEST_OSC2 = 0x00000000;
+        SYS_TEST_OSC3 = 0x00000000;
+        SYS_TEST_OSC4 = 0x00000000;
+        SYS_T1_PLD_DATA = 0x00000000;
+        SYS_T2_PLD_DATA = 0x00000000;
+        SYS_GPIO = 0x00000000;
+        
+        RESET_TIME_24MHZ = 24000000;
+        RESET_TIME_100HZ = 100;
+        timer_24mhz.timer_control.set(RESET_TIME_24MHZ);
+        timer_100hz.timer_control.set(RESET_TIME_100HZ);
+        if (boot_control.setValue.implemented())
+            boot_control.setValue(SYS_BOOTCS);
+    }
+                                                                         
+    behavior timer_callback_24mhz() : uint32_t
+    {
+        SYS_24MHZ += RESET_TIME_24MHZ;
+        return RESET_TIME_24MHZ;
+    }
+    behavior timer_callback_100hz() : uint32_t
+    {
+        SYS_100HZ += RESET_TIME_100HZ;
+        return RESET_TIME_100HZ;
+    }
+    
+    behavior setConfiguration(uint32_t osc, uint32_t osc_reg_number)
+    {
+        uint32_t vdw = (osc & VDW_MASK) >> VDW_SHIFT;
+        uint32_t rdw = (osc & RDW_MASK) >> RDW_SHIFT;
+        uint32_t od = (osc & DIVIDE_MASK) >> DIVIDE_SHIFT;
+           
+        switch(osc_reg_number)
+        {                          
+        case 0x0C:
+        case 0x8C:
+            osc0.setConfiguration(vdw, rdw, od);
+            break;
+        case 0x10:
+        case 0x90:
+            osc1.setConfiguration(vdw, rdw, od);
+            break;                                       
+        case 0x14:
+        case 0x94:
+            osc2.setConfiguration(vdw, rdw, od);
+            break;
+        case 0x18:
+        case 0x98:
+            osc3.setConfiguration(vdw, rdw, od);
+            break;
+        case 0x1C:
+        case 0x9C:
+            osc4.setConfiguration(vdw, rdw, od);
+            break;
+        }
+    }
+    
+    behavior registerRead(uint32_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+        if (sysreg_overrides.read.implemented())
+        {       
+            if (sysreg_overrides.read(device_addr, &data))
+            {
+                return data;
+            }
+        }
+
+        switch(device_addr) {
+        case 0x00: // SYS_ID 
+            data = sys_id;
+            EBSYSREG_TRACE("SYS_ID -> 0x%x\n", data);
+            return data;
+        case 0x04: // SYS_SW
+            data = SYS_SW;
+            EBSYSREG_TRACE("SYS_SW -> 0x%x\n", data);
+            return data;
+        case 0x08: // SYS_LED
+            data = SYS_LED;
+            EBSYSREG_TRACE("SYS_LED ->i 0x%x\n", data);
+            return data;
+        case 0x0C: // SYS_OSC0
+            data = SYS_OSC0;
+            EBSYSREG_TRACE("SYS_OSC0 -> 0x%x\n", data);
+            return data;
+        case 0x10: // SYS_OSC1
+            data = SYS_OSC1;
+            EBSYSREG_TRACE("SYS_OSC1 -> 0x%x\n", data);
+            return data;
+        case 0x14: // SYS_OSC2
+            data = SYS_OSC2;
+            EBSYSREG_TRACE("SYS_OSC2 -> 0x%x\n", data);
+            return data;
+        case 0x18: // SYS_OSC3
+            data = SYS_OSC3;
+            EBSYSREG_TRACE("SYS_OSC3 -> 0x%x\n", data);
+            return data;
+        case 0x1C: // SYS_OSC4
+            data = SYS_OSC4;
+            EBSYSREG_TRACE("SYS_OSC4 -> 0x%x\n", data);
+            return data;
+        case 0x20: // SYS_LOCK
+            data = SYS_LOCK;
+            EBSYSREG_TRACE("SYS_LOCK -> 0x%x\n", data);
+            return data;
+        case 0x24: // SYS_100HZ
+            data = SYS_100HZ + (RESET_TIME_100HZ - timer_100hz.timer_control.remaining());
+            EBSYSREG_TRACE("SYS_100HZ -> 0x%x\n", data);
+            return data;
+        case 0x28: // SYS_CONFIGDATA 1
+            data = SYS_CONFIGDATA1;
+            EBSYSREG_TRACE("SYS_CONFIGDATA1 -> 0x%x\n", data);
+            return data;
+        case 0x2C: // SYS_CONFIGDATA 2
+            data = SYS_CONFIGDATA2;
+            EBSYSREG_TRACE("SYS_CONFIGDATA2 -> 0x%x\n", data);
+            return data;
+        case 0x30: // SYS_FLAGS
+            data = SYS_FLAGS;
+            EBSYSREG_TRACE("SYS_FLAGS -> 0x%x\n", data);
+            return data;
+        case 0x34: // SYS_FLAGSCLR
+            EBSYSREG_TRACE("SYS_FLAGSSET -> 0x%x -- Write only\n", data);
+            return data;
+        case 0x38: // SYS_NVFLAGS
+            data = SYS_NVFLAGS;
+            EBSYSREG_TRACE("SYS_NVFLAGS -> 0x%x\n", data);
+            return data;
+        case 0x3C: // SYS_NVFLAGSCLR
+            data = SYS_NVFLAGSCLR;
+            EBSYSREG_TRACE("SYS_NVFLAGSCLR -> 0x%x -- Write only\n", data);
+            return data;
+        case 0x44: // SYS_PCICTL
+            data = SYS_PCICTL;
+            EBSYSREG_TRACE("SYS_PCICTL -> 0x%x\n", data);
+            return data;
+        case 0x48: // SYS_MCI
+            data = SYS_MCI;
+            EBSYSREG_TRACE("SYS_MCI -> 0x%x\n", data);
+            return data;
+        case 0x4C: // SYS_FLASH
+            data = SYS_FLASH;
+            EBSYSREG_TRACE("SYS_FLASH -> 0x%x\n", data);
+            return data;
+        case 0x50: // SYS_CLCD
+            data = SYS_CLCD;
+            EBSYSREG_TRACE("SYS_CLCD -> 0x%x\n", data);
+            return data;
+        case 0x54: // SYS_CLCDSER
+            data = SYS_CLCDSER;
+            EBSYSREG_TRACE("SYS_CLCDSER -> 0x%x\n", data);
+            return data;
+        case 0x58: // SYS_BOOTCS
+            data = SYS_BOOTCS;
+            EBSYSREG_TRACE("SYS_BOOTCS -> 0x%x\n", data);
+            return data;
+        case 0x5C: // SYS_24MHZ
+            data = SYS_24MHZ + (RESET_TIME_24MHZ - timer_24mhz.timer_control.remaining());
+            EBSYSREG_TRACE("SYS_24MHZ -> 0x%x\n", data);
+            return data;
+        case 0x60: // SYS_MISC
+            data = SYS_MISC;
+            EBSYSREG_TRACE("SYS_MISC -> 0x%x\n", data);
+            return data;
+        case 0x64: // SYS_DMAPSR0
+            data = SYS_DMAPSR0;
+            EBSYSREG_TRACE("SYS_DMAPSR0 -> 0x%x\n", data);
+            return data;
+        case 0x68: // SYS_DMAPSR1
+            data = SYS_DMAPSR1;
+            EBSYSREG_TRACE("SYS_DMAPSR1 -> 0x%x\n", data);
+            return data;
+        case 0x6C: // SYS_DMAPSR2
+            data = SYS_DMAPSR2;
+            EBSYSREG_TRACE("SYS_DMAPSR2 -> 0x%x\n", data);
+            return data;
+        case 0x70: // SYS_IOSEL
+            data = SYS_IOSEL;
+            EBSYSREG_TRACE("SYS_IOSEL -> 0x%x\n", data);
+            return data;
+        case 0x74: // SYS_PLDCTL1
+            data = SYS_PLDCTL1;
+            EBSYSREG_TRACE("SYS_PLDCTL1 -> 0x%x\n", data);
+            return data;
+        case 0x78: // SYS_PLDCTL2
+            data = SYS_PLDCTL2;
+            EBSYSREG_TRACE("SYS_PLDCTL2 -> 0x%x\n", data);
+            return data;
+        case 0x80: // SYS_BUSID
+            data = SYS_BUSID;
+            EBSYSREG_TRACE("SYS_BUSID -> 0x%x -- System doesn't support bus ID\n", data);
+            return data;
+        case 0x84: // SYS_PROCID0
+            data = SYS_PROCID0 | proc_id_tile_site1;
+            EBSYSREG_TRACE("SYS_PROCID0 -> 0x%x\n", data);
+            return data;
+        case 0x88: // SYS_PROCID1
+            data = SYS_PROCID1 | proc_id_tile_site2;
+            EBSYSREG_TRACE("SYS_PROCID1 -> 0x%x\n", data);
+            return data;
+        case 0x8C: // SYS_OSCRESET0
+            data = SYS_OSCRESET0;
+            EBSYSREG_TRACE("SYS_OSCRESET0 -> 0x%x\n", data);
+            return data;
+        case 0x90: // SYS_OSCRESET1
+            data = SYS_OSCRESET1;
+            EBSYSREG_TRACE("SYS_OSCRESET1 -> 0x%x\n", data);
+            return data;
+        case 0x94: // SYS_OSCRESET2
+            data = SYS_OSCRESET2;
+            EBSYSREG_TRACE("SYS_OSCRESET2 -> 0x%x\n", data);
+            return data;
+        case 0x98: // SYS_OSCRESET3
+            data = SYS_OSCRESET3;
+            EBSYSREG_TRACE("SYS_OSCRESET3 -> 0x%x\n", data);
+            return data;
+        case 0x9C: // SYS_OSCRESET4
+            data = SYS_OSCRESET4;
+            EBSYSREG_TRACE("SYS_OSCRESET4 -> 0x%x\n", data);
+            return data;
+        case 0xA0: // SYS_VOLTAGE0
+            data = SYS_VOLTAGE0;
+            EBSYSREG_TRACE("SYS_VOLTAGE0 -> 0x%x\n", data);
+            return data;
+        case 0xA4: // SYS_VOLTAGE1
+            data = SYS_VOLTAGE1;
+            EBSYSREG_TRACE("SYS_VOLTAGE1 -> 0x%x\n", data);
+            return data; 
+        case 0xA8: // SYS_VOLTAGE2
+            data = SYS_VOLTAGE2;
+            EBSYSREG_TRACE("SYS_VOLTAGE2 -> 0x%x\n", data);
+            return data;
+        case 0xAC: // SYS_VOLTAGE3
+            data = SYS_VOLTAGE3;
+            EBSYSREG_TRACE("SYS_VOLTAGE3 -> 0x%x\n", data);
+            return data;
+        case 0xB0: // SYS_VOLTAGE4
+            data = SYS_VOLTAGE4;
+            EBSYSREG_TRACE("SYS_VOLTAGE4 -> 0x%x\n", data);
+            return data;
+        case 0xB4: // SYS_VOLTAGE5
+            data = SYS_VOLTAGE5;
+            EBSYSREG_TRACE("SYS_VOLTAGE5 -> 0x%x\n", data);
+            return data;
+        case 0xB8: // SYS_VOLTAGE6
+            data = SYS_VOLTAGE6;
+            EBSYSREG_TRACE("SYS_VOLTAGE6 -> 0x%x\n", data);
+            return data;
+        case 0xBC: // SYS_VOLTAGE7
+            data = SYS_VOLTAGE7;
+            EBSYSREG_TRACE("SYS_VOLTAGE7 -> 0x%x\n", data);
+            return data;
+        case 0xC0: // SYS_TEST_OSC0
+            //data = SYS_TEST_OSC0;
+            EBSYSREG_TRACE("SYS_TEST_OSC0 -> 0x%x -- UNIMPLEMENTED \n", data);
+            return data;
+        case 0xC4: // SYS_TEST_OSC1
+            //data = SYS_TEST_OSC1;
+            EBSYSREG_TRACE("SYS_TEST_OSC1 -> 0x%x -- UNIMPLEMENTED \n", data);
+            return data;
+        case 0xC8: // SYS_TEST_OSC2
+            //data = SYS_TEST_OSC2;
+            EBSYSREG_TRACE("SYS_TEST_OSC2 -> 0x%x -- UNIMPLEMENTED \n", data);
+            return data;
+        case 0xCC: // SYS_TEST_OSC3
+            //data = SYS_TEST_OSC3;
+            EBSYSREG_TRACE("SYS_TEST_OSC3 -> 0x%x -- UNIMPLEMENTED \n", data);
+            return data;
+        case 0xD0: // SYS_TEST_OSC4
+            //data = SYS_TEST_OSC4;
+            EBSYSREG_TRACE("SYS_TEST_OSC4 -> 0x%x -- UNIMPLEMENTED \n", data);
+            return data;
+        case 0xE0: // SYS_T1_PLD_DATA
+            data = SYS_T1_PLD_DATA;
+            EBSYSREG_TRACE("SYS_T1_PLD_DATA -> 0x%x\n", data);
+            return data;
+        case 0xE4: // SYS_T2_PLD_DATA
+            data = SYS_T2_PLD_DATA;
+            EBSYSREG_TRACE("SYS_T2_PLD_DATA -> 0x%x\n", data);
+            return data;
+        case 0xE8: // SYS_GPIO
+            data = SYS_GPIO;
+            EBSYSREG_TRACE("SYS_GPIO -> 0x%x\n", data);
+            return data;
+        default:
+            EBSYSREG_TRACE("EB system undefined register 0x%x -> 0x%x\n", device_addr, data);
+            return 0;
+        }
+        return data;
+    }
+    
+    behavior registerWrite(uint32_t device_addr, uint32_t data)
+    {
+        if (sysreg_overrides.write.implemented())
+        {       
+            if (sysreg_overrides.write(device_addr, data))
+            {
+                return;
+            }
+        }
+        switch (device_addr)
+        {
+        case 0x00: // SYS_ID
+            EBSYSREG_TRACE("SYS_ID <- 0x%x -- Read only\n", data);
+            break;
+        case 0x04: // SYS_SW
+            EBSYSREG_TRACE("SYS_SW <- 0x%x -- Read only\n", data);
+            break;
+        case 0x08: // SYS_LED
+            EBSYSREG_TRACE("SYS_LED <- 0x%x\n", data);
+            SYS_LED = data;
+            break;
+        case 0x0C: // SYS_OSC0
+            EBSYSREG_TRACE("SYS_OSC0 <- 0x%x\n", data);
+            if(SYS_LOCK == 0x0000A05F)
+            {
+                SYS_OSC0 = data;
+                setConfiguration(data, 0x0C);
+            }
+            else
+                EBSYSREG_TRACE("SYS_OSC0 is locked\n");
+            break;
+        case 0x10: // SYS_OSC1
+            EBSYSREG_TRACE("SYS_OSC1 <- 0x%x\n", data);
+            if(SYS_LOCK == 0x0000A05F)
+            {
+                SYS_OSC1 = data;
+                setConfiguration(data, 0x10);
+            }
+            else
+                EBSYSREG_TRACE("SYS_OSC1 is locked\n");
+            break;
+        case 0x14: // SYS_OSC2
+            EBSYSREG_TRACE("SYS_OSC2 <- 0x%x\n", data);
+            if(SYS_LOCK == 0x0000A05F)
+            {
+                SYS_OSC2 = data;
+                setConfiguration(data, 0x14);
+            }
+            else
+                EBSYSREG_TRACE("SYS_OSC2 is locked\n");
+            break;
+        case 0x18: // SYS_OSC3
+            EBSYSREG_TRACE("SYS_OSC3 <- 0x%x\n", data);
+            if(SYS_LOCK == 0x0000A05F)
+            {
+                SYS_OSC3 = data;
+                setConfiguration(data, 0x18);
+            }
+            else
+                EBSYSREG_TRACE("SYS_OSC3 is locked\n");
+            break;
+        case 0x1C: // SYS_OSC4
+            EBSYSREG_TRACE("SYS_OSC4 <- 0x%x\n", data);
+            if(SYS_LOCK == 0x0000A05F)
+            {
+                SYS_OSC4 = data;
+                setConfiguration(data, 0x1C);
+            }
+            else
+                EBSYSREG_TRACE("SYS_OSC4 is locked\n");
+            break;
+        case 0x20: // SYS_LOCK
+            EBSYSREG_TRACE("SYS_LOCK <- 0x%x\n", data);
+            SYS_LOCK = data;
+            break;
+        case 0x24: // SYS_100HZ
+            EBSYSREG_TRACE("SYS_100HZ <- 0x%x -- Read only\n", data);
+            break;
+        case 0x28: // SYS_CONFIGDATA1
+            EBSYSREG_TRACE("SYS_CONFIGDATA1 <- 0x%x\n", data);
+            SYS_CONFIGDATA1 = data;
+            break;
+        case 0x2C: // SYS_CONFIGDATA2
+            EBSYSREG_TRACE("SYS_CONFIGDATA2 <- 0x%x\n", data);
+            SYS_CONFIGDATA2 = data;
+            break;
+        case 0x30: // SYS_FLAGSSET
+            EBSYSREG_TRACE("SYS_FLAGSSET <- 0x%x\n", data);
+            SYS_FLAGS |= data;
+            break;
+        case 0x34: // SYS_FLAGSCLR
+            EBSYSREG_TRACE("SYS_FLAGSCLR <- 0x%x\n", data);
+            SYS_FLAGS = ~((~SYS_FLAGS) | data);
+            break;
+        case 0x38: // SYS_NVFLAGS
+            EBSYSREG_TRACE("SYS_NVFLAGSSET <- 0x%x\n", data);
+            SYS_NVFLAGS |= data;
+            break;
+        case 0x3C: // SYS_NVFLAGSCLR
+            EBSYSREG_TRACE("SYS_NVFLAGSCLR <- 0x%x\n", data);
+            SYS_NVFLAGS = ~((~SYS_NVFLAGS) | data);
+            break;
+        case 0x44: // SYS_PCICTL
+            EBSYSREG_TRACE("SYS_PCICTL <- 0x%x\n", data);
+            SYS_PCICTL = data;
+            break;
+        case 0x48: // SYS_MCI
+            EBSYSREG_TRACE("SYS_MCI <- 0x%x -- Read only\n", data);
+            break;
+        case 0x4C: // SYS_FLASH
+            EBSYSREG_TRACE("SYS_FLASH <- 0x%x\n", data);
+            SYS_FLASH = data;
+            break;
+        case 0x50: // SYS_CLCD
+            EBSYSREG_TRACE("SYS_CLCD <- 0x%x\n", data);
+            SYS_CLCD = data;
+            break;
+        case 0x54: // SYS_CLCDSER
+            EBSYSREG_TRACE("SYS_CLCDSER <- 0x%x\n", data);
+            SYS_CLCDSER = data;
+            break;
+        case 0x58: // SYS_BOOTCS
+            EBSYSREG_TRACE("SYS_BOOTCS <- 0x%x -- Read only\n", data);
+            break;
+        case 0x5C: // SYS_24MHZ
+            EBSYSREG_TRACE("SYS_24MHZ <- 0x%x -- Read only\n", data);
+            break;
+        case 0x60: // SYS_IMSC
+            EBSYSREG_TRACE("SYS_IMSC <- 0x%x -- Read only\n", data);
+            break;
+        case 0x64: // SYS_DMAPSR0
+            EBSYSREG_TRACE("SYS_DMAPSR0 <- 0x%x\n", data);
+            SYS_DMAPSR0 = data;
+            break;
+        case 0x68: // SYS_DMAPSR1
+            EBSYSREG_TRACE("SYS_DMAPSR1 <- 0x%x\n", data);
+            SYS_DMAPSR1 = data;
+            break;
+        case 0x6C: // SYS_DMAPSR2
+            EBSYSREG_TRACE("SYS_DMAPSR2 <- 0x%x\n", data);
+            SYS_DMAPSR2 = data;
+            break;
+        case 0x70: // SYS_IOSEL
+            EBSYSREG_TRACE("SYS_IOSEL <- 0x%x\n", data);
+            SYS_IOSEL = data;
+            break;
+        case 0x74: // SYS_PLDCTL 1
+            EBSYSREG_TRACE("SYS_PLDCTL1 <- 0x%x\n", data);
+            SYS_PLDCTL1 = data;
+            break;
+        case 0x78: // SYS_PLDCTL 2
+            EBSYSREG_TRACE("SYS_PLDCTL2 <- 0x%x\n", data);
+            SYS_PLDCTL2 = data;
+            break;
+        case 0x80: // SYS_BUSID
+            EBSYSREG_TRACE("SYS_BUSID <- 0x%x -- Read only\n", data);
+            break;
+        case 0x84: // SYS_PROCID0
+            EBSYSREG_TRACE("SYS_PROCID0 <- 0x%x -- Read only\n", data);
+            break;
+        case 0x88: // SYS_PROCID1
+            EBSYSREG_TRACE("SYS_PROCID1 <- 0x%x -- Read only\n", data);
+            break;
+        case 0x8C: // SYS_OSCRESET0
+            EBSYSREG_TRACE("SYS_OSCRESET0 <- 0x%x\n", data);
+            if(SYS_LOCK == 0x0000A05F)
+            {
+                SYS_OSCRESET0 = data;
+                setConfiguration(data, 0x8C);
+            }
+            else
+                EBSYSREG_TRACE("SYS_OSCRESET0 is locked\n");
+            break;
+        case 0x90: // SYS_OSCRESET1
+            EBSYSREG_TRACE("SYS_OSCRESET1 <- 0x%x\n", data);
+            if(SYS_LOCK == 0x0000A05F)
+            {
+                SYS_OSCRESET1 = data;
+                setConfiguration(data, 0x90);
+            }
+            else
+                EBSYSREG_TRACE("SYS_OSCRESET1 is locked\n");
+            break;
+        case 0x94: // SYS_OSCRESET2
+            EBSYSREG_TRACE("SYS_OSCRESET2 <- 0x%x\n", data);
+            if(SYS_LOCK == 0x0000A05F)
+            {
+                SYS_OSCRESET2 = data;
+                setConfiguration(data, 0x94);
+            }
+            else
+                EBSYSREG_TRACE("SYS_OSCRESET2 is locked\n");
+            break;
+        case 0x98: // SYS_OSCRESET3
+            EBSYSREG_TRACE("SYS_OSCRESET3 <- 0x%x\n", data);
+            if(SYS_LOCK == 0x0000A05F)
+            {
+                SYS_OSCRESET3 = data;
+                setConfiguration(data, 0x98);
+            }
+            else
+                EBSYSREG_TRACE("SYS_OSCRESET3 is locked\n");
+            break;
+        case 0x9C: // SYS_OSCRESET4
+            EBSYSREG_TRACE("SYS_OSCRESET4 <- 0x%x\n", data);
+            if(SYS_LOCK == 0x0000A05F)
+            {
+                SYS_OSCRESET4 = data;
+                setConfiguration(data, 0x9C);
+            }
+            else
+                EBSYSREG_TRACE("SYS_OSCRESET4 is locked\n");
+            break;
+        case 0xA0: // SYS_VOLTAGE0
+            EBSYSREG_TRACE("SYS_VOLTAGE0 <- 0x%x\n", data);
+            SYS_VOLTAGE0 = data;
+            break;
+        case 0xA4: // SYS_VOLTAGE1
+            EBSYSREG_TRACE("SYS_VOLTAGE1 <- 0x%x\n", data);
+            SYS_VOLTAGE1 = data;
+            break;
+        case 0xA8: // SYS_VOLTAGE2
+            EBSYSREG_TRACE("SYS_VOLTAGE2 <- 0x%x\n", data);
+            SYS_VOLTAGE2 = data;
+            break;
+        case 0xAC: // SYS_VOLTAGE3
+            EBSYSREG_TRACE("SYS_VOLTAGE3 <- 0x%x\n", data);
+            SYS_VOLTAGE3 = data;
+            break;
+        case 0xB0: // SYS_VOLTAGE4
+            EBSYSREG_TRACE("SYS_VOLTAGE4 <- 0x%x\n", data);
+            SYS_VOLTAGE4 = data;
+            break;
+        case 0xB4: // SYS_VOLTAGE5
+            EBSYSREG_TRACE("SYS_VOLTAGE5 <- 0x%x\n", data);
+            SYS_VOLTAGE5 = data;
+            break;
+        case 0xB8: // SYS_VOLTAGE6
+            EBSYSREG_TRACE("SYS_VOLTAGE6 <- 0x%x\n", data);
+            SYS_VOLTAGE6 = data;
+            break;
+        case 0xBC: // SYS_VOLTAGE7
+            EBSYSREG_TRACE("SYS_VOLTAGE7 <- 0x%x\n", data);
+            SYS_VOLTAGE7 = data;
+            break;
+        case 0xC0: // SYS_TEST_OSC0
+            EBSYSREG_TRACE("SYS_TEST_OSC0 <- 0x%x -- Read only\n", data);
+            break;
+        case 0xC4: // SYS_TEST_OSC1
+            EBSYSREG_TRACE("SYS_TEST_OSC1 <- 0x%x -- Read only\n", data);
+            break;
+        case 0xC8: // SYS_TEST_OSC2
+            EBSYSREG_TRACE("SYS_TEST_OSC2 <- 0x%x -- Read only\n", data);
+            break;
+        case 0xCC: // SYS_TEST_OSC3
+            EBSYSREG_TRACE("SYS_TEST_OSC3 <- 0x%x -- Read only\n", data);
+            break;
+        case 0xD0: // SYS_TEST_OSC4
+            EBSYSREG_TRACE("SYS_TEST_OSC4 <- 0x%x -- Read only\n", data);
+            break;
+        case 0xE0: // SYS_T1_PLD_DATA
+            EBSYSREG_TRACE("SYS_T1_PLD_DATA <- 0x%x\n", data);
+            SYS_T1_PLD_DATA = data;
+            break;
+        case 0xE4: // SYS_T2_PLD_DATA
+            EBSYSREG_TRACE("SYS_T2_PLD_DATA <- 0x%x\n", data);
+            SYS_T2_PLD_DATA = data;
+            break;
+        case 0xE8: // SYS_GPIO
+            EBSYSREG_TRACE("SYS_GPIO <- 0x%x\n", data);
+            SYS_GPIO = data;
+            break;
+        }
+        
+    }
+    
+    // debugger register access support
+    behaviour debug_read(CASIU32 reg_id, CASIU64* datap, bool /*side_effects*/) : CADIReturn_t
+    {
+        *datap = registerRead(reg_id);
+
+        return eslapi::CADI_STATUS_OK;
+    }
+
+    behaviour debug_write(CASIU32 reg_id, const CASIU64* datap, bool /*side_effects*/) : CADIReturn_t
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+
+        return eslapi::CADI_STATUS_OK;
+    }
+}

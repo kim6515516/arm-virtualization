@@ -1,0 +1,30 @@
+// The MPS_CharacterLCDProtocol is used to connect a Character LCD controller
+// and a visualization module
+
+protocol CharacterLCD
+{
+
+    properties {
+        version = "8.1.37";
+        description = "Generic Character LCD Protocol";
+        documentation_file = "../../../#DUI0423#";
+    }
+
+    includes
+    {
+        // This is a descriptor for a character to draw
+        typedef struct 
+        {
+            uint32_t posX;       // Upper left corner X
+            uint32_t posY;       // Upper left corner Y
+            uint32_t nrPixelsX;
+            uint32_t nrPixelsY;
+            uint8_t *pBitmap;    // Array of bytes
+        } TCharacterInfo;
+    }
+
+    // Behaviours [Controller -> Visualization]
+    slave behavior setLayoutInfo(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+    slave behavior draw(TCharacterInfo *pCharInfo);
+}
+

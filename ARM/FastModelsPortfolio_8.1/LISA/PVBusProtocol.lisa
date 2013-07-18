@@ -1,0 +1,117 @@
+/*
+ * Copyright 2006-2010,2012 ARM Limited. All rights reserved.
+ */
+
+// PVBus is used to connect a PV core model (or any user-defined bus
+// masters) to a tree of bus decoders and slave devices.
+//
+// The bus protocol is designed to allow reasonably efficient calling
+// through the bus decode tree, but it also provides back doors that
+// allow core models to cache the decode results and access the device
+// directly.
+//
+// From a simple bus slave's point of view, all of this complexity is
+// hidden.  The slave handles transactions by implementing the read() and
+// write() behaviors.  All of the details of the transaction state are
+// available through the fs::Transaction class, which is passed by value
+// to the read/write behaviors.
+//
+// If devices want to benefit from the efficient back-door channels,
+// they do so by instantiating a subcomponent of one of the supplied
+// types, that encapsulates all of the complexity.  For example, the
+// PVBusSlave component provides support for efficient access
+// to memory-like storage.
+//
+// Examples of usage:
+//   component MemorySlave      //  A component containing 64M of fast RAM
+//   {
+//       slave port<PVBus> pvbus_s;
+//
+//       master port <PVBusSlaveControl> busslave_control;
+//
+//       composition
+//       {
+//           bus_slave : PVBusSlave(size = 0x04000000);
+//       }
+//       connection
+//       {
+//           self.pvbus_s => memory_slave.pvbus_s;
+//           self.bus_slave_control => bus_slave.control;
+//       }
+//       behavior init()
+//       {
+//           bus_slave_control.setAccess(0, 0x04000000, pv::ACCESSTYPE_RW, pv::ACCESSMODE_MEMORY);
+//           composition.init();
+//       }
+//    }
+
+protocol PVBus
+{
+    includes
+    {
+#include "pv/PVTransaction.h"
+
+struct DeviceAccess;
+
+namespace pv
+{
+    template <typename Direction> class DownstreamRequest;
+    typedef DownstreamRequest<AccessRead> ReadRequest;
+    typedef DownstreamRequest<AccessWrite> WriteRequest;
+}
+
+namespace DVM
+{
+    class UpstreamVisitor;
+    class DownstreamVisitor;
+}
+
+namespace ACE
+{
+    class SnoopRequest;
+}
+    }
+
+    properties
+    {
+        version = "8.1.37";
+        description = "PVBus Protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    // Device access behaviours for the PVBus protocol.
+    slave  behavior read(pv::ReadTransaction tx) : pv::Tx_Result;
+    slave  behavior write(pv::WriteTransaction tx) : pv::Tx_Result;
+
+    // debug accesses functions
+    slave  behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result;
+    slave  behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result;
+
+    // Internal behaviors.
+
+    // These are used to handle cached bus decodings.
+    // These are all implemented internally by PVBusMaster/PVBusSlave.
+    // Devices do not need to implement these.
+
+    optional master behavior busMapChanging(pv::bus_addr_t base, pv::bus_addr_t size);
+    optional master behavior busMapChanged(pv::bus_addr_t base, pv::bus_addr_t size);
+
+    // Support DVM message passing
+
+    // Allow a PVBus master to probe a bus port for any slaves that can propagate DVM messages.
+    // Bus routing fabric should forward the discovery request to all slaves
+    optional slave behaviour discoverDownstreamChildDVMNodes(DVM::DownstreamVisitor *) : void;
+
+    // Allow a PVBus slave to probe a bus port for any masters that can respond to DVM messages.
+    optional master behaviour discoverUpstreamParentDVMNodes(DVM::UpstreamVisitor *) : void;
+
+    // Support a coherency request from down-stream.
+    optional master behaviour aceSnoopRequest( ACE::SnoopRequest* ) : void;
+    optional master behaviour debugACESnoopRequest( ACE::SnoopRequest* ) : void;
+
+    //! PVBus re-entrant channels support
+    optional slave behaviour doReadAccess  (pv::ReadRequest *) : pv::Tx_Result;
+    optional slave behaviour doWriteAccess (pv::WriteRequest *) : pv::Tx_Result;
+}
+
+

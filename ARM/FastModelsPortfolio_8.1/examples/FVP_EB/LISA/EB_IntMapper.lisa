@@ -1,0 +1,107 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component EB_IntMapper
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Interrupt Mapping peripheral (non-cascaded)";
+    }
+
+    includes
+    {
+        #define EB_INTM_TRACE if (!0) ; else printf
+    }
+
+    composition
+    {
+    }    
+
+    resources
+    {
+        // Temporary variable
+        MxU32 irq_num_latch;
+    }
+
+
+    connection
+    {
+    }
+
+
+    master port<Signal> irq[224];
+    master port<Signal> fiq;
+
+
+    behavior dcci_map(MxU32 value) : MxU32
+    {
+        /* In DCCI System:                In EB system:
+         * Timers 0_1: int 1            <- 36
+         * Timers 2_3: int 2            <- 37
+         * GPIO 0,1,2: int 38, 39, 40   <- No change
+         * UART 0,1  : int 4, 5         <- 44, 45
+         * UART 2,3  : int 46, 47       <- No change
+         * MMCI0     : int 14, 15       <- 49, 50
+         * KMI  0,1  : int 7,8          <- 52, 53
+         * CLCD      : int 55           <- No change
+         * Ethernet  : int 9            <- 60
+         */
+        switch (value)
+        {
+            case 36: value = 1; break;
+            case 37: value = 2; break;
+            case 44: value = 4; break;
+            case 45: value = 5; break;
+            case 49: value = 14; break;
+            case 50: value = 15; break;
+            case 52: value = 7; break;
+            case 53: value = 8; break;
+            case 60: value = 9; break;
+            default: break;
+        }
+        return(value);
+    }
+
+    // Temporary interface for EB connector
+    slave port<ValueState> int_num
+    {
+        behavior setValue(MxU32 num_in)
+        {
+            // We don't like this protocol: it's unnecessarily inefficient!
+            irq_num_latch = dcci_map(num_in);
+        }
+    }
+    
+    // (More) temporary interface for EB connector
+    slave port<Signal> int_in
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            EB_INTM_TRACE("%s: INPUT[%d] -> %s\n", 
+                           getInstanceName().c_str(), irq_num_latch,
+                           (state==sg::Signal::Set)?"Set":"Clear");
+            self.irq[irq_num_latch].setValue(state);
+        }
+    }
+
+    behavior init
+    {
+      // nothing
+    }
+
+    behavior terminate
+    {
+      // nothing
+    }
+
+    // reset is reset (no argument needed).
+    behavior reset(int level)
+    {
+    }
+
+
+}

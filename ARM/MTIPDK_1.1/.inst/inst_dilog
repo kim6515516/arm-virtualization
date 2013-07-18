@@ -1,0 +1,273 @@
+install "2013-07-16T00:12:40" {
+  inst_package_dir = "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1";
+  inst_package_name = "MTI Plugin Development Kit";
+  installer_version = "2.2.025";
+
+  input {
+globals {
+  EnableUnInstall = "1";
+  Personality = "AFM";
+  ProductName = "Fast Models";
+  QueryLicenseFileLocation = "1";
+  UnixDefaultBasePath = "${HOME}/ARM/";
+  UnixPostInstallCommand = "./global_post_install.sh 1 1  \"/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1\" \"/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1\"";
+  Win32DefaultBasePath = "ARM\\";
+}
+
+package "Fast Model Tools"
+{
+  Afc = "SystemGenerator.afc";
+  DefaultSelection = "1";
+  Dir = "FastModelsTools_8.1";
+  Info = "Fast Model Tools: This package contains System Generator 8.1.032, System Canvas 8.1.032 and Model Debugger 8.1.022";
+  UnixPostInstallCommand = "./post_install_scripts.sh \"/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1\" \"/home/sxcheng/Workspace/kvm/license.dat\"";
+  ui_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1";
+  executable {
+    Win32Arguments = "";
+    Win32DesktopShortCut = "1";
+    Win32MenuShortCut = "1";
+    Win32Path = "bin\\SGCanvas.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32SetVistaWinXPSP2Flag = "1";
+    Win32ShortCutName = "System Canvas";
+  }
+  executable {
+    Win32Arguments = "";
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "0";
+    Win32Path = "bin\\SimGen.exe";
+    Win32SetVistaWinXPSP2Flag = "1";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32IconId = "ext";
+    Win32MenuShortCut = "1";
+    Win32Path = "doc\\FastModelsTools_ReleaseNotes_8.1.txt";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "Release Notes for Fast Models Tools";
+  }
+  executable {
+    Win32Arguments = "--reloc --uiinf \"/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1/.inst/inst_dilog\"";
+    Win32DesktopShortCut = "0";
+    Win32IconId = "1";
+    Win32MenuShortCut = "1";
+    Win32Path = ".inst\\setup.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "Uninstall Fast Models Tools";
+  }
+  envvar {
+    Win32Name = "MAXCORE_HOME";
+    Win32Value = "/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1";
+  }
+
+
+inner_package "Model Shell"
+{
+  Afc = "ModelShell.afc";
+  Dir = "";
+  UnixPostInstallCommand = "";
+  ui_inner_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1/";
+  executable {
+    Win32Path = "bin\\model_shell.exe";
+    Win32SetVistaWinXPSP2Flag = "1";
+  }
+
+}
+
+inner_package "Model Debugger"
+{
+  Afc = "ModelDebugger.afc";
+  Dir = "";
+  UnixPostInstallCommand = "";
+  ui_inner_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1/";
+  executable {
+    Win32DesktopShortCut = "1";
+    Win32MenuShortCut = "1";
+    Win32Path = "bin\\ModelDebugger.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32SetVistaWinXPSP2Flag = "1";
+    Win32ShortCutName = "Model Debugger";
+  }
+  envvar {
+    Win32Name = "MAXVIEW_HOME";
+    Win32Value = "/home/sxcheng/Workspace/kvm/ARM/FastModelsTools_8.1/";
+  }
+
+}
+}
+
+package "Fast Model Portfolio"
+{
+  Afc = "model_library.afc";
+  AllowDirEdit = "1";
+  DefaultSelection = "1";
+  Dir = "FastModelsPortfolio_8.1";
+  Info = "Fast Model Portfolio: This package contains the Fast Model Portfolio 8.1.037";
+  UnixPostInstallCommand = "\"/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1/etc/install.sh\" \"/home/sxcheng/Workspace/kvm/license.dat\"";
+  Win32PostInstallCommand = "\"\"/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1\\etc\\excopy.bat\" \"/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1\"\"";
+  ui_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1";
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32Path = "Docs\\FastModelsCollection.pdf";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "Fast Models 8.1 Documentation Index";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32Path = "Docs\\FastModelsPortfolio_ReleaseNotes_8.1.txt";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "Release Notes for the Fast Model Portfolio";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32Path = "Docs\\CADIClientIntegrationKit_ReleaseNotes_2.0.txt";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "CADI Client Integration Kit Release Notes";
+  }
+  executable {
+    Win32Arguments = "--reloc --uiinf \"/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1/.inst/inst_dilog\"";
+    Win32DesktopShortCut = "0";
+    Win32IconId = "1";
+    Win32MenuShortCut = "1";
+    Win32Path = ".inst\\Setup.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\";
+    Win32ShortCutName = "Uninstall Fast Model Portfolio";
+  }
+  envvar {
+    Win32Name = "PVLIB_HOME";
+    Win32Value = "/home/sxcheng/Workspace/kvm/ARM/FastModelsPortfolio_8.1";
+  }
+
+}
+
+package "MTI Plugin Development Kit"
+{
+  Afc = "MTIPDK.afc";
+  AllowDirEdit = "1";
+  DefaultSelection = "0";
+  Dir = "MTIPDK_1.1";
+  Info = "This package contains the Model Trace Interface (MTI) headers for trace plugins to Fast models, documentation and examples.";
+  ui_package_dir = "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1";
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32IconId = "ext";
+    Win32MenuShortCut = "1";
+    Win32Path = "doc\\ModelTraceInterface-ReferenceManual.pdf";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\MTI Plugin Development Kit";
+    Win32ShortCutName = "Model Trace Interface Reference Manual";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32IconId = "ext";
+    Win32MenuShortCut = "1";
+    Win32Path = "doc\\TraceSources_Cortex-A8.txt";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\MTI Plugin Development Kit";
+    Win32ShortCutName = "ARM_Cortex-A8 model Trace sources";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32IconId = "ext";
+    Win32MenuShortCut = "1";
+    Win32Path = "README.txt";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\MTI Plugin Development Kit";
+    Win32ShortCutName = "MTI Plugin Development Kit Release Notes";
+  }
+  executable {
+    Win32Arguments = "--reloc --uiinf \"/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/.inst/inst_dilog\"";
+    Win32DesktopShortCut = "0";
+    Win32IconId = "1";
+    Win32MenuShortCut = "1";
+    Win32Path = ".inst\\setup.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\MTI Plugin Development Kit";
+    Win32ShortCutName = "Uninstall MTI Plugin Development Kit";
+  }
+
+}
+
+package "Flex Licensing Tools"
+{
+  Afc = "FlexTools.afc";
+  AllowDirEdit = "1";
+  DefaultSelection = "0";
+  Dir = "FlexTools_10.8.10";
+  Info = "Fast Model Portfolio: This package contains the Flex Licensing tools";
+  ui_package_dir = "/home/sxcheng/Workspace/kvm/ARM/FlexTools_10.8.10";
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32Path = "lmtools.exe";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\flex licensing tools";
+    Win32ShortCutName = "lmtools";
+  }
+  executable {
+    Win32DesktopShortCut = "0";
+    Win32MenuShortCut = "1";
+    Win32Path = "DUI0209I_flexnet_guide.pdf";
+    Win32ProgramSubMenu = "ARM\\Fast Models 8.1\\\\flex licensing tools";
+    Win32ShortCutName = "FLEXnet for ARM Tools License Management Guide";
+  }
+
+}
+  }
+
+  files (
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/README.txt", "38a0a5de8e9ccee5c0885ebba6d372c6",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/doc/ModelTraceInterface-ReferenceManual.pdf", "24efa34fcefa81e0625b77daaee366ea",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/doc/TraceSources_Cortex-A8.txt", "39e072663a1d4b2cf25885fb7822e458",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/CacheStatistics/source/CacheStatistics.cpp", "51689c85073d1c9fb5cbe6445f4037a6",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/CacheStatistics/source/Makefile", "49bc0b2b516bf29a7fcd638db1e33a83",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/GenericTrace/source/FormattedBuffer.cpp", "88fe8310590ab23d43356ac545a1568a",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/GenericTrace/source/FormattedBuffer.h", "08f76703099784061122415c86a23c93",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/GenericTrace/source/FormatterUtils.h", "85aad2b8af83439c0dfcf9b078e59992",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/GenericTrace/source/GenericTrace.cpp", "5f54e2768f60ea6f2a3f9d20283c8d07",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/GenericTrace/source/Makefile", "159b87eb6a1eeaac140bfe508bbf4bc1",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/GenericTrace/source/MTI_ext.h", "95aef7aaa18d816923ed7ad300f55a89",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/GenericTrace/source/PatternBuffer.cpp", "096fa95066ddd1079eb4c3e7e5c04cb2",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/GenericTrace/source/PatternBuffer.h", "17aaa4ef8b8d245a8ca3bda7c93c0877",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/LinuxSyscallTrace/source/LinuxSyscallIDs.h", "70a916190fea24644e4fe63139ddf095",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/LinuxSyscallTrace/source/LinuxSyscallTrace.cpp", "0e2475121d2d3cd9aa38c3a50d3768fc",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/LinuxSyscallTrace/source/Makefile", "563c1ff2cc363a6212ad5900668dbc39",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/ListTraceSources/source/ListTraceSources.cpp", "599b7d63c1bed270943d480dd709ac8d",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/ListTraceSources/source/Makefile", "ace447a05cdec0e6b428441c9d5003e2",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/RunTimeParameterTest/source/Makefile", "5a7e40752939206000f8b6119b7a63f8",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/RunTimeParameterTest/source/RunTimeParameterTest.cpp", "653fe03eb8401a2c23c421151496a9c0",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/SimpleTraceExample/source/Makefile", "4ab10b7b04f9e7a6879414753294b95b",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/examples/SimpleTraceExample/source/SimpleTraceExample.cpp", "d46a8ffb3143af76d62893b95f3e7b17",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/GetTopLevelCADIFromSystemTraceInterface.h", "89f15c48ec4e67daea0eb58730ddeecc",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CADI.h", "e465638d147cc8f4fcef0bcea4fb4e73",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CADICommon.h", "c971c6ffff8fc5249bd02746587f314a",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CADIDisassembler.h", "8fd2e1a62c1b254e0f78e508ef7834d0",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CADIDisassemblerTypes.h", "ac7ec29cd90b599240a210bbbfc849fb",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CADIFactory.h", "90bcb67db56fe9bbd1ce737908261d96",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CADIProfiling.h", "b3857ecbddcb3bbc7aaea7b55411bcdf",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CADITypes.h", "3667c64924d707bb1a3e01081166de08",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CAInterface.h", "8f2d344555825ab0c14a3f0de2c95aa9",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CAInterfaceRegistry.h", "d6940df84c9967d95aa0b9936af9c0e8",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CAInterfaceRegistryIF.h", "2dac8f6cfd2a48ce7dbb2bccd5c739a8",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CAPI.h", "f722e1ccb86eec3d57d423c07f553cbc",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CAPIColors.h", "799773d9cbfa77c395256099264d8d74",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CAPIGlobalContainer.h", "3b3d56407f5dfa99398defddfac2094f",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CAPIIF.h", "61faa2d7ed0ebf2a2ff2a7c905d1f04f",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CAPIRegistry.h", "e00e54a175db89b681692ecf941c2296",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/CAPITypes.h", "3ea56ec5bf550f090a5f687c35f2830c",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/eslapi_stdint.h", "0c6073effa5611180090e22fb26efcc6",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/hostconf/zinttypes.h", "afa89c0fa4fa772de7d737ceaddfd61a",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/eslapi/hostconf/zstdint.h", "de769a11633f69e9379dfb599c412273",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/ComponentTraceInterface_v1.h", "9e38a6b726d67a1df3e29245397fa3c8",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/ModelTraceInterface.h", "eb1e07307415ae9f8ee7d6d843d81d77",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/ModelTraceInterface_v1.h", "f054df1c345cfaf05c520eb3b2a10d8d",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/ParameterInterface.h", "43b186a3b3b130514bde6f505f0415ca",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/ParameterInterface_v0.h", "d7f1ac480781cc985e315cd46f204df5",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/PluginFactory.h", "4091a6f4a87f9ebd9ca1d16c68edc6ec",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/PluginFactory_v0.h", "7feeafdf8ccc2de418275fa5946d8d02",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/PluginFactory_v1.h", "d0c2b9057d8d0f8cb7603044c75ba7fc",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/PluginInstance.h", "2359e2a233cdc286e0ddf9c4176f4caa",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/PluginInstance_v0.h", "398d19658d3cb872e41aebbde788b287",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/PluginInterface.h", "2a17f0464ec1b469e5877fe4984fddea",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/include/MTI/SystemTraceInterface_v1.h", "9ebf3c47df67a24939fe5b34962af487",
+    "/home/sxcheng/Workspace/kvm/ARM/MTIPDK_1.1/EULA.htm", "c2607c00ddfe9e8b1163482382c6a1e4",
+  )
+}

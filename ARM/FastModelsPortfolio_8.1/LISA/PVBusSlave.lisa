@@ -1,0 +1,105 @@
+/*
+ * Copyright 2006-2007 ARM Limited. All rights reserved.
+ */
+
+// A PVBusSlave handles incoming transactions, and handles support for
+// mapping regions of device address space to work as RAM/ROM/device memory.
+//
+// See PVBusSlaveControlProtocol.lisa for details of the mechanisms for
+// configuring the memory regions.
+//
+// The PVBusSlave 'size' parameter controls the addressable size of the
+// device. Addresses outside of this range will wrap around.
+//
+// By default, the entire device address range is treated as device memory,
+// meaning that all accesses will be routed to the device port.
+// A component implementing device registers should connect the
+// device port to a slave port that implements the read() and
+// write() behaviors. (See the first example below).
+//
+// A component that wants to implement regions of RAM or ROM must use the
+// control port to reconfigure the PVBusSlave's decoding.  See the second
+// example below.
+//
+// Example of usage:
+//
+//  component BitLatch
+//  {
+//      resources {
+//          flag : bool;
+//      }
+//      slave port<PVBus> pvbus_s;
+//
+//      slave port<PVDevice> device_port {
+//          behaviour read(pv::ReadTransaction tx) {
+//              if (tx.getAddress() != 0) {
+//                  return tx.generateAbort();
+//              }
+//              return tx.write8(flag ? 1 : 0);
+//          behaviour write(pv::WriteTransaction tx) {
+//              if (tx.getAddress() != 0) {
+//                  return tx.generateAbort();
+//              }
+//              flag = ((tx.read8() & 1) != 0);
+//              return tx.writeComplete();
+//          }
+//
+//          behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+//          {
+//              return device_port.read(tx);
+//          }
+//
+//          behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+//          {
+//              return device_port.write(tx);
+//          }        
+//      }
+//      composition {
+//          busslave : PVBusSlave(size=0x1000);
+//      }
+//      connection {
+//          self.pvbus_s => busslave.pvbus_s;
+//          busslave.device => self.device_port;
+//      }
+//  }
+//
+//  component RAM
+//  {
+//      slave port<PVBus> pvbus_s;
+//      master port<PVBusSlaveControl> busslave_control;
+//
+//      composition {
+//          busslave : PVBusSlave(size=0x01000000);
+//      }
+//      connection {
+//          self.pvbus_s => busslave.pvbus_s;
+//          self.busslave_control => busslave.control;
+//      }
+//      behavior init() {
+//          busslave_control.setAccess(0, 0x01000000, pv::RW, pv::MEMORY);
+//      }
+//  }
+
+extern component PVBusSlave
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "A PVBusSlave handles incoming transactions, and handles support for mapping regions of device address space to work as RAM/ROM/device memory.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    resources
+    {
+        PARAMETER { description("Addressable range of device (0 means 2^64)"), type(uint64_t), default(0) } size;
+        PARAMETER { description("Maximum width of an access in bytes.  Must be a power of 2.  Wider accesses will split in chunks no larger than this."), type(uint32_t), default(8), min(1), max(16) } max_access_width;
+    }
+
+    // Connection in from bus master.
+    slave port<PVBus> pvbus_s;
+
+    // Connection out to device
+    master port<PVDevice> device;
+
+    slave port<PVBusSlaveControl> control;
+}

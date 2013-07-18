@@ -1,0 +1,18 @@
+/*
+ * Copyright 2009 ARM Limited. All rights reserved.
+ */
+
+// Protocol which allows a core tile to override the implementation
+// of system registers.
+
+protocol EBSysRegs
+{
+    properties {
+        version = "8.1.37";
+        description = "EBSysRegs protocol";
+    }
+
+    // Return true if the read/write has been handled
+    slave behavior read(uint32_t addr, uint32_t *data) : bool;
+    slave behavior write(uint32_t addr, uint32_t data) : bool;
+}

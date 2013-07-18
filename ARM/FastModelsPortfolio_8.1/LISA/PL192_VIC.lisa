@@ -1,0 +1,1156 @@
+/*
+ * Copyright 2005-2008 ARM Limited. All rights reserved.
+ */
+
+// LISA Implementation of PL 192 VIC (Vectored Interrupt Controller). ARM PrimeCell VIC(PL192)
+
+/*
+*     The state transition diagram of a VIC 192 interrupt source
+*
+*      _________                          _________
+*     |         |--------(1)IRQ--------->|         |
+*     |  ~A~S   |                        |   A~S   |
+*     |_________|<-------(2)~IRQ --------|_________|
+*             ^                            ^     |
+*             |                            |     |
+*             |                           (4)Write VICADDRESS
+*             |                            |     |
+*            (7)Write VICADDRESS           |     |
+*             |                            |    (3)Serve a IRQ
+*             |                            |     |
+*      _______|_                          _|_____V_
+*     |         |--------(6)IRQ--------->|         |
+*     |  ~A S   |                        |   A S   |
+*     |_________|<-------(5)~IRQ---------|_________|
+*
+* NOTE:
+*      A: The IRQ is active. It is in the irqServeList which is a sorted 
+*         list of active IRQs that need to be served.
+*     ~A: Inactive IRQ. The corresponding input port is tied to low.
+*      S: The IRQ is being served.
+*     ~S: The IRQ is waiting to be served
+*
+* Detailed Descriptions:
+*
+* (1) An IRQ is asserted, and state changes from ~A~S to A~S. The IRQ is
+*     inserted into a sorted list called irqServeList to wait for service. In
+*     this case, the corresponding input pin is tie to high.
+*
+* (2) The IRQ is deasserted. This can happen when the device doesn't want to
+*     keep IRQ active. For example, after continuously sending data, UART can
+*     deassert IRQ to indicate stopping data transmission. In this case, even if
+*     the IRQ is in the stack and ready to be served it should be removed from
+*     the stack immediately.
+*
+* (3) When an IRQ which is at the top of the waiting stack is being served, the
+*     state changes from A~S to AS.
+*
+* (4) Writing to the VICADDRESS register indicates that the current served
+*     interrupt has been finished. However, the state of the IRQ could be still
+*     active. The device, such as a UART, which raised the IRQ could
+*     still want to generate a new IRQ to finish a task.
+*
+* (5) The IRQ is being served. Before finishing, the device deasserts the IRQ.
+*     The current IRQ will be removed from the top of the stack immediately,
+*     but it is still being served.
+*
+* (6) The IRQ is being served, and it is not in the stack. At this point, the
+*     device reasserts the IRQ, the state of IRQ will change from ~AS to AS, in
+*     another words, IRQ will be reinserted into stack.
+*
+* (7) An ISR writes to VICADDRESS to indicate the current IRQ has been served.
+*     Meanwhile the IRQ is deasserted by the device, the VIC's state will
+*     change from ~A S to ~A~S.
+*
+* The handshake when VIC is using VIC port to communicate. 
+* As this is an untimed model, it isn't possible to model the timed nature of 
+* vector address passing accurately. There are two options offered:
+* 1. Send the address just after the irq. This is closer to the hardware but
+*    requires that daisychained vics repeatedly send their address as new,
+*    higher priority irqs arrive, so may be slower
+* _________________                      _________________
+* |               |                      |               |
+* |        nVICIRQ|-------> Set -------->|nVICIRQIN      |
+* | VICVECTADDROUT|----> VICADDRESS ---->|VICVECTADDRIN  |
+* |      VICIRQACK|<------- Set <--------|VICIRQACKOUT   |
+* |        nVICIRQ|-------> Clear------->|nVICIRQIN      |
+* |      VICIRQACK|<------ Clear <-------|VICIRQACKOUT   |
+* |_______________|                      |_______________|
+*
+* 2. Send the address during the ack. In this case, the ack ripples up
+*    through the vics until it finds the irq and then the address
+*    ripples back down through the vics, before the ack returns.
+* _________________                      _________________
+* |               |                      |               |
+* |        nVICIRQ|-------> Set -------->|nVICIRQIN      |
+* |      VICIRQACK|<------- Set <--------|VICIRQACKOUT   |
+* | VICVECTADDROUT|----> VICADDRESS ---->|VICVECTADDRIN  |
+* |        nVICIRQ|-------> Clear------->|nVICIRQIN      |
+* |      VICIRQACK|<------ Clear <-------|VICIRQACKOUT   |
+* |_______________|                      |_______________|
+*
+* In both cases the ack clear is ignored by the vic.
+*/
+
+component PL192_VIC
+{
+    
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell Vectored Interrupt Controller(PL192)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        // debugging support
+        #define PL192_TRACE_REG if (!0) ; else printf
+        #define PL192_TRACE_IRQ if (!0) ; else printf
+        #define PL192_TRACE_ST  if (!0) ; else printf
+        #define PL192_TRACE_QUE if (!0) ; else printf
+        
+        // for testing. force state to be recalculated on input, or outputs
+        // to be reasserted even if they don't change.
+        #define PL192_OUTPUT_ALWAYS 0
+        #define PL192_INPUT_ALWAYS  0
+
+        // control whether to send the vaddr after the irq or during the ack
+        #define PL192_SEND_ADDR_ON_ACK 1
+
+        // enable the integration test support registers
+        #define PL192_TEST 0
+
+        // Don't change anything below here
+        
+        struct PL192_IRQ
+        {
+            bool active;        // If the IRQ is active
+            bool served;        // If the IRQ is served
+            uint8_t priority;   // Define the priority
+            uint32_t vectAddr;  // Vector address of IRQ
+        };
+        
+        #define PL192_NUM_IRQS   32
+        #define PL192_DAISYCHAIN 32
+    } 
+    
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+    }
+    
+    resources 
+    {
+        // debugger visible registers
+        REGISTER { description("IRQ status (R0)"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x000) } VICIRQSTATUS;
+        REGISTER { description("FIQ status (R0)"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x004) } VICFIQSTATUS;
+        REGISTER { description("Raw Interrupt Status"),         read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x008) } VICRAWINTR;
+        REGISTER { description("Interrupt Select"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x00c) } VICINTSELECT;
+        REGISTER { description("Interrupt Enable"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x010) } VICINTENABLE;
+        REGISTER { description("Interrupt Enable Clear (WO)"),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x014) } VICINTENCLEAR;
+        REGISTER { description("Software Interrupt"),           read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x018) } VICSOFTINT;
+        REGISTER { description("Software Interrupt Clear (WO)"),read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x01c) } VICSOFTINTCLEAR;
+        REGISTER { description("Protection Enable"),            read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x020) } VICPROTECTION;
+        REGISTER { description("Software Priority Mask"),       read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x024) } VICSWPRIORITYMASK;
+        REGISTER { description("Daisy Chain Priority"),         read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x028) } VICPRIORITYDAISY;
+        REGISTER { description("Vector Address"),               read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x100), reg_number_increment(1) } VICVECTADDR[32];
+        REGISTER { description("Vector Priority"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x200), reg_number_increment(1) } VICVECTPRIORITY[32];  
+        
+#ifdef PL192_TEST
+        // test registers
+        REGISTER { description("Test Control"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x300) } VICITCR;  
+        REGISTER { description("Test Input 1"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x304) } VICITIP1;  
+        REGISTER { description("Test Input 2"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x308) } VICITIP2;  
+        REGISTER { description("Test Output 1"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x30c) } VICITOP1;  
+        REGISTER { description("Test Output 2"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x310) } VICITOP2;  
+        REGISTER { description("Sampled Interrupt Source"),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x314) } VICINTSSTATUS;  
+        REGISTER { description("Clear Interrupt Source"),    read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x318) } VICINTSSTATUSCLEAR;  
+#endif
+        
+        // we don't current allow control of the address register via the debugger as it is read sensitive
+        REGISTER { description("Current Vector Address"), reg_number(0xf00) } VICADDRESS;                    
+        
+        REGISTER { bitwidth(8) } VICPERIPHID[4];
+        REGISTER { bitwidth(8) } VICPCELLID[4];
+        
+        // Internal state
+        
+        int irqServeList[PL192_NUM_IRQS+1]; // priority queue of pending or serviced irqs
+        int serveIndex;                     // current number of pending or serviced irqs
+        
+        PL192_IRQ irqs[PL192_NUM_IRQS+1];   // stored state of irqs, +1 for daisy chain
+        
+        uint32_t vic_address;               // address of highest priority served interrupt
+        uint32_t int_source;                // latched state of irq inputs
+        uint32_t int_enable;                // interrupt enable state
+        uint32_t int_select;                // fiq/irq routing control
+        uint32_t soft_int;                  // software interrupt state
+        uint32_t protection;                // (unimplemented) protection control
+        uint32_t swprio_mask;               // software priority mask
+        bool fiq_in_state;                  // latched state of nVICFIQIN
+        bool irq_in_state;                  // latched state of nVICIRQIN
+        bool ack_in_state;                  // latched state of VICIRQACKIN
+        bool fiq_out_state;                 // current fiq out state
+        bool irq_out_state;                 // current irq out state
+        bool ack_out_state;                 // current ack out state
+        uint32_t int_source_s;              // sticky interrupt source state
+        uint32_t itcr;                      // test control register
+        bool privilege_mode;                // true for privileged mode, false for user mode
+    }
+    
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;   
+        busslave.device => self.device; 
+    }
+    
+    /********************
+    * Behavior Section
+    ********************/
+        
+    behavior init_id_registers()
+    {
+        VICPERIPHID[0]    = 0x92;
+        VICPERIPHID[1]    = 0x11;
+        VICPERIPHID[2]    = 0x04;
+        VICPERIPHID[3]    = 0x00;
+        
+        VICPCELLID[0]      = 0x0D;
+        VICPCELLID[1]      = 0xF0;
+        VICPCELLID[2]      = 0x05;
+        VICPCELLID[3]      = 0xB1;
+    }
+
+    behavior init()
+    {
+        composition.init();
+        int_source   = 0;
+        fiq_in_state = false;
+        irq_in_state = false;
+        ack_in_state = false;
+        fiq_out_state = false;
+        irq_out_state = false;
+        ack_out_state = false;
+        
+
+        
+        for (uint8_t i = 0; i<PL192_NUM_IRQS+1; i++)
+            irqs[i].active = false;
+        
+        common_reset();
+    }
+    
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        common_reset();
+        
+        // rebuild the priority table for any active interrupts
+        IRQUpdate();
+        FIQUpdate();
+    }
+    
+    behaviour common_reset()
+    {
+        init_id_registers();
+        int_select   = 0;
+        int_enable   = 0;
+        soft_int     = 0;
+        protection   = 0;
+        vic_address  = 0;
+        swprio_mask  = 0xFFFF;
+        itcr         = 0;
+        int_source_s = 0;
+        privilege_mode = false;
+        
+        for (int i=0; i<PL192_NUM_IRQS+1; i++)
+        {
+            irqs[i].vectAddr = 0;
+            irqs[i].priority = 0xF;
+            irqs[i].served   = false;
+        }
+
+        serveIndex = -1;
+    }
+    
+    // External ports
+    
+    master port<ValueState> VICVECTADDROUT; 
+    master port<Signal>     VICIRQACKOUT;    
+    master port<Signal>     nVICFIQ;
+    master port<Signal>     nVICIRQ;
+
+    slave port<Signal> VICIntSource[32]
+    {
+        behavior setValue(uint32_t index, sg::Signal::State state)
+        {
+            int_source_in(index, state == sg::Signal::Set);
+        }
+    }    
+
+    slave port<Signal> nVICFIQIN
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            fiq_in(state == sg::Signal::Set);
+        }
+    }
+    
+    slave port<Signal> nVICIRQIN
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            irq_in(state == sg::Signal::Set);
+        }
+    }
+
+    slave port<ValueState> VICVECTADDRIN
+    {
+        behavior setValue(uint32_t addr)
+        {
+            vaddr_in(addr);
+        }
+    }
+
+    slave port<Signal> VICIRQACK
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            ack_in(state == sg::Signal::Set);
+        }
+    }
+    
+    slave  port<PVBus> pvbus;
+
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.isPrivileged())
+                privilege_mode = true;
+            else
+                privilege_mode = false;
+            
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned())
+                return tx.generateAbort();
+
+            return tx.setReturnData32((uint32_t)registerRead(tx.getAddress()));
+        }
+        
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.isPrivileged())
+                privilege_mode = true;
+            else
+                privilege_mode = false;
+            
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned())
+                return tx.generateAbort();
+
+            registerWrite(tx.getAddress(),tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    /*******************
+    * Small functions
+    *******************/
+    
+    behavior getBitStatus(uint32_t input, uint32_t index) : bool
+    {
+        return ((input>>index) & 1) != 0;
+    }
+
+    /*******************
+    * Queue logic
+    *******************/
+    
+    behaviour setServed(uint32_t index, bool state)
+    {
+        PL192_TRACE_ST("%s: VIC irqs[%d] %s%s -> %s%s\n", getInstanceName().c_str(), index,
+                        irqs[index].active ? "A":"a",
+                        irqs[index].served ? "S":"s",
+                        irqs[index].active ? "A":"a",
+                                     state ? "S":"s");
+
+        irqs[index].served = state;
+    }
+    
+    behaviour isServed(uint32_t index) : bool
+    {
+        return irqs[index].served;
+    }
+   
+    behaviour setActive(uint32_t index, bool state)
+    {
+        PL192_TRACE_ST("%s: VIC irqs[%d] %s%s -> %s%s\n", getInstanceName().c_str(), index,
+                        irqs[index].active ? "A":"a",
+                        irqs[index].served ? "S":"s",
+                                     state ? "A":"a",
+                        irqs[index].served ? "S":"s");
+
+        irqs[index].active = state;
+    }
+    
+    behaviour isActive(uint32_t index) : bool
+    {
+        return irqs[index].active;
+    }
+    
+    behaviour priorityQueueAsString() : const char*
+    {
+        static char str[256];
+        str[0] = 0;
+        int spos = 0;
+        
+        for (int i=serveIndex; i>=0; --i)
+            spos += sprintf(str+spos, "%d ", irqServeList[i]);
+            
+        return str;
+    }
+  
+    // insert an irq into the priority queue
+    // highest priority is 0, lowest is 15
+    // hihest irq is 0, lowest is 32 (daisychain)
+    behavior insertIRQ(int irqnum)
+    {
+        // if the priority level is masked out, the irq is effectively masked
+        if (!getBitStatus(swprio_mask, irqs[irqnum].priority))
+            return;
+        
+        int i;
+        
+        // find the first irq below the required priority
+        for (i=serveIndex; i>=0; --i)
+        {
+            if (((irqs[irqnum].priority == irqs[irqServeList[i]].priority) && (irqnum < irqServeList[i])) ||
+                 (irqs[irqnum].priority < irqs[irqServeList[i]].priority))
+            {
+                break;
+            }
+            else
+            {
+                // make room in the queue by shifting up other elements
+                irqServeList[i+1] = irqServeList[i];
+            }
+        }
+        
+        // irq should be inserted above lower priority irq
+        i++;
+        
+        irqServeList[i]=irqnum;
+        serveIndex++;
+    }
+    
+    // remove an irq from the priority queue. 
+    // It is likely be at the front of the queue
+    behavior removeIRQ(int irqnum)
+    {
+        for (int i=serveIndex; i>=0; --i)
+        {
+            if (irqnum == irqServeList[i])
+            {
+                for (int j=i; j<serveIndex; j++)
+                    irqServeList[j] = irqServeList[j+1];
+
+                serveIndex--;
+                return;
+            }
+        }
+    }
+
+    /*******************
+    * IRQLogic behaviors
+    *******************/
+
+    // update the fiq state after a change and output the new state
+    behavior FIQUpdate()
+    {   
+        uint32_t fiq_status = ((int_source | soft_int) & int_enable) & int_select;
+        
+        set_fiq_out(fiq_in_state || fiq_status);
+    }
+
+    // Update the irq output after the irq queue has changed
+    behavior updateIRQOutput()
+    {
+        PL192_TRACE_QUE("%s: queue { %s}\n", getInstanceName().c_str(), priorityQueueAsString());
+         
+        bool irq_status = (serveIndex != -1) && !isServed(irqServeList[serveIndex]);
+                
+        set_irq_out(irq_status);
+        
+        if (irq_status && !PL192_SEND_ADDR_ON_ACK)
+        {
+            // in this mode, we follow the irq with the address. Which is
+            // closer to the hardware but may be slower with lots of irqs
+            // Note that the vaddr can change again after the irq is sent
+            // and before the irq is acknowledged
+            
+            int irqnum = irqServeList[serveIndex];
+            set_vaddr_out(irqs[irqnum].vectAddr);
+        }
+    }
+                  
+    // service the highest priority interrupt (and clear the pending interrupt)
+    // it is unpredictable if the highest priority irq is already being
+    // serviced or there is no irq to service
+    behavior setIrqServiced()
+    {
+        if (serveIndex != -1)
+        {
+            int irqnum = irqServeList[serveIndex];
+            if (!isServed(irqnum))
+            {
+                // state transition 3
+                setServed(irqnum, true);
+                                
+                // if the interrupt came from the daisy chain port, pass on the ack.
+                // this will service the interrupt in the daisychain vic
+                if (irqnum == PL192_DAISYCHAIN)
+                {
+                    set_ack_out(true);
+                }
+                
+                if (PL192_SEND_ADDR_ON_ACK)
+                {
+                    // In this mode, the ack may have caused a daisychained vic to
+                    // to send through its vaddr (using this routine).
+                    // In any case, we now forward the address
+                    set_vaddr_out(irqs[irqnum].vectAddr);
+                }
+                
+                // the irq will always be cleared, no need to call updateIRQOutput
+                set_irq_out(false);
+            }
+        }
+    }
+    
+    // clear the service status of the highest priority serviced interrupt.
+    // This may not be at the top of the irq queue any more as other unserviced
+    // interrupts may have arrived since this interrupt was marked serviced
+    // It is unpredictable if there is no serviced interrupt
+    behaviour clearIrqServiced()
+    {
+        // find the highest priority serviced irq and clear its service flag
+        for (int i=serveIndex; i>=0; --i)
+        {
+            int irqnum = irqServeList[i];
+            
+            if (isServed(irqnum))
+            {
+                setServed(irqnum, false);
+                
+                if (!isActive(irqnum))
+                {
+                    // state transition 7
+                    removeIRQ(irqnum);
+                }
+                else
+                {
+                    // state transition 4
+                    // nothing to do, irq will be reasserted
+                }
+                
+                updateIRQOutput();
+                
+                return;
+            }
+        }
+    }
+    
+    //Update the status of an irq source input when it has been cleared
+    behavior clearIRQInput(int irqnum)
+    {
+        if (isActive(irqnum))
+        {
+            setActive(irqnum, false);
+            
+            if (!isServed(irqnum))
+            {
+                // State transition 2
+                removeIRQ(irqnum);
+                
+                updateIRQOutput();
+            }
+            else
+            {
+                // state transition 5
+            }
+        }
+    }
+    
+    // Update the status of an irq source input when it has been set
+    behavior setIRQInput(int irqnum)
+    {
+        if (!isActive(irqnum))
+        {
+            setActive(irqnum, true);
+            
+            if (!isServed(irqnum))
+            {
+                // state transition 1
+                insertIRQ(irqnum);
+                
+                updateIRQOutput();
+            }
+            else
+            {
+                // state transition 6   
+            }    
+        }
+    }
+    
+    // Update the priority queue based on current status and update the 
+    // IRQ output accordingly. This is quite expensive for masking
+    behavior IRQUpdate()
+    {
+        uint32_t irq_status = ((int_source | soft_int) & int_enable) & (~int_select);
+        
+        // empty the priorty queue before starting
+        serveIndex = -1;
+        
+        // rebuild the priority queue (in likely low to high priority)
+        if (isActive(PL192_DAISYCHAIN) || isServed(PL192_DAISYCHAIN))
+        {
+            insertIRQ(PL192_DAISYCHAIN);
+        }
+        
+        for (int i=31; i>=0; --i)
+        {
+            bool active = getBitStatus(irq_status, i);
+            if (active != isActive(i))
+                setActive(i, active);
+            
+            if (isActive(i) || isServed(i))
+            {
+                insertIRQ(i);
+            }
+        }
+        
+        updateIRQOutput();
+    }
+    
+    // output changing
+    
+    behaviour set_ack_out(bool state)
+    {
+        // ack is edge triggered 
+        PL192_TRACE_IRQ("%s: ACKOUT *> %s\n", getInstanceName().c_str(), state ? "set" : "clear");
+    
+        ack_out_state = state;
+        if (VICIRQACKOUT.setValue.implemented())
+            VICIRQACKOUT.setValue(ack_out_state ? sg::Signal::Set : sg::Signal::Clear);
+    }
+    
+    behaviour set_irq_out(bool state)
+    {
+        if (PL192_OUTPUT_ALWAYS || (irq_out_state != state))
+        {
+            PL192_TRACE_IRQ("%s: IRQOUT *> %s\n", getInstanceName().c_str(), state ? "set" : "clear");
+
+            irq_out_state = state;
+            if (nVICIRQ.setValue.implemented())
+                nVICIRQ.setValue(irq_out_state ? sg::Signal::Set : sg::Signal::Clear);
+        }
+    }
+
+    behaviour set_fiq_out(bool state)
+    {
+        if (PL192_OUTPUT_ALWAYS || (fiq_out_state != state))
+        {
+            PL192_TRACE_IRQ("%s: FIQOUT *> %s\n", getInstanceName().c_str(), state ? "set" : "clear");
+
+            fiq_out_state = state;
+            if (nVICFIQ.setValue.implemented())
+                nVICFIQ.setValue(fiq_out_state ? sg::Signal::Set : sg::Signal::Clear);
+        }
+    }
+
+    behaviour set_vaddr_out(uint32_t state)
+    {
+        if (PL192_OUTPUT_ALWAYS || (vic_address != state))
+        {
+            PL192_TRACE_IRQ("%s: VECTADDROUT -> 0x%x\n", getInstanceName().c_str(), state);
+            
+            vic_address = state;
+            if (VICVECTADDROUT.setValue.implemented())
+                VICVECTADDROUT.setValue(state);
+        }
+    }
+    
+    // input changing
+    
+    behaviour fiq_in(bool state)
+    {
+        if (PL192_INPUT_ALWAYS || (fiq_in_state != state))
+        {
+            PL192_TRACE_IRQ("%s: FIQIN <* %s\n", getInstanceName().c_str(), state ? "set" : "clear");
+                
+            fiq_in_state = state;
+            
+            FIQUpdate();
+        }
+    }
+    
+    behaviour irq_in(bool state)
+    {
+        if (PL192_INPUT_ALWAYS || (irq_in_state != state))
+        {
+            PL192_TRACE_IRQ("%s: IRQIN <* %s\n", getInstanceName().c_str(), state ? "set" : "clear");
+            
+            irq_in_state = state;
+            
+            // It is expected that a daisychain VIC will already have sent the VIC address
+            // which is the opposite order to the hardware
+            if (state)
+                setIRQInput(PL192_DAISYCHAIN);
+            else
+                clearIRQInput(PL192_DAISYCHAIN);
+        }
+    }
+    
+    behaviour vaddr_in(uint32_t state)
+    {
+        if (PL192_INPUT_ALWAYS || (irqs[PL192_DAISYCHAIN].vectAddr != state))
+        {
+            PL192_TRACE_IRQ("%s: VECTADDRIN <* 0x%x\n", getInstanceName().c_str(), state);
+                
+            // the address is used when the daisychain interrupt arrives
+            irqs[PL192_DAISYCHAIN].vectAddr = state;
+            
+            if (!PL192_SEND_ADDR_ON_ACK)
+            {
+                // in this mode, any change to the vaddress will need to be
+                // propagated to the next vic/cpu if the daisychain is highest priority
+                updateIRQOutput();
+            }
+        }
+    }
+    
+    behaviour ack_in(bool state)
+    {
+        ack_in_state = state;
+        
+        // ack is edge triggered
+        if (state)
+        {
+            PL192_TRACE_IRQ("%s: IRQACKIN <* %s\n", getInstanceName().c_str(), state ? "set" : "clear");
+            
+            // this should have the same behaviour as reading from the VIC_ADDRESS register
+            setIrqServiced();
+        }
+    }
+    
+    behaviour int_source_in(uint32_t index, bool state)
+    {
+        if (PL192_INPUT_ALWAYS || getBitStatus(int_source, index) != state)
+        {
+            PL192_TRACE_IRQ("%s: IRQ[%d] <* %s\n", getInstanceName().c_str(), index, state ? "set" : "clear");
+  
+            uint32_t mask = 1<<index;
+            if (state)
+            {
+                int_source |= mask;
+                int_source_s |= mask;
+                
+                uint32_t int_status = (int_source|soft_int) & int_enable;
+                if (int_status & mask)
+                {
+                    if (!getBitStatus(int_select, index))
+                        setIRQInput(index);
+                    else
+                        FIQUpdate();
+                }
+            }
+            else
+            {
+                int_source &= ~mask;
+                
+                uint32_t int_status = (int_source|soft_int) & int_enable;
+                if (!(int_status & mask))
+                {
+                    if (!getBitStatus(int_select, index))
+                        clearIRQInput(index);
+                    else
+                        FIQUpdate();
+                }
+            }
+        }
+    }
+    
+    /**************************************************
+    * pvbus access
+    * ************************************************/
+    behavior registerRead(uint32_t addr) : uint32_t
+    {
+        uint32_t data = 0;
+        
+        if (protection == 0x1 && !privilege_mode)
+            return data;
+        
+        if (addr <= 0x028)
+        {
+            switch(addr)
+            {
+            case 0x000:
+                data = ((int_source|soft_int) & int_enable) & (~int_select);
+    
+                PL192_TRACE_REG("%s: VICIRQSTATUS -> 0x%x\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x004:
+                data = ((int_source|soft_int) & int_enable) & (int_select);
+    
+                PL192_TRACE_REG("%s: VICFIQSTATUS -> 0x%x\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x008: 
+                data = int_source|soft_int;
+    
+                PL192_TRACE_REG("%s: VICRAWINTR -> 0x%x\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x00C: 
+                data = int_select;
+    
+                PL192_TRACE_REG("%s: VICINTSELECT -> 0x%x\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x010: 
+                data = int_enable;
+    
+                PL192_TRACE_REG("%s: VICINTENABLE -> 0x%x\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x014: 
+                PL192_TRACE_REG("%s: VICINTENCLEAR (W0)\n", getInstanceName().c_str());
+            break;              
+            case 0x018: 
+                data = soft_int;
+    
+                PL192_TRACE_REG("%s: VICSOFTINT -> 0x%x\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x01c: 
+                PL192_TRACE_REG("%s: VICSOFTINTCLEAR (W0)\n", getInstanceName().c_str());
+            break;              
+            case 0x020: 
+                if (privilege_mode)
+                   data = protection;
+                else
+                    PL192_TRACE_REG("ERROR - Access(read) VICPROTECTION in User mode\n");
+    
+                PL192_TRACE_REG("%s: VICPROTECTION -> 0x%x\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x024:
+                data = swprio_mask;
+    
+                PL192_TRACE_REG("%s: VICSWPRIORITYMASK -> 0x%x\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x028: 
+                data = irqs[PL192_DAISYCHAIN].priority;
+    
+                PL192_TRACE_REG("%s: VICPRIORITYDAISY -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+            }   
+        }
+        else if (addr == 0xF00)
+        {
+            setIrqServiced();
+            
+            data = vic_address;
+
+            PL192_TRACE_REG("%s: VICADDRESS -> 0x%x\n", getInstanceName().c_str(), data);
+        }
+        else if (addr>=0x100 && addr<=0x17C)
+        {
+            uint32_t index = (addr-0x100)/4;
+
+            data = irqs[index].vectAddr;
+
+            PL192_TRACE_REG("%s: VICVECTADDR[%d] -> 0x%x\n", getInstanceName().c_str(), index, data);
+        } 
+        else if (addr>=0x200 && addr<=0x27C)
+        {
+            uint32_t index = (addr-0x200)/4;
+
+            data = irqs[index].priority;
+
+            PL192_TRACE_REG("%s: VICVECTPRIORITY[%d] -> 0x%x\n", getInstanceName().c_str(), index, data);
+        } 
+        else if (addr>=0xFE0 && addr<=0xFEC)
+        {
+            uint32_t index = (addr-0xFE0)/4;
+
+            data = VICPERIPHID[index];
+
+            PL192_TRACE_REG("%s: VICPERIPHID[%d] -> 0x%x\n", getInstanceName().c_str(), index, data);
+        }
+        else if (addr>=0xFF0 && addr<=0xFFC)
+        {
+            uint32_t index = (addr-0xFF0)/4;
+
+            data = VICPCELLID[index];
+
+            PL192_TRACE_REG("%s: VICPCELLID[%d] -> 0x%x\n", getInstanceName().c_str(), index, data);
+        }
+#ifdef PL192_TEST
+        else if (addr>=0x300 && addr<=0x318)
+        {
+            switch (addr)
+            {
+            case 0x300:
+                data = itcr;
+                
+                PL192_TRACE_REG("%s: VICITCR -> 0x%x\n", getInstanceName().c_str(), data);
+            break;
+            case 0x304:
+                data = (0            ? (1<<10) : 0)    // we don't implement vicfiqinreg
+                     | (0            ? (1<<9) : 0)     // we don't implement vifirqinreg
+                     | (ack_in_state ? (1<<8) : 0)
+//                     | (irq_in_state ? (1<<7) : 0)
+//                     | (fiq_in_state ? (1<<6) : 0);
+                     | (irq_in_state ? 0 : (1<<7))
+                     | (fiq_in_state ? 0 : (1<<6));
+                     
+                PL192_TRACE_REG("%s: VICITIP1 -> 0x%x\n", getInstanceName().c_str(), data);
+            break;   
+            case 0x308:       
+                data = irqs[PL192_DAISYCHAIN].vectAddr;
+                
+                PL192_TRACE_REG("%s: VICITIP2 -> 0x%x\n", getInstanceName().c_str(), data);
+            break;   
+            case 0x30C:
+                data = (ack_out_state ? (1<<9) : 0)
+                     | (ack_out_state ? (1<<8) : 0) // actually vectaddrv but we don't implement it
+                     | (irq_out_state ? (1<<7) : 0)
+                     | (fiq_out_state ? (1<<6) : 0);
+                
+                PL192_TRACE_REG("%s: VICITOP1 -> 0x%x\n", getInstanceName().c_str(), data);
+            break;   
+            case 0x310:
+                // this won't work for daisy chain addresses as they are sent on demand
+                // during the ack, not clocked after the interrupt
+                if (serveIndex != -1)
+                    data = irqs[irqServeList[serveIndex]].vectAddr;
+                
+                PL192_TRACE_REG("%s: VICITOP2 -> 0x%x\n", getInstanceName().c_str(), data);
+            break;   
+            case 0x314:
+                data = int_source_s;
+                
+                PL192_TRACE_REG("%s: VICINITSSTATUS -> 0x%x\n", getInstanceName().c_str(), data);
+            break;   
+            case 0x318:
+                PL192_TRACE_REG("%s: VICIINTSSTATUSCLEAR -> (W0)\n", getInstanceName().c_str());
+            break;
+            }
+        }
+#endif // PL192_TEST
+        else
+        {
+            printf("Read register: Invalid address 0x%x\n", addr);
+        }
+        return data;
+    }
+    
+    behavior registerWrite(uint32_t addr, uint32_t data)
+    {
+        if (protection == 0x1 && !privilege_mode)
+            return;
+        if (addr <= 0x28)
+        {
+            switch(addr)
+            {
+            case 0x000:
+                PL192_TRACE_REG("%s: VICIRQSTATUS <- 0x%x (R0)\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x004:
+                PL192_TRACE_REG("%s: VICFIQSTATUS <- 0x%x (R0)\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x008: 
+                PL192_TRACE_REG("%s: VICRAWINTR <- 0x%x (R0)\n", getInstanceName().c_str(), data);
+            break;              
+            case 0x00C:         
+                PL192_TRACE_REG("%s: VICINTSELECT <- 0x%x\n", getInstanceName().c_str(), data);
+
+                int_select = data;
+                IRQUpdate();
+                FIQUpdate();
+            break;
+            case 0x010:         
+                PL192_TRACE_REG("%s: VICINTENABLE <- 0x%x\n", getInstanceName().c_str(), data);
+
+                int_enable |= data;
+                IRQUpdate();
+                FIQUpdate();
+            break;
+            case 0x014:         
+                PL192_TRACE_REG("%s: VICINTENCLEAR <- 0x%x\n", getInstanceName().c_str(), data);
+
+                int_enable &= ~data;
+                IRQUpdate();
+                FIQUpdate();
+            break;
+            case 0x018:         
+                PL192_TRACE_REG("%s: VICSOFTINT <- 0x%x\n", getInstanceName().c_str(), data);
+
+                soft_int |= data;
+                IRQUpdate();
+                FIQUpdate();
+            break;
+            case 0x01C:          
+                PL192_TRACE_REG("%s: VICSOFTINTCLEAR <- 0x%x\n", getInstanceName().c_str(), data);
+
+                soft_int &= ~data;
+                IRQUpdate();
+                FIQUpdate();
+            break;
+            case 0x020:
+                PL192_TRACE_REG("%s: VICPROTECTION <- 0x%x\n", getInstanceName().c_str(), data);
+                if (privilege_mode)
+                    protection = data & 1;
+                else
+                    PL192_TRACE_REG("ERROR - Access(write) VICPROTECTION in User mode\n");
+            break;
+            case 0x024:
+                PL192_TRACE_REG("%s: VICSWPRIORITYMASK <- 0x%x\n", getInstanceName().c_str(), data);
+
+                swprio_mask = data & 0x0000FFFF;
+                IRQUpdate();
+                FIQUpdate();
+            break;
+            case 0x028:
+                PL192_TRACE_REG("%s: VICPRIORITYDAISY <- 0x%x\n", getInstanceName().c_str(), data);
+
+                irqs[PL192_DAISYCHAIN].priority = data & 0xF;
+                IRQUpdate();
+            break;
+            }        
+        }
+        else if (addr == 0xF00)
+        {
+            PL192_TRACE_REG("%s: VICADDRESS <- 0x%x\n", getInstanceName().c_str(), data);
+                
+            clearIrqServiced();
+        }
+        else if (addr>=0x100 && addr<=0x17C)
+        {
+            uint32_t index = (addr-0x100)/4;
+
+            PL192_TRACE_REG("%s: VICVECTADDR[%d] <- 0x%x\n", getInstanceName().c_str(), index, data);
+
+            irqs[index].vectAddr = data;
+        } 
+        else if (addr>=0x200 && addr<=0x27C)
+        {  
+            uint32_t index = (addr-0x200)/4;
+
+            PL192_TRACE_REG("%s: VICVECTPRIORITY[%d] <- 0x%x\n", getInstanceName().c_str(), index, data);
+
+            irqs[index].priority = data & 0xf;
+        }
+#ifdef PL192_TEST
+        else if (addr>=0x300 && addr<=0x318)
+        {     
+            // test registers
+            switch (addr)
+            {
+            case 0x300:
+                PL192_TRACE_REG("%s: VICITCR <- 0x%x\n", getInstanceName().c_str(), data);
+                
+                itcr = data & 3;
+            break;
+            case 0x304:
+                PL192_TRACE_REG("%s: VICITIP1 <- 0x%x\n", getInstanceName().c_str(), data);
+                
+                // simulate input changing - not sure if this is what happens
+                ack_in((data & (1<<8)) != 0);
+                irq_in((data & (1<<7)) != 0);
+                fiq_in((data & (1<<6)) != 0);               
+            break;   
+            case 0x308:                
+                PL192_TRACE_REG("%s: VICITIP2 <- 0x%x\n", getInstanceName().c_str(), data);
+                
+                vaddr_in(data);
+            break;   
+            case 0x30C:
+                PL192_TRACE_REG("%s: VICITOP1 <- 0x%x\n", getInstanceName().c_str(), data);
+                
+                set_ack_out((data & (1<<9)) != 0);
+                // don't implement vectaddrv
+                set_irq_out((data & (1<<7)) != 0);
+                set_fiq_out((data & (1<<6)) != 0);
+            break;   
+            case 0x310:
+                PL192_TRACE_REG("%s: VICITOP2 <- 0x%x\n", getInstanceName().c_str(), data);
+                
+                set_vaddr_out(data);
+            break;   
+            case 0x314:
+                PL192_TRACE_REG("%s: VICINITSSTATUS <- 0x%x (R0)\n", getInstanceName().c_str(), data);
+            break;   
+            case 0x318:
+                PL192_TRACE_REG("%s: VICIINTSSTATUSCLEAR <- 0x%x\n", getInstanceName().c_str(), data);
+                
+                int_source_s &= ~data;
+            break;
+            }
+        }
+#endif // PL192_TEST
+        else   
+        {
+            printf("Write register: Invalid address 0x%x\n", addr);
+        }
+    }
+        
+    // debugger support - slightly more complicated than normal because of the way that register arrays are handled
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        if (reg_id < 0x100)
+        {
+        }
+        else if (reg_id < 0x200)
+        {
+            // vector address - register is encoded as 0x100, 0x101, 0x102 etc
+            reg_id = ((reg_id - 0x100)*4)+0x100;
+        }
+        else if (reg_id < 0x300)
+        {
+            // vector priority - register is encoded as 0x200, 0x201, 0x202 etc
+            reg_id = ((reg_id - 0x200)*4)+0x200;
+        }
+
+        *datap = registerRead(reg_id);
+        
+        return ACCESS_FUNC_OK;
+    }
+    
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        if (reg_id < 0x100)
+        {
+        }
+        else if (reg_id < 0x200)
+        {
+            // vector address - register is encoded as 0x100, 0x101, 0x102 etc
+            reg_id = ((reg_id - 0x100)*4)+0x100;
+        }
+        else if (reg_id < 0x300)
+        {
+            // vector priority - register is encoded as 0x200, 0x201, 0x202 etc
+            reg_id = ((reg_id - 0x200)*4)+0x200;
+        }
+        
+        registerWrite(reg_id, (uint32_t)*datap);
+        
+        return ACCESS_FUNC_OK;
+    }
+}

@@ -1,0 +1,295 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// LISA Implementation of a PL031 Real Time Clock
+
+component PL031_RTC
+{
+    includes {
+        // for debug instrumentation
+        #define PL031_TRACE if (!0) ; else printf
+    }
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell Real Time Clock(PL031)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);        
+        timer : ClockTimer;
+    }
+    
+    resources
+    {
+        REGISTER { description("Data Register"),            read_function(debug_read), write_function(debug_write), reg_number(0x00) } RTCDR;
+        REGISTER { description("Match Register"),           read_function(debug_read), write_function(debug_write), reg_number(0x04) } RTCMR;
+        REGISTER { description("Load Register"),            read_function(debug_read), write_function(debug_write), reg_number(0x08) } RTCLR;
+        REGISTER { description("Control Register"),         read_function(debug_read), write_function(debug_write), reg_number(0x0c) } RTCCR;
+        REGISTER { description("Interrupt Mask"),           read_function(debug_read), write_function(debug_write), reg_number(0x10) } RTCIMSC;
+        REGISTER { description("Raw interrupt status"),     read_function(debug_read), write_function(debug_write), reg_number(0x14) } RTCRIS;
+        REGISTER { description("Masked interrupt status"),  read_function(debug_read), write_function(debug_write), reg_number(0x18) } RTCMIS;
+    }
+    
+    // Ports
+    master port<Signal> intr;
+    
+    slave port<ClockSignal> clock;    
+    
+    internal slave port <TimerCallback> timer_callback_handler
+    {
+        behaviour signal() : uint32_t  
+        {
+            // on every clock callback the counter is incremented and checked against
+            // the match register. If there is a match, an interrupt is generated
+            RTCDR++;
+
+            if (RTCDR == RTCMR)
+            {
+                RTCRIS = 1;
+                update_rtc_interrupt();
+            }
+            return 1;
+        }
+    }
+        
+    // Memory-mapped register interface.
+    slave port<PVBus> pvbus;
+    
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32((uint32_t)registerRead((uint32_t)tx.getAddress() & ~3));
+        }
+        
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite((uint32_t)tx.getAddress(), tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    
+    connection
+    {
+        self.clock => timer.clk_in;
+        timer.timer_callback => self.timer_callback_handler;
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+    }
+    
+    behavior init()
+    {
+        composition.init();
+        common_reset();
+    }
+    
+    // Reset
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        common_reset();
+        timer.timer_control.cancel();
+        update_rtc_interrupt();
+    }
+    
+    behavior common_reset()
+    {
+        RTCDR     = 0;
+        RTCMR     = 0;
+        RTCLR     = 0;
+        RTCCR     = 0;
+        RTCIMSC   = 0;
+        RTCRIS    = 0;
+        RTCMIS    = 0;
+    }
+    
+    behavior update_rtc_interrupt()
+    {
+        RTCMIS = RTCRIS & RTCIMSC;
+        if (RTCMIS != 0)
+        {
+            if (intr.setValue.implemented())
+                intr.setValue(sg::Signal::Set);
+        }
+        else
+        {
+            if (intr.setValue.implemented())
+                intr.setValue(sg::Signal::Clear);
+        }
+    }
+            
+    behavior registerRead(uint32_t addr) : uint32_t
+    {
+        uint32_t data = 0;
+        switch (addr) 
+        {
+        case 0x00: 
+            data = RTCDR;     
+            
+            PL031_TRACE("%s: RTCDR -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x04: 
+            data = RTCMR;      
+            
+            PL031_TRACE("%s: RTCMR -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x08: 
+            data = RTCLR;      
+            
+            PL031_TRACE("%s: RTCLR -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x0c: 
+            data = RTCCR;      
+            
+            PL031_TRACE("%s: RTCCR -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x10: 
+            data = RTCIMSC;      
+            
+            PL031_TRACE("%s: RTCIMSC -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x14: 
+            data = RTCRIS;      
+            
+            PL031_TRACE("%s: RTCRIS -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x18: 
+            data = RTCMIS;      
+            
+            PL031_TRACE("%s: RTCMIS -> 0x%x\n", getInstanceName().c_str(), data);
+        break;
+                    
+        case 0x1c: 
+            PL031_TRACE("%s: RTCICR -> (Write Only)\n", getInstanceName().c_str());
+        break;
+        
+        // ID registers
+       
+        case 0xfe0: return 0x00000031;  // Peripheral ID register 0
+        case 0xfe4: return 0x00000010;  // Peripheral ID register 1
+        case 0xfe8: return 0x00000004;  // Peripheral ID register 2
+        case 0xfec: return 0x00000000;  // Peripheral ID register 3
+        
+        case 0xff0: return 0x0000000d;  // Primecell ID register 0
+        case 0xff4: return 0x000000f0;  // Primecell ID register 1
+        case 0xff8: return 0x00000005;  // Primecell ID register 2
+        case 0xffc: return 0x000000b1;  // Primecell ID register 3
+        
+        default:
+            PL031_TRACE("%s: Read from unimplemented register at 0x%x\n", getInstanceName().c_str(), addr);
+        break;
+        }
+        return data;
+    }
+
+    behavior registerWrite(uint32_t addr, uint32_t data)
+    {
+        switch (addr) 
+        {
+        case 0x00:             
+            PL031_TRACE("%s: RTCDR <- 0x%x (Read Only)\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x04: 
+            PL031_TRACE("%s: RTCMR <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            RTCMR = data;
+        break;
+           
+        case 0x08:
+            PL031_TRACE("%s: RTCLR <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            RTCLR = data;
+            RTCDR = data;
+            break;
+        
+        case 0x0c:
+            PL031_TRACE("%s: RTCCR <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            // Only a reset can disable the RTC
+            if (data & 1)
+            {
+                if (RTCCR != 1)
+                {
+                    RTCCR = 1;
+                    timer.timer_control.set(1);
+                }
+            }
+        break;
+          
+        case 0x10:
+            PL031_TRACE("%s: RTCIMSC <- 0x%x\n", getInstanceName().c_str(), data);
+            
+            RTCIMSC = data & 1;
+            
+            update_rtc_interrupt();
+        break;
+        
+        case 0x014:
+            PL031_TRACE("%s: RTCRIS <- 0x%x (Read Only)\n", getInstanceName().c_str(), data);
+        break;
+        
+        case 0x018:
+            PL031_TRACE("%s: RTCMIS <- 0x%x (Read Only)\n", getInstanceName().c_str(), data); 
+        break;
+        
+        case 0x01c:
+            PL031_TRACE("%s: RTCICR <- 0x%x\n", getInstanceName().c_str(), data);
+
+            if (data & 1)
+            {
+                RTCRIS = 0;
+                update_rtc_interrupt();
+            }
+        break;
+        
+        default: 
+            PL031_TRACE("%s: write to unimplemented register at 0x%x <- 0x%x\n", getInstanceName().c_str(), addr, data);
+        break;
+        }
+    }
+    
+    // debugger support
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+        
+        return ACCESS_FUNC_OK;
+    }
+    
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+        
+        return ACCESS_FUNC_OK;
+    }
+
+}

@@ -1,0 +1,26 @@
+component "MessageBox"
+{
+        path="../LISA/MessageBox.lisa";
+}
+protocol "MessageBoxProtocol"
+{
+        path="../LISA/MessageBoxProtocol.lisa";
+}
+component "VFS2"
+{
+        path="../LISA/VFS2.lisa";
+}
+
+files
+(
+        path = "../C/MessageCodec.h";
+        path = "../C/MBoxTypes.h";
+        path = "../C/VFS.cpp";
+        path = "../C/VFSFileSystem.cpp";
+        path = "../C/VFSOps.h";
+        path = "../C/MessageCodec.h";
+        path = "../C/VFS.h";
+        path = "../C/VFSFileSystem.h";
+        path = "../C/VFSTypes.h";
+        path = "../C/";
+)

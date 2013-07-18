@@ -1,0 +1,493 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component PL050_KMI
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell PS2 Keyboard/Mouse Interface(PL050)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes
+    {
+        #include <stdio.h>
+
+        #define TRACE_KMI if (!0) ; else printf
+    }
+    
+    composition
+    {
+        clk_divider : ClockDivider;
+        clk_timer : ClockTimer;
+        busslave : PVBusSlave(size=0x1000);
+    }
+    
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        
+        self.clock => clk_divider.clk_in;
+        clk_divider.clk_out => clk_timer.clk_in;
+        clk_timer.timer_callback => self.timer_callback;
+    }
+    
+    resources
+    {
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x0),  description("Control")          } KMICR;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x4),  description("Status")           } KMISTAT;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x8),  description("Data")             } KMIDATA;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xc),  description("Clock divisor")    } KMICLKDIV;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x10), description("Interrupt status") } KMIIR;
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xFE0), description("Peripheral id 0") } KMIPeriphID0;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xFE4), description("Peripheral id 1") } KMIPeriphID1;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xFE8), description("Peripheral id 2") } KMIPeriphID2;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xFEC), description("Peripheral id 3") } KMIPeriphID3;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xFF0), description("PrimeCell id 0") } KMIPCellID0;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xFF4), description("PrimeCell id 1") } KMIPCellID1;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xFF8), description("PrimeCell id 2") } KMIPCellID2;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0xFFC), description("PrimeCell id 3") } KMIPCellID3;
+
+        enum consts {
+            KMICR_FKMIC    = (1<<0),
+            KMICR_FKMID    = (1<<1),
+            KMICR_ENABLE   = (1<<2),
+            KMICR_TXEN     = (1<<3),
+            KMICR_RXEN     = (1<<4),
+            KMICR_TYPE     = (1<<5),
+
+            KMITXINT = 2,
+            KMIRXINT = 1,
+
+            KMIST_D      = (1 << 0),
+            KMIST_C      = (1 << 1),
+            KMIST_PARITY = (1 << 2),
+            KMIST_RXBUSY = (1 << 3),
+            KMIST_RXFULL = (1 << 4),
+            KMIST_TXBUSY = (1 << 5),
+            KMIST_TXEMPTY= (1 << 6)
+        };
+        
+        uint8_t cr;       //!< Control register.
+        uint8_t stat;     //!< Status register.
+        uint8_t rxdata;   //!< RX data register.
+        uint8_t txdata;   //!< TX data register.
+        uint8_t ir;       //!< Interrupt register.
+        uint8_t clkdiv;   //!< Clock divide register.
+        
+        uint8_t irmask;   //!< Pseudo interrupt mask register.    
+        
+        bool irq;         //!< current status of IRQ line
+    }
+    
+    // Memory-mapped register interface.
+    slave port<PVBus> pvbus;
+
+    // Time interrupt.
+    master port<Signal> intr;
+
+    // Master 1MHz clock signal
+    slave port<ClockSignal> clock;
+    
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            uint32_t device_addr = (uint32_t)tx.getAddress() & ~3;
+            uint32_t data = registerRead(device_addr);
+            return tx.setReturnData32(data);
+        }
+        
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || (tx.getAddress() & 3) != 0) return tx.generateAbort();
+            uint32_t device_addr = (uint32_t)tx.getAddress();
+            registerWrite(device_addr, tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    // Incoming PS2 data
+    slave port<PS2Data> ps2device
+    {
+        behaviour getData() : uint8_t
+        {
+            if (stat & KMIST_TXBUSY)
+            {
+                stat &=~ KMIST_TXBUSY;
+                stat |= KMIST_TXEMPTY;
+
+                ir |= KMITXINT;
+
+                update_kmi_interrupt();
+
+            }
+            // clear bus state so device can send data
+            ps2device.setClockData(PS2_Ready);
+           
+            return txdata;        
+        }
+        
+        behaviour putData(uint8_t data)
+        {
+            if (!(stat & KMIST_RXFULL))
+            {
+                rxdata = data;
+                stat  |= KMIST_RXFULL;
+                ir    |= KMIRXINT;
+
+                update_kmi_interrupt();
+            }
+            
+            // block any more data until the data is read
+            ps2device.setClockData(PS2_Inhibit);
+        }
+    }
+    
+    
+    slave port<TimerCallback> timer_callback
+    {
+        behaviour signal() : uint32_t
+        {
+            TRACE_KMI("KMI tick\n");
+            update_kmi_interrupt();
+            return 0;         
+        }
+    }
+
+    // component control
+    
+    behaviour init()
+    {
+        composition.init();
+    stat = 0;
+    clkdiv = 0;
+    irq = 0;
+    
+    }
+    
+    behaviour reset(int level)
+    {
+        composition.reset(level);
+        device_reset();
+    }
+    
+    // implementation
+    
+    behaviour update_kmi_interrupt()
+    {
+        bool new_irq = (ir & irmask) != 0;
+        
+        if (irq != new_irq)
+        {
+            irq = new_irq;
+            TRACE_KMI("%s:irq %s\n", getInstanceName().c_str(), irq ? "set" : "cleared");
+            
+            if (intr.setValue.implemented())
+                intr.setValue(irq ? sg::Signal::Set : sg::Signal::Clear);
+        }
+    }
+    
+    behaviour control_write(uint32_t new_cr)
+    {
+        cr = (uint8_t)new_cr;
+
+        uint32_t c = (cr & KMICR_FKMIC) ? 0 : 1;
+        uint32_t d = (cr & KMICR_FKMID) ? 0 : 1;
+
+
+        // this messes with the state machine. Only
+        // force state if either is forced low
+
+        // normally both c and d are allowed to float
+        //      keyboard drives the clock
+        //      device sends data
+        // host can force clock low to inhibit the device (it may buffer)
+        // host can send a command by forcing data low (when clock is low)
+        //      host then releases clock
+        //      device drives the clock
+        //      host sends data
+        //      device acks the frame
+        //      reverts to keyboard sending
+
+
+        // probably want to check RXFULL/TXEMPTY to sort out relax state
+
+        ps2clockdata_state state;
+        if (c && d) {
+            if (!(stat & KMIST_TXEMPTY))
+                state = PS2_Request_To_Send;
+            else if (stat & KMIST_RXFULL)
+                state = PS2_Inhibit;
+            else
+                state = PS2_Ready;
+        } else if (!d) {
+            state = PS2_Request_To_Send;
+        } else {
+            state = PS2_Inhibit;
+        }
+        ps2device.setClockData(state);
+
+        irmask = 0;
+        if (cr & KMICR_TXEN) {
+            irmask |= KMITXINT;
+        }
+        if (cr & KMICR_RXEN) {
+            irmask |= KMIRXINT;
+        }
+
+        // interrupt masks may have changed
+        update_kmi_interrupt();
+    }
+    
+    behaviour status_read() : uint32_t
+    {
+        uint8_t s = stat &~ (KMIST_PARITY|KMIST_C|KMIST_D);
+
+        // parity bit
+        uint8_t parity = rxdata;
+        parity ^= (parity>>4);
+        parity ^= (parity>>2);
+        parity ^= (parity>>1);
+        if (!(parity & 1))
+            s |= KMIST_PARITY;
+
+        // cr bit 0 high forces clock low
+        // cr bit 1 forces data low
+        s |= ((~cr << 1) & KMIST_C);
+        s |= ((~cr >> 1) & KMIST_D);
+
+        // update register ready for reading
+        stat = s;
+        return stat;
+    }
+    
+    behaviour data_write(uint8_t data)
+    {
+        txdata = data;
+
+        ir   &=~ KMITXINT;
+        stat |=  KMIST_TXBUSY;
+        stat &=~ KMIST_TXEMPTY;
+
+        update_kmi_interrupt();
+
+        // tell the device to stop sending more data and that a command is ready
+        // to be read
+        ps2device.setClockData(PS2_Request_To_Send);
+    }
+    
+    behaviour data_read() : uint8_t
+    {
+        if (stat & KMIST_RXFULL)
+        {
+            ir &=~ KMIRXINT;
+            stat &=~ KMIST_RXFULL;
+
+            update_kmi_interrupt();
+
+            // tell the device that more data can be sent
+            ps2device.setClockData(PS2_Ready);
+        }
+        return rxdata;
+    }
+    
+    behaviour update_clock()
+    {
+        clk_divider.rate.set(1, (1+clkdiv));
+    }
+
+    behaviour device_reset()
+    {
+        stat = KMIST_TXEMPTY;
+        rxdata = 0;
+        txdata = 0;
+        ir = KMITXINT;
+        clkdiv = 0;
+        irmask = 0;
+
+        control_write(0);
+        update_clock();
+    }
+    
+    behaviour registerRead(uint32_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+        switch (device_addr)
+        {
+            case 0x00:
+                data = cr;
+                
+                TRACE_KMI("%s:KMICR -> 0x%x\n", getInstanceName().c_str(), data);
+                break;
+                
+           case 0x04:
+                data = status_read();;
+                
+                TRACE_KMI("%s:KMISTAT -> 0x%x\n", getInstanceName().c_str(), data);
+                break;
+                 
+           case 0x08:
+                data = data_read();
+                
+                TRACE_KMI("%s:KMIDATA -> 0x%x\n", getInstanceName().c_str(), data);
+                break;
+                 
+           case 0x0c:
+                data = clkdiv;
+
+                TRACE_KMI("%s:KMICLKDIV -> 0x%x\n", getInstanceName().c_str(), data);
+                
+                update_clock();
+                
+                break;
+            
+           case 0x10:
+                data = ir & irmask;
+                
+                TRACE_KMI("%s:KMIIR -> 0x%x\n", getInstanceName().c_str(), data);
+                break;
+                
+            case 0xFE0: data = 0x50; 
+                
+                TRACE_KMI("%s:PeriphID0 -> 0x%x\n", getInstanceName().c_str(), data);
+                
+                break;
+            case 0xFE4: data = 0x10;  
+                
+                TRACE_KMI("%s:PeriphID1 -> 0x%x\n", getInstanceName().c_str(), data);
+                
+                break;
+            case 0xFE8: data = 0x14;  
+                
+                TRACE_KMI("%s:PeriphID2 -> 0x%x\n", getInstanceName().c_str(), data);
+                
+                break;
+            case 0xFEC: data = 0x00;  
+                
+                TRACE_KMI("%s:PeriphID3 -> 0x%x\n", getInstanceName().c_str(), data);
+                
+                break;
+            case 0xFF0: data = 0x0D;  
+                
+                TRACE_KMI("%s:PCellID0 -> 0x%x\n", getInstanceName().c_str(), data);
+                
+                break;
+            case 0xFF4: data = 0xF0;   
+                
+                TRACE_KMI("%s:PCellID1 -> 0x%x\n", getInstanceName().c_str(), data);
+                
+                break;
+            case 0xFF8: data = 0x05;   
+                
+                TRACE_KMI("%s:PCellID2 -> 0x%x\n", getInstanceName().c_str(), data);
+                
+                break;
+            case 0xFFC: data = 0xB1;   
+                
+                TRACE_KMI("%s:PCellID3 -> 0x%x\n", getInstanceName().c_str(), data);
+                
+                break;
+     
+           default:
+                TRACE_KMI("%s:KMI read at 0x%x\n", getInstanceName().c_str(), device_addr);
+                break;
+        }
+        return data;
+    }
+
+    behaviour registerWrite(uint32_t device_addr, uint32_t data)
+    {
+        switch (device_addr)
+        {
+            
+            case 0x00: 
+                TRACE_KMI("%s:KMICR <- 0x%x\n", getInstanceName().c_str(), data);
+                
+                /*
+                    * 0 - force clock low.
+                    * 1 - force data low.
+                    * 2 - enable interface
+                    * 3 - enable TX interrupt
+                    * 4 - enable RX interrupt.
+                    * 5 - TYPE (0=PS2/1=Something else)
+                */
+                control_write(static_cast<uint8_t>(data & 0xff));
+                
+            return;
+            
+            case 0x04: 
+                TRACE_KMI("%s:KMISTAT <- 0x%x (READ ONLY)\n", getInstanceName().c_str(), data);
+                
+            return;
+            
+            case 0x08: 
+                TRACE_KMI("%s:KMIDATA <- 0x%x\n", getInstanceName().c_str(), data);
+                
+                // data stays valid until another write or the receive
+                // register overwrites it
+                // but we immediately act on command data
+                data_write(static_cast<uint8_t>(data & 0xff));
+            return;
+            
+            case 0x0c: 
+                TRACE_KMI("%s:KMICLKDIV <- 0x%x\n", getInstanceName().c_str(), data);
+                
+                clkdiv = (uint8_t)(data & 0xf);
+                
+            return;
+            
+            case 0x10: 
+                TRACE_KMI("%s:KMIIR <- 0x%x (READ ONLY)\n", getInstanceName().c_str(), data);
+                
+            return;
+            
+            default: 
+                TRACE_KMI("%s:KMI write at 0x%x <- 0x%x\n", getInstanceName().c_str(), device_addr, data);
+            return; 
+        }
+    }    
+    
+    // debugger register access support
+    
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        if (reg_id == 0x8)
+        {
+            *datap = rxdata;
+        }
+        else
+        {
+            *datap = registerRead(reg_id);
+        }
+        
+        return ACCESS_FUNC_OK;
+    }
+    
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+        
+        return ACCESS_FUNC_OK;
+    }
+}

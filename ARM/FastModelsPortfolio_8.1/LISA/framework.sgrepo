@@ -1,0 +1,87 @@
+component "ClockDivider"
+{
+    path="../LISA/ClockDivider.lisa";
+}
+component "ClockTimer"
+{
+    path="../LISA/ClockTimer.lisa";
+}
+component "ClockTimer64"
+{
+    path="../LISA/ClockTimer64.lisa";
+}
+component "MasterClock"
+{
+    path="../LISA/MasterClock.lisa";
+}
+component "AsyncSignal"
+{
+    path="../LISA/AsyncSignal.lisa";
+}
+
+protocol "ClockRateControl"
+{
+    path="../LISA/ClockRateControlProtocol.lisa";
+}
+protocol "ClockSignal"
+{
+    path="../LISA/ClockSignalProtocol.lisa";
+}
+protocol "Signal"
+{
+    path="../LISA/SignalProtocol.lisa";
+}
+protocol "StateSignal"
+{
+    path="../LISA/SignalProtocol.lisa";
+}
+protocol "TimerCallback"
+{
+    path="../LISA/TimerCallbackProtocol.lisa";
+}
+protocol "TimerCallback64"
+{
+    path="../LISA/TimerCallbackProtocol64.lisa";
+}
+protocol "TimerControl"
+{
+    path="../LISA/TimerControlProtocol.lisa";
+}
+protocol "TimerControl64"
+{
+    path="../LISA/TimerControlProtocol64.lisa";
+}
+protocol "Value"
+{
+    path="../LISA/ValueProtocol.lisa";
+}
+protocol "ValueState"
+{
+    path="../LISA/ValueProtocol.lisa";
+}
+protocol "Value_64"
+{
+    path="../LISA/Value64Protocol.lisa";
+}
+protocol "AsyncSignalControl"
+{
+    path="../LISA/AsyncSignalControlProtocol.lisa";
+}
+protocol "AsyncSignalCallback"
+{
+    path="../LISA/AsyncSignalCallbackProtocol.lisa";
+}
+protocol "CADIProtocol"
+{
+    path="../LISA/CADIProtocol.lisa";
+}
+protocol "CADIDisassemblerProtocol"
+{
+    path="../LISA/CADIDisassemblerProtocol.lisa";
+}
+
+
+files
+(
+)
+

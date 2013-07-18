@@ -1,0 +1,1095 @@
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+#//
+#//  File:    FVP_EB_Cortex_A9_MPx2.sgcanvas
+#//  Created: Thu Sep 02 15:40:06 2010
+#//  By: Fast Models  System Canvas 0.0.305  (Aug 24 2010)
+#//
+# *  Do NOT modify this file. It is for internal use by System Canvas only.
+#//
+#//  Copyright (c) 2004-2008 by ARM Limited,  2000-2004 by AXYS Design Automation Inc.,
+#//
+#//  AXYS GmbH, Herzogenrath, Germany
+#//
+#//  ARM Limited Proprietary Information.
+#//  Disclosure to third parties is prohibited without prior consent.
+#//
+#//////////////////////////////////////////////////////////////////////////
+#//////////////////////////////////////////////////////////////////////////
+
+
+editor
+(
+    properties
+    (
+        instance "component"
+        (
+            font_family = "Times New Roman";
+            font_size = 12;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "component_port"
+        (
+            font_family = "Arial";
+            font_size = 10;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "external_port"
+        (
+            font_family = "Arial";
+            font_size = 10;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+        )
+        instance "grid"
+        (
+            width = 10;
+            height = 10;
+        )
+    )
+    components
+    (
+        instance "audioout"
+        (
+            x = -220;
+            y = -90;
+            width = 151;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "audio"
+                (
+                x = 140;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "baseboard"
+        (
+            x = -20;
+            y = 10;
+            width = 171;
+            height = 241;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "aaci_audio_out"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "boot_switch"
+                (
+                x = 0;
+                y = 142;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clk_in_master"
+                (
+                x = 160;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "display"
+                (
+                x = 0;
+                y = 182;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ethernet"
+                (
+                x = 0;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "ethernet[0]"
+                (
+                x = 170;
+                y = 192;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "hdr"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "keyboard"
+                (
+                x = 0;
+                y = 102;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "lcd_layout"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "leds"
+                (
+                x = 0;
+                y = 162;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "mouse"
+                (
+                x = 0;
+                y = 202;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "terminal"
+                (
+                x = 0;
+                y = 76;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = true;
+                )
+                define "terminal[0]"
+                (
+                x = 160;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "terminal[1]"
+                (
+                x = 170;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "terminal[2]"
+                (
+                x = 160;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "terminal[3]"
+                (
+                x = 160;
+                y = 152;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+                )
+                define "touch_screen"
+                (
+                x = 0;
+                y = 82;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "user_switches"
+                (
+                x = 0;
+                y = 122;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "clk50hz"
+        (
+            x = -20;
+            y = -90;
+            width = 171;
+            height = 59;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_in"
+                (
+                x = 170;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clk_out"
+                (
+                x = 0;
+                y = 12;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "rate"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = true;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "coretile"
+        (
+            x = -220;
+            y = 10;
+            width = 161;
+            height = 61;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "hdr"
+                (
+                x = 140;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ticks"
+                (
+                x = 0;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "hostbridge"
+        (
+            x = -220;
+            y = 260;
+            width = 161;
+            height = 62;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "eth"
+                (
+                x = 160;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "terminal_0"
+        (
+            x = 180;
+            y = -190;
+            width = 161;
+            height = 91;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "terminal_1"
+        (
+            x = 180;
+            y = -40;
+            width = 161;
+            height = 91;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 52;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "terminal_2"
+        (
+            x = 180;
+            y = 60;
+            width = 161;
+            height = 91;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 12;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "terminal_3"
+        (
+            x = 180;
+            y = 160;
+            width = 161;
+            height = 91;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "serial"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+            )
+        )
+        instance "tick"
+        (
+            x = 180;
+            y = -90;
+            width = 161;
+            height = 41;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "clk_out"
+                (
+                x = 0;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "virtualethernetcrossover"
+        (
+            x = -20;
+            y = 260;
+            width = 171;
+            height = 62;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "deva"
+                (
+                x = 160;
+                y = 12;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "devb"
+                (
+                x = 0;
+                y = 12;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+        instance "visualisation"
+        (
+            x = -220;
+            y = 90;
+            width = 161;
+            height = 161;
+            sheight = 21;
+            show_title = true;
+            show_name = true;
+            show_type = false;
+            show_logo = true;
+            ports
+            (
+                define "boot_switch"
+                (
+                x = 140;
+                y = 62;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "clock_50Hz"
+                (
+                x = 140;
+                y = 2;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "daughter_leds"
+                (
+                x = 0;
+                y = 42;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = false;
+            expanded = false;
+                )
+                define "daughter_user_switches"
+                (
+                x = -10;
+                y = 92;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "keyboard"
+                (
+                x = 140;
+                y = 22;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "lcd"
+                (
+                x = 140;
+                y = 102;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "lcd_layout"
+                (
+                x = 10;
+                y = 22;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "leds"
+                (
+                x = 140;
+                y = 82;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "mouse"
+                (
+                x = 140;
+                y = 122;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "ticks"
+                (
+                x = 30;
+                y = 112;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "touch_screen"
+                (
+                x = -10;
+                y = 2;
+                side = 16;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+                define "user_switches"
+                (
+                x = 140;
+                y = 42;
+                side = 64;
+                clock_type = 0;
+                enabled = true;
+                hidden = false;
+                moved_by_user = true;
+            expanded = false;
+                )
+            )
+        )
+    )
+    ports
+    (
+    )
+    connections
+    (
+        define "baseboard.aaci_audio_out=>audioout.audio"
+        (
+            point
+            (
+                x = -50;
+                y = 40;
+                automatic = false;
+            )
+            point
+            (
+                x = -50;
+                y = -50;
+                automatic = false;
+            )
+        )
+        define "baseboard.boot_switch=>visualisation.boot_switch"
+        (
+        )
+        define "baseboard.display=>visualisation.lcd"
+        (
+        )
+        define "baseboard.ethernet=>virtualethernetcrossover.deva"
+        (
+            point
+            (
+                x = 180;
+                y = 100;
+                automatic = true;
+            )
+            point
+            (
+                x = 180;
+                y = 155;
+                automatic = true;
+            )
+            point
+            (
+                x = 165;
+                y = 155;
+                automatic = true;
+            )
+            point
+            (
+                x = 165;
+                y = 300;
+                automatic = true;
+            )
+        )
+        define "baseboard.ethernet[0]=>virtualethernetcrossover.deva"
+        (
+            point
+            (
+                x = 160;
+                y = 300;
+                automatic = true;
+            )
+            point
+            (
+                x = 160;
+                y = 230;
+                automatic = true;
+            )
+        )
+        define "baseboard.leds=>visualisation.leds"
+        (
+        )
+        define "baseboard.terminal=>terminal_0.serial"
+        (
+            point
+            (
+                x = 160;
+                y = 114;
+                automatic = true;
+            )
+            point
+            (
+                x = 160;
+                y = -160;
+                automatic = true;
+            )
+        )
+        define "baseboard.terminal=>terminal_1.serial"
+        (
+            point
+            (
+                x = 160;
+                y = 114;
+                automatic = true;
+            )
+            point
+            (
+                x = 160;
+                y = 40;
+                automatic = true;
+            )
+        )
+        define "baseboard.terminal=>terminal_2.serial"
+        (
+            point
+            (
+                x = 170;
+                y = 114;
+                automatic = true;
+            )
+            point
+            (
+                x = 170;
+                y = 100;
+                automatic = true;
+            )
+        )
+        define "baseboard.terminal=>terminal_3.serial"
+        (
+            point
+            (
+                x = 170;
+                y = 114;
+                automatic = true;
+            )
+            point
+            (
+                x = 170;
+                y = 190;
+                automatic = true;
+            )
+        )
+        define "baseboard.terminal[0]=>terminal_0.serial"
+        (
+            point
+            (
+                x = 170;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = 170;
+                y = -160;
+                automatic = false;
+            )
+        )
+        define "baseboard.terminal[1]=>terminal_1.serial"
+        (
+            point
+            (
+                x = 170;
+                y = 40;
+                automatic = false;
+            )
+        )
+        define "baseboard.terminal[2]=>terminal_2.serial"
+        (
+        )
+        define "baseboard.terminal[3]=>terminal_3.serial"
+        (
+        )
+        define "baseboard.user_switches=>visualisation.user_switches"
+        (
+        )
+        define "clk50hz.clk_out=>visualisation.clock_50Hz"
+        (
+            point
+            (
+                x = -50;
+                y = -50;
+                automatic = false;
+            )
+            point
+            (
+                x = -50;
+                y = 120;
+                automatic = false;
+            )
+        )
+        define "coretile.hdr=>baseboard.hdr"
+        (
+        )
+        define "coretile.ticks=>visualisation.ticks"
+        (
+            point
+            (
+                x = -230;
+                y = 60;
+                automatic = false;
+            )
+            point
+            (
+                x = -230;
+                y = 230;
+                automatic = false;
+            )
+        )
+        define "hostbridge.eth=>virtualethernetcrossover.devb"
+        (
+        )
+        define "tick.clk_out=>baseboard.clk_in_master"
+        (
+            point
+            (
+                x = 170;
+                y = -60;
+                automatic = false;
+            )
+            point
+            (
+                x = 170;
+                y = 60;
+                automatic = false;
+            )
+        )
+        define "tick.clk_out=>clk50hz.clk_in"
+        (
+        )
+        define "visualisation.keyboard=>baseboard.keyboard"
+        (
+        )
+        define "visualisation.lcd_layout=>baseboard.lcd_layout"
+        (
+            point
+            (
+                x = -230;
+                y = 140;
+                automatic = false;
+            )
+            point
+            (
+                x = -230;
+                y = 80;
+                automatic = false;
+            )
+        )
+        define "visualisation.mouse=>baseboard.mouse"
+        (
+        )
+        define "visualisation.touch_screen=>baseboard.touch_screen"
+        (
+            point
+            (
+                x = -230;
+                y = 120;
+                automatic = false;
+            )
+            point
+            (
+                x = -230;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = -50;
+                y = 80;
+                automatic = false;
+            )
+            point
+            (
+                x = -50;
+                y = 120;
+                automatic = false;
+            )
+        )
+    )
+    portmaps
+    (
+    )
+    labels
+    (
+        instance "Label 0"
+        (
+            text  = "FVP CortexA9MPx2 Versatile EB System";
+            x = -240;
+            y = -250;
+            width = 591;
+            height = 41;
+            font_family  = "Helvetica [Adobe]";
+            font_size = 16;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 1"
+        (
+            text  = "";
+            x = -240;
+            y = -210;
+            width = 591;
+            height = 541;
+            font_family  = "SansSerif";
+            font_size = 8;
+            font_bold = false;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -8349258;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 2"
+        (
+            text  = "Top Level:\10Builds an Emulation Baseboard FVP, containing an ARM CortexA9MP Core Tile";
+            x = -220;
+            y = -200;
+            width = 367;
+            height = 97;
+            font_family  = "Helvetica [Adobe]";
+            font_size = 12;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -5254664;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 4;
+            draw_below = false;
+        )
+        instance "Label 3"
+        (
+            text  = "EmulationBaseboard";
+            x = -20;
+            y = -20;
+            width = 171;
+            height = 31;
+            font_family  = "Helvetica [Adobe]";
+            font_size = 10;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+        instance "Label 4"
+        (
+            text  = "EBCortexA9MPx2CoreTile";
+            x = -220;
+            y = -20;
+            width = 161;
+            height = 31;
+            font_family  = "Helvetica";
+            font_size = 9;
+            font_bold = true;
+            font_italic = false;
+            font_underline = false;
+            text_color = -16777216;
+            background_color = -6637350;
+            rotation = 0;
+            transparent = false;
+            alignment = 68;
+            border = 0;
+            shadow = 0;
+            draw_below = true;
+        )
+    )
+)

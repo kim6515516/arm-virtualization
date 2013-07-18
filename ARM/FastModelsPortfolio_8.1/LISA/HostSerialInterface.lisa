@@ -1,0 +1,357 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component HostSerialInterface
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Component which provides access to the host serial interface.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+#include <errno.h>
+#include "sg/SystemInclude.h"
+#ifdef __unix
+# include <sys/types.h>
+# include <sys/stat.h>
+# include <fcntl.h>
+# include <termios.h>
+// undef these three defines as it pollutes the ability of LISA files to have
+// symbols (registers) of the same name in any other component
+// ideally pull out into another translation unit
+#undef CS5
+#undef CS6
+#undef CS7
+# include <sys/ioctl.h>
+#endif
+    }
+    resources
+    {
+#ifdef WIN32
+        PARAMETER { description("HW device to use"), type(string), default("COM1") } device;
+#else
+        PARAMETER { description("HW device to use"), type(string), default("/dev/ttyS0") } device;
+#endif
+        PARAMETER { description("Baud rate override"), type(int), default(0) } baud_rate;
+        
+#ifdef WIN32
+        HANDLE hCommPort;
+#else
+        int fd;
+        int fd_nonblock; // opened in nonblocking mode to do nonblocking reads
+#endif
+    }
+
+    behavior error(string msg)
+    {
+        msg = "Call " + msg + " resulted in error: " + strerror(errno);
+        message(MSG_FATAL_ERROR, msg.c_str());
+        printf("%s\n", msg.c_str());
+    }
+
+#ifdef WIN32
+    behavior encode_baud_rate(unsigned int baud_rate) : DWORD
+    {
+        DWORD speed = 0;
+        switch(baud_rate)
+        {
+        case 110: speed = CBR_110; break;
+        case 300: speed = CBR_300; break;
+        case 600: speed = CBR_600; break;
+        case 1200: speed = CBR_1200; break;
+        case 2400: speed = CBR_2400; break;
+        case 4800: speed = CBR_4800; break;
+        case 9600: speed = CBR_9600; break;
+        case 14400: speed = CBR_14400; break;
+        case 19200: speed = CBR_19200; break;
+        case 38400: speed = CBR_38400; break;
+        case 56000: speed = CBR_56000; break;
+        case 57600: speed = CBR_57600; break;
+        case 115200: speed = CBR_115200; break;
+        case 128000: speed = CBR_128000; break;
+        case 256000: speed = CBR_256000; break;
+        }
+        return speed;
+    }
+#else
+    behavior encode_baud_rate(unsigned int baud_rate) : speed_t
+    {
+        speed_t speed = B0;
+        switch(baud_rate)
+        {
+        case 50: speed = B50; break;
+        case 75: speed = B75; break;
+        case 110: speed = B110; break;
+        case 134: speed = B134; break;
+        case 150: speed = B150; break;
+        case 200: speed = B200; break;
+        case 300: speed = B300; break;
+        case 600: speed = B600; break;
+        case 1200: speed = B1200; break;
+        case 1800: speed = B1800; break;
+        case 2400: speed = B2400; break;
+        case 4800: speed = B4800; break;
+        case 9600: speed = B9600; break;
+        case 19200: speed = B19200; break;
+        case 38400: speed = B38400; break;
+        case 57600: speed = B57600; break;
+        case 115200: speed = B115200; break;
+        case 230400: speed = B230400; break;
+        }
+        return speed;
+    }
+#endif
+
+    behavior init
+    {
+#ifdef WIN32
+        hCommPort = CreateFile(device.c_str(),  
+                               GENERIC_READ | GENERIC_WRITE, 
+                               0, 
+                               0, 
+                               OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL,
+                               0);
+
+        if (hCommPort == INVALID_HANDLE_VALUE) {   
+            error("CreateFile(" + device + ", ...)");
+            return;
+        }
+        
+        // Set com timeouts
+        COMMTIMEOUTS timeouts = { MAXDWORD, 0, 0, 0, 0 };
+        if (!SetCommTimeouts(hCommPort, &timeouts))
+            error("SetCommTimeouts");
+
+        // set comm buffer sizes
+        SetupComm(hCommPort, 2048, 1024); // set MAX_READ_BUFFER and MAX_WRITE_BUFFER
+
+        // DCB settings
+        DCB dcb = {0};
+
+        if (!GetCommState(hCommPort, &dcb)) {   
+            error("GetCommState(...)");
+            return;
+        }
+
+        if (baud_rate)
+        {
+            dcb.BaudRate = encode_baud_rate(baud_rate);
+            if (dcb.BaudRate == 0)
+                error("Unsupported baud rate");
+        }
+
+        // switch on XON/XOFF flow control on input and output lines
+        dcb.fOutX = true;
+        dcb.fInX = true;
+        
+        // set data bits, parity and stop bits to 8 N 1
+        dcb.ByteSize = 8;
+        dcb.Parity   = NOPARITY;
+        dcb.StopBits = ONESTOPBIT;
+
+        // Set new state.
+        if (!SetCommState(hCommPort, &dcb))
+        {   
+            error("SetCommState(...)");
+            return;
+        }
+        
+#else
+        fd = open(device.c_str(), O_WRONLY);
+        if (fd == -1)
+        {
+            error("open(" + device + ", O_WRONLY)");
+        }
+        else
+        {
+            struct termios tios;
+            if (tcgetattr(fd, &tios) != 0)
+            {
+                error("tcgetattr(...)");
+            }
+            else
+            {
+                // configure "raw" mode for serial
+                cfmakeraw(&tios);
+                
+                // switch on XON/XOFF flow control on input and output lines
+                tios.c_iflag |= IXON | IXOFF;
+
+                // switch on RTS/CTS flow control
+                tios.c_cflag |= CRTSCTS;
+
+                if (baud_rate)
+                {
+                    speed_t speed = encode_baud_rate(baud_rate);
+                    if (speed == B0)
+                        error("Unsupported baud rate");
+                    cfsetospeed(&tios, speed);
+                    cfsetispeed(&tios, 0); // set identical to output rate
+                }
+                if (tcsetattr(fd, TCSAFLUSH, &tios) == -1)
+                    error("tcsetattr(...)");
+            }
+        }
+        
+        fd_nonblock = open(device.c_str(), O_RDONLY | O_NONBLOCK);
+        if (fd_nonblock == -1)
+        {
+            error("open(" + device + ", O_RDONLY | O_NONBLOCK)");
+        }        
+#endif
+    }
+    
+    behavior terminate
+    {
+#ifdef WIN32
+        if (hCommPort == INVALID_HANDLE_VALUE)
+            return;
+ 
+        // Purge reads/writes, input buffer and output buffer
+        if (!PurgeComm(hCommPort, PURGE_TXABORT | PURGE_TXCLEAR | PURGE_RXABORT | PURGE_RXCLEAR))
+            error("PurgeComm(...)");
+
+        CloseHandle(hCommPort);
+        
+#else
+        if (fd_nonblock != -1)
+            close(fd_nonblock);
+        
+        if (fd != -1)
+            close(fd);
+#endif
+    }
+    
+    slave port<SerialData> SerialData
+    {
+        behavior dataTransmit(uint16_t data)
+        {
+#ifdef WIN32
+            if (hCommPort == INVALID_HANDLE_VALUE)
+                return;
+
+            DWORD dwWritten;
+            char c = (char)data;
+            
+            if (WriteFile(hCommPort, &c, 1, &dwWritten, NULL)) {
+                if (dwWritten != 1)
+                    error("Error writing data to port");
+            } else
+               error("WriteFile");
+
+#else
+            if (fd == -1)
+                return;
+
+            char c = (char)data;
+            ssize_t size = write(fd, &c, 1);
+            if (size != 1)
+            {
+                error("write(...)");
+            }
+#endif
+        }
+
+        behavior dataReceive():uint16_t
+        {
+#ifdef WIN32
+            if (hCommPort == INVALID_HANDLE_VALUE)
+                return 1U << 12; // not data available
+
+            DWORD dwRead;
+            char c;
+
+            if (ReadFile(hCommPort, &c, 1, &dwRead, NULL)) {
+                if (dwRead == 1)
+                    return c;
+            } else
+                error("ReadFile");
+            
+            return  1U << 12; // no data available
+
+#else
+            if (fd_nonblock == -1)
+                return 1U << 12; // not data available
+            
+            char c;
+            
+            ssize_t size = read(fd_nonblock, &c, 1);
+            
+            if (size == 1)
+            {
+                return c;
+            }
+            else
+            {
+                if (errno != EAGAIN)
+                {
+                    error("read(...)");
+                }
+                return 1U << 12; // no data available
+            }
+#endif
+        }
+
+        behavior signalsSet(uint8_t signal)
+        {
+#ifdef WIN32
+#else
+            if (fd == -1)
+                return;
+            
+            int serial_status;
+            if (ioctl(fd, TIOCMGET, &serial_status) == -1)
+            {
+                error("ioctl(TIOCMGET)");
+                return;
+            }
+            serial_status &= ~(TIOCM_RTS | TIOCM_DTR);
+
+            if (signal & (1U << 5))
+                serial_status |= TIOCM_RTS;
+
+            if (signal & (1U << 4))
+                serial_status |= TIOCM_DTR;
+
+            if (ioctl(fd, TIOCMSET, &serial_status) == -1)
+            {
+                error("ioctl(TIOCMSET)");
+            }            
+#endif
+        }
+
+        behavior signalsGet() : uint8_t
+        {
+#ifdef WIN32
+            return 0xe;
+#else
+            if (fd == -1)
+                return 0;
+
+            int serial_status;
+            if (ioctl(fd, TIOCMGET, &serial_status) == -1)
+            {
+                error("ioctl(TIOCMGET)");
+                return 0;
+            }
+
+            uint8_t signals = 0;
+            if (serial_status & TIOCM_CD)
+                signals |= 1U << 3;
+            if (serial_status & TIOCM_DSR)
+                signals |= 1U << 2;
+            if (serial_status & TIOCM_CTS)
+                signals |= 1U << 1;
+            if (serial_status & TIOCM_RI)
+                signals |= 1U;                
+
+            return signals;
+#endif
+        }
+    }
+}

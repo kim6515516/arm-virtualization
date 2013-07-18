@@ -1,0 +1,533 @@
+/*
+ * Copyright 2007-2008 ARM Limited. All rights reserved.
+ */
+
+component FVP_GIC
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Cortex-A9 GIC implementation";
+        documentation_file = "../../../#DUI0423#";
+    }
+    
+    includes
+    {
+        #include "hostconf/zinttypes.h"
+        #define TARGET_COUNT (1)
+        #include "GIC.h"
+        
+        #define FVP_GIC_TRACE if (!0) ; else printf
+        
+    }
+    
+    composition
+    {
+        busslave_dist : PVBusSlave(size = 0x1000);
+        busslave_core : PVBusSlave(size = 0x1000);
+    }    
+    
+    resources
+    {
+        //PARAMETER { runtime(1), type(MxU16), default(64) } num_interrupts;
+        
+        // GIC Core Interface
+        REGISTER { description("[S] CPU Interface Control (RW)"      ), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC000) } ICCICR_S;
+        REGISTER { description("[N] CPU Interface Control (RW)"      ), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC001) } ICCICR_NS;
+        REGISTER { description("Priority Mask (RW)"                  ), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC004) } ICCPMR;
+        REGISTER { description("[S] Binary Point (RW)"               ), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC008) } ICCBPR_S;
+        REGISTER { description("[N] Binary Point (RW)"               ), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC009) } ICCBPR_NS;
+        REGISTER { description("Interrupt Acknowledge (RO)"          ), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC00C) } ICCIAR;
+        REGISTER { description("End of Interrupt (WO)"               ), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC010) } ICCEOIR;
+        REGISTER { description("Running Priority (RO)"               ), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC014) } ICCRPR;
+        REGISTER { description("Highest Pending Interrupt (RO)"      ), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC018) } ICCHPIR;
+        REGISTER { description("Aliased Non-Secure Binary Point (RW)"), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC01C) } ICCABPR;
+        REGISTER { description("CPU Interface Implementation ID (RO)"), read_function(debug_read_core), write_function(debug_write_core), display_format("hex"), reg_number(0xC0FC) } ICCIIDR;
+        
+        
+        
+        // GIC Distributor
+        REGISTER { description("Distributor Enable_S (RW)"      ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD000) } ICDDCR_S;
+        REGISTER { description("Distributor Enable_NS (RW)"     ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD001) } ICDDCR_NS;
+        REGISTER { description("Interrupt Controller Type (RO)" ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD004) } ICDICTR;
+        REGISTER { description("Distributor Implementer ID (RO)"), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD008) } ICDIIDR;
+        REGISTER { description("Interrupt Security 0-31 (RW)"   ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD080) } ICDISR_0_31;
+        REGISTER { description("Interrupt Security 32-63 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD084) } ICDISR_32_63;
+        REGISTER { description("Enable Set 0-31 (RW)"           ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD100) } ICDISER_0_31;
+        REGISTER { description("Enable Set 32-63 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD104) } ICDISER_32_63;
+
+        REGISTER { description("Enable Clear 0-31 (RW)"         ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD180) } ICDICER_0_31;
+        REGISTER { description("Enable Clear 32-63 (RW)"        ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD184) } ICDICER_32_63;
+
+        REGISTER { description("Pending Set 0-31 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD200) } ICDISPR_0_31;
+        REGISTER { description("Pending Set 32-63 (RW)"         ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD204) } ICDISPR_32_63;
+
+        REGISTER { description("Pending Clear 0-31 (RW)"        ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD280) } ICDICPR_0_31;
+        REGISTER { description("Pending Clear 32-63 (RW)"       ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD284) } ICDICPR_32_63;
+
+        REGISTER { description("Active Status 0-31 (RW)"        ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD300) } ICDABR_0_31;
+        REGISTER { description("Active Status 32-63 (RW)"       ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD304) } ICDABR_32_63;
+
+        REGISTER { description("Priority level STI 0-3 (RW)"    ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD400) } ICDIPR_0_3;
+        REGISTER { description("Priority level STI 4-7 (RW)"    ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD404) } ICDIPR_4_7;
+        REGISTER { description("Priority level STI 8-11 (RW)"   ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD408) } ICDIPR_8_11;
+        REGISTER { description("Priority level STI 12-15 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD40C) } ICDIPR_12_15;
+
+        REGISTER { description("Priority level PPI 16-19 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD410) } ICDIPR_16_19;
+        REGISTER { description("Priority level PPI 20-23 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD414) } ICDIPR_20_23;
+        REGISTER { description("Priority level PPI 24-27 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD418) } ICDIPR_24_27;
+        REGISTER { description("Priority level PPI 28-31 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD41C) } ICDIPR_28_31;
+
+        REGISTER { description("Priority level SPI 32-35 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD420) } ICDIPR_32_35;
+        REGISTER { description("Priority level SPI 36-39 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD424) } ICDIPR_36_39;
+        REGISTER { description("Priority level SPI 40-43 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD428) } ICDIPR_40_43;
+        REGISTER { description("Priority level SPI 44-47 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD42C) } ICDIPR_44_47;
+        REGISTER { description("Priority level SPI 48-51 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD430) } ICDIPR_48_51;
+        REGISTER { description("Priority level SPI 52-55 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD434) } ICDIPR_52_55;
+        REGISTER { description("Priority level SPI 56-59 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD438) } ICDIPR_56_59;
+        REGISTER { description("Priority level SPI 60-63 (RW)"  ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD43C) } ICDIPR_60_63;
+
+        REGISTER { description("SPI Target 0-3 (RW)"            ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD800) } ICDIPTR_0_3;
+        REGISTER { description("SPI Target 4-7 (RW)"            ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD804) } ICDIPTR_4_7;
+        REGISTER { description("SPI Target 8-11 (RW)"           ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD808) } ICDIPTR_8_11;
+        REGISTER { description("SPI Target 12-15 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD80C) } ICDIPTR_12_15;
+        REGISTER { description("SPI Target 16-19 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD810) } ICDIPTR_16_19;
+        REGISTER { description("SPI Target 20-23 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD814) } ICDIPTR_20_23;
+        REGISTER { description("SPI Target 24-27 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD818) } ICDIPTR_24_27;
+        REGISTER { description("SPI Target 28-31 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD81C) } ICDIPTR_28_31;
+        REGISTER { description("SPI Target 32_35 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD820) } ICDIPTR_32_35;
+        REGISTER { description("SPI Target 36_39 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD824) } ICDIPTR_36_39;
+        REGISTER { description("SPI Target 40_43 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD828) } ICDIPTR_40_43;
+        REGISTER { description("SPI Target 44_47 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD82C) } ICDIPTR_44_47;
+        REGISTER { description("SPI Target 48_51 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD830) } ICDIPTR_48_51;
+        REGISTER { description("SPI Target 52-55 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD834) } ICDIPTR_52_55;
+        REGISTER { description("SPI Target 56-59 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD838) } ICDIPTR_56_59;
+        REGISTER { description("SPI Target 60-63 (RW)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xD83C) } ICDIPTR_60_63;
+
+        REGISTER { description("Interrupt Config 0-15 (RW)"     ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDC00) } ICDICFR_0_15;
+        REGISTER { description("Interrupt Config 16-31 (RW)"    ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDC04) } ICDICFR_16_31;
+        REGISTER { description("Interrupt Config 32-47 (RW)"    ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDC08) } ICDICFR_32_47;
+        REGISTER { description("Interrupt Config 48-63 (RW)"    ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDC0C) } ICDICFR_48_63;
+
+        REGISTER { description("PPI Status 0-15 (RO)"           ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDD00) } PPI_STATUS;
+
+        REGISTER { description("SPI Status 0-31 (RO)"           ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDD04) } SPI_STATUS_0_31;
+        REGISTER { description("SPI Status 32-63 (RO)"          ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDD08) } SPI_STATUS_32_63;
+
+        REGISTER { description("SW Triggered Interrupt (WO)"    ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDF00) } ICDSGIR;
+
+        REGISTER { description("Peripheral ID 0 (RO)"           ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDFE0) } ICPIDR_0;
+        REGISTER { description("Peripheral ID 1 (RO)"           ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDFE4) } ICPIDR_1;
+        REGISTER { description("Peripheral ID 2 (RO)"           ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDFE8) } ICPIDR_2;
+        REGISTER { description("Peripheral ID 3 (RO)"           ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDFEC) } ICPIDR_3;
+
+        REGISTER { description("PrimeCell ID 0 (RO)"            ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDFF0) } ICCIDR_0;
+        REGISTER { description("PrimeCell ID 1 (RO)"            ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDFF4) } ICCIDR_1;
+        REGISTER { description("PrimeCell ID 2 (RO)"            ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDFF8) } ICCIDR_2;
+        REGISTER { description("PrimeCell ID 3 (RO)"            ), read_function(debug_read_dist), write_function(debug_write_dist), display_format("hex"), reg_number(0xDFFC) } ICCIDR_3;
+        
+        
+        GIC gic;
+        
+        // Temporary variable
+        MxU32 irq_num_latch;
+        MxU16 num_interrupts;
+    }
+    
+    // Memory-mapped register interfaces
+    slave port<PVBus> pvbus_distributor;
+    slave port<PVBus> pvbus_core;
+    
+    connection
+    {
+        self.pvbus_core => busslave_core.pvbus_s;   
+        busslave_core.device => self.dev_core; 
+        
+        self.pvbus_distributor => busslave_dist.pvbus_s;   
+        busslave_dist.device => self.dev_dist; 
+    }
+    
+    internal slave port<PVDevice> dev_dist
+    {
+        behaviour read(pv::ReadTransaction tx)
+        : pv::Tx_Result
+        {
+            int domain = tx.isNonSecure()?NONSECURE:SECURE;
+            MxStatus status = MX_STATUS_ERROR;
+            uint32_t data;
+            if (tx.isAligned())
+            {
+                switch (tx.getAccessWidth()) {
+                case pv::ACCESS_8_BITS:
+                    MxU8 data8;
+                    status = gic.distributor_read8(tx.getAddress(), data8,
+                        0 /* cpuid */, domain);
+                    tx.setReturnData8(data8);
+                    data = data8;
+                    break;
+                case pv::ACCESS_16_BITS:
+                    MxU16 data16;
+                    status = gic.distributor_read16(tx.getAddress(), data16,
+                        0 /* cpuid */, domain);
+                    tx.setReturnData16(data16);
+                    data = data16;
+                    break;
+                case pv::ACCESS_32_BITS:
+                    MxU32 data32;
+                    status = gic.distributor_read32(tx.getAddress(), data32,
+                        0 /* cpuid */, domain);
+                    tx.setReturnData32(data32);
+                    data = data32;
+                    break;
+                case pv::ACCESS_64_BITS:
+                    MxU64 data64;
+                    status = gic.distributor_read64(tx.getAddress(), data64,
+                        0 /* cpuid */, domain);
+                    tx.setReturnData64(data64);
+                    data = data64;
+                    break;
+                default:
+                    assert(!"Unsupported transaction size");
+                    break;
+                }
+            } else {
+                FVP_GIC_TRACE("%s: Unaligned DistRd at 0x%"PRIx64" (size %d)\n", getInstanceName().c_str(), tx.getAddress(), tx.getAccessByteWidth());
+            }
+
+            self.updateOutputs();
+            
+            if (status == MX_STATUS_OK)
+            {
+                FVP_GIC_TRACE("%s: DistRd %08x <- %s\n", getInstanceName().c_str(),
+                               data, gic.DistRegName(tx.getAddress()));
+                return tx.readComplete();
+            }
+            else 
+            {
+                FVP_GIC_TRACE("%s: ERROR in DistRd %08x <- %s\n", 
+                               getInstanceName().c_str(),
+                               data, gic.DistRegName(tx.getAddress()));
+                return tx.generateAbort();
+            }
+        }
+        
+        behaviour write(pv::WriteTransaction tx)
+        : pv::Tx_Result
+        {
+            int domain = tx.isNonSecure()?NONSECURE:SECURE;
+            MxStatus status = MX_STATUS_ERROR;
+            
+            if (tx.isAligned())
+            {
+                switch (tx.getAccessWidth()) {
+                case pv::ACCESS_8_BITS:
+                    status = gic.distributor_write8(tx.getAddress(), tx.getData8(),
+                        0 /* cpuid */, domain);
+                    break;
+                case pv::ACCESS_16_BITS:
+                    status = gic.distributor_write16(tx.getAddress(), tx.getData16(),
+                        0 /* cpuid */, domain);
+                    break;
+                case pv::ACCESS_32_BITS:
+                    status = gic.distributor_write32(tx.getAddress(), tx.getData32(),
+                        0 /* cpuid */, domain);
+                    break;
+                case pv::ACCESS_64_BITS:
+                    status = gic.distributor_write64(tx.getAddress(), tx.getData64(),
+                        0 /* cpuid */, domain);
+                    break;
+                default:
+                    assert(!"Unsupported transaction size");
+                    break;
+                }
+            } else {
+                FVP_GIC_TRACE("%s: Unaligned DistWr at 0x%"PRIx64" (size %d)\n", getInstanceName().c_str(), tx.getAddress(), tx.getAccessByteWidth());
+            }
+            
+            self.updateOutputs();
+            
+            if (status == MX_STATUS_OK)
+            {
+                FVP_GIC_TRACE("%s: DistWr %08x -> %s\n", getInstanceName().c_str(),
+                               tx.getData32(), gic.DistRegName(tx.getAddress()));
+                return tx.writeComplete();
+            }
+            else 
+            {
+                FVP_GIC_TRACE("%s: ERROR in DistWr %08x -> %s\n", 
+                               getInstanceName().c_str(),
+                               tx.getData32(), gic.DistRegName(tx.getAddress()));
+                return tx.generateAbort();
+            }
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return dev_dist.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return dev_dist.write(tx);
+        }        
+    } // distributor slave port
+    
+    internal slave port<PVDevice> dev_core
+    {
+        behaviour read(pv::ReadTransaction tx)
+        : pv::Tx_Result
+        {
+            int domain = tx.isNonSecure()?NONSECURE:SECURE;
+            MxStatus status = MX_STATUS_ERROR;
+            MxU32 data;
+            if (tx.isAligned())
+            {
+                switch (tx.getAccessWidth()) {
+                case pv::ACCESS_8_BITS:
+                    MxU8 data8;
+                    status = gic.cpuif_read8(tx.getAddress(), data8,
+                        0 /* cpuid */, domain);
+                    tx.setReturnData8(data8);
+                    data = data8;
+                    break;
+                case pv::ACCESS_16_BITS:
+                    MxU16 data16;
+                    status = gic.cpuif_read16(tx.getAddress(), data16,
+                        0 /* cpuid */, domain);
+                    tx.setReturnData16(data16);
+                    data = data16;
+                    break;
+                case pv::ACCESS_32_BITS:
+                    MxU32 data32;
+                    status = gic.cpuif_read32(tx.getAddress(), data32,
+                        0 /* cpuid */, domain);
+                    tx.setReturnData32(data32);
+                    data = data32;
+                    break;
+                case pv::ACCESS_64_BITS:
+                    MxU64 data64;
+                    status = gic.cpuif_read64(tx.getAddress(), data64,
+                        0 /* cpuid */, domain);
+                    tx.setReturnData64(data64);
+                    data = data64;
+                    break;
+                default:
+                    assert(!"Unsupported transaction size");
+                    break;
+                }
+            } else {
+                FVP_GIC_TRACE("%s: Unaligned CpuIfRd at 0x%"PRIx64" (size %d)\n", getInstanceName().c_str(), tx.getAddress(), tx.getAccessByteWidth());
+            }
+            self.updateOutputs();
+            
+            if (status == MX_STATUS_OK)
+            {
+                FVP_GIC_TRACE("%s: CpuIfRd %08x <- %s\n", getInstanceName().c_str(),
+                              data, gic.CpuIfRegName(tx.getAddress()));
+                return tx.readComplete();
+            }
+            else 
+            {
+                FVP_GIC_TRACE("%s: ERROR in CpuIfRd %08x <- %s\n", 
+                              getInstanceName().c_str(),
+                              data, gic.CpuIfRegName(tx.getAddress()));
+                return tx.generateAbort();
+            }
+        }
+        
+        behaviour write(pv::WriteTransaction tx)
+        : pv::Tx_Result
+        {
+            int domain = tx.isNonSecure()?NONSECURE:SECURE;
+            MxStatus status = MX_STATUS_ERROR;
+            
+            if (tx.isAligned())
+            {
+                switch (tx.getAccessWidth()) {
+                case pv::ACCESS_8_BITS:
+                    status = gic.cpuif_write8(tx.getAddress(), tx.getData8(),
+                        0 /* cpuid */, domain);
+                    break;
+                case pv::ACCESS_16_BITS:
+                    status = gic.cpuif_write16(tx.getAddress(), tx.getData16(),
+                        0 /* cpuid */, domain);
+                    break;
+                case pv::ACCESS_32_BITS:
+                    status = gic.cpuif_write32(tx.getAddress(), tx.getData32(),
+                        0 /* cpuid */, domain);
+                    break;
+                case pv::ACCESS_64_BITS:
+                    status = gic.cpuif_write64(tx.getAddress(), tx.getData64(),
+                        0 /* cpuid */, domain);
+                    break;
+                default:
+                    assert(!"Unsupported access size");
+                }
+            } else {
+                FVP_GIC_TRACE("%s: Unaligned CpuIfWr at 0x%"PRIx64" (size %d)\n", getInstanceName().c_str(), tx.getAddress(), tx.getAccessByteWidth());
+            }
+            
+            self.updateOutputs();
+            
+            if (status == MX_STATUS_OK)
+            {
+                FVP_GIC_TRACE("%s: CpuIfWr %08x -> %s\n", getInstanceName().c_str(),
+                              tx.getData32(), gic.CpuIfRegName(tx.getAddress()));
+                return tx.writeComplete();
+            }
+            else 
+            {
+                FVP_GIC_TRACE("%s: ERROR in CpuIfWr %08x -> %s\n", 
+                              getInstanceName().c_str(),
+                              tx.getData32(), gic.CpuIfRegName(tx.getAddress()));
+                return tx.generateAbort();
+            }
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return dev_core.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return dev_core.write(tx);
+        }        
+    } // core slave port
+    
+    master port<Signal> irq;
+    master port<Signal> fiq;
+    
+    behavior updateOutputs
+    {
+        if (gic.edge_irq_o[0]) {
+            FVP_GIC_TRACE("%s: IRQ -> %s\n", 
+                getInstanceName().c_str(), gic.irq_o[0] ?"Set":"Clear");
+            if (irq.setValue.implemented())
+                irq.setValue(gic.irq_o[0] ? sg::Signal::Set : sg::Signal::Clear);
+            gic.edge_irq_o[0] = false;
+        }
+        if (gic.edge_fiq_o[0]) {
+            FVP_GIC_TRACE("%s: FIQ -> %s\n", 
+                getInstanceName().c_str(), gic.fiq_o[0] ?"Set":"Clear");
+            if (fiq.setValue.implemented())
+                fiq.setValue(gic.fiq_o[0] ? sg::Signal::Set : sg::Signal::Clear);
+            gic.edge_fiq_o[0] = false;
+        }
+    }
+    
+    
+    // Temporary interface for EB connector
+    slave port<ValueState> int_num
+    {
+        behavior setValue(MxU32 num_in)
+        {
+            // We don't like this: it's unnecessarily inefficient!
+            irq_num_latch = num_in; 
+        }
+    }
+    
+    // (More) temporary interface for EB connector
+    slave port<Signal> int_in
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            FVP_GIC_TRACE("%s: INPUT[%d] -> %s\n", 
+                getInstanceName().c_str(), irq_num_latch,
+                (state==sg::Signal::Set)?"Set":"Clear");
+            gic.signal_port_irq_drive(irq_num_latch, 0 /* dummy*/, 
+                (state==sg::Signal::Set)?1:0);
+            self.updateOutputs();
+        }
+    }
+    
+    behavior init
+    {
+        // nothing
+        composition.init();
+    }
+    
+    behavior terminate
+    {
+        // nothing
+        // Explicitly invoke subcomponent's terminate() behavior.
+        composition.terminate();
+    }
+    
+    // reset is reset (no argument needed).
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        num_interrupts = 64;
+        gic.n_cores = TARGET_COUNT; // this would normally be a parameter passed to constructor GIC().
+        gic.n_ints  = num_interrupts >= 32 ? num_interrupts : 32; // idem.
+        gic.init();   //Reset is called inside
+    }
+    
+    // debugger support - slightly more complicated than normal because of the way that register arrays are handled
+    behaviour debug_read_dist(uint32_t reg_id, uint64_t* datap, bool /*side_effects*/) : CADIReturn_t
+    {
+        int domain = (reg_id & 0x1)?NONSECURE:SECURE;
+        MxStatus status = MX_STATUS_ERROR;
+        if (domain == NONSECURE)
+            reg_id = reg_id & (~0x1);
+        
+        MxU32 data32;
+        status = gic.distributor_readDbg32((uint32_t)(reg_id & 0xFFF), data32, 0, domain);
+        *datap = data32;
+        
+        if (status == MX_STATUS_OK)
+            return eslapi::CADI_STATUS_OK;
+        else 
+            return eslapi::CADI_STATUS_GeneralError;
+    }
+    
+    behaviour debug_write_dist(uint32_t reg_id, const uint64_t* datap, bool /*side_effects*/) : CADIReturn_t
+    {
+        int domain = (reg_id & 0x1)?NONSECURE:SECURE;
+        MxStatus status = MX_STATUS_ERROR;
+        if (domain == NONSECURE)
+            reg_id = reg_id & (~0x1);
+        
+        status = gic.distributor_writeDbg32((uint32_t)(reg_id & 0xFFF), (uint32_t)*datap, 0, domain);
+        
+        if (status == MX_STATUS_OK)
+            return eslapi::CADI_STATUS_OK;
+        else 
+            return eslapi::CADI_STATUS_GeneralError;
+    }
+    
+    behaviour debug_read_core(uint32_t reg_id, uint64_t* datap, bool /*side_effects*/) : CADIReturn_t
+    {
+        int domain = (reg_id & 0x1)?NONSECURE:SECURE;
+        MxStatus status = MX_STATUS_ERROR;
+        if (domain == NONSECURE)
+            reg_id = reg_id & (~0x1);
+        
+        MxU32 data32;
+        status = gic.cpuif_readDbg32((uint32_t)(reg_id & 0xFFF), data32, 0, domain);          
+        *datap = data32;
+        
+        if (status == MX_STATUS_OK)
+            return eslapi::CADI_STATUS_OK;
+        else 
+            return eslapi::CADI_STATUS_GeneralError;
+    }
+    
+    behaviour debug_write_core(uint32_t reg_id, const uint64_t* datap, bool /*side_effects*/) : CADIReturn_t
+    {
+        int domain = (reg_id & 0x1)?NONSECURE:SECURE;
+        MxStatus status = MX_STATUS_ERROR;
+        if (domain == NONSECURE)
+            reg_id = reg_id & (~0x1);
+        
+        status = gic.cpuif_writeDbg32((uint32_t)(reg_id & 0xFFF), (uint32_t)*datap, 0, domain);
+        
+        if (status == MX_STATUS_OK)
+            return eslapi::CADI_STATUS_OK;
+        else 
+            return eslapi::CADI_STATUS_GeneralError;
+    }
+    
+}

@@ -1,0 +1,212 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+
+component FVP_VE_Cortex_A9x4
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Top level component of the Cortex-A9x4 Versatile Express inspired model.";
+    }
+
+    composition
+    {
+        // These items are on the testchip
+        cluster : ARMCortexA9MPx4CT("PERIPHBASE"=0x2C000000,
+                    "cpu0.semihosting-heap_base".default   = 0x00000000,
+                    "cpu0.semihosting-heap_limit".default  = 0xff000000,
+                    "cpu0.semihosting-stack_limit".default = 0xff000000,
+                    "cpu0.semihosting-stack_base".default  = 0xffff0000,
+                    "cpu1.semihosting-heap_base".default   = 0x00000000,
+                    "cpu1.semihosting-heap_limit".default  = 0xff000000,
+                    "cpu1.semihosting-stack_limit".default = 0xff000000,
+                    "cpu1.semihosting-stack_base".default  = 0xffff0000,
+                    "cpu2.semihosting-heap_base".default   = 0x00000000,
+                    "cpu2.semihosting-heap_limit".default  = 0xff000000,
+                    "cpu2.semihosting-stack_limit".default = 0xff000000,
+                    "cpu2.semihosting-stack_base".default  = 0xffff0000,
+                    "cpu3.semihosting-heap_base".default   = 0x00000000,
+                    "cpu3.semihosting-heap_limit".default  = 0xff000000,
+                    "cpu3.semihosting-stack_limit".default = 0xff000000,
+                    "cpu3.semihosting-stack_base".default  = 0xffff0000);
+
+
+
+        // Motherboard and Daughter Card
+        motherboard   : VEMotherBoard();
+        daughterboard : VEDaughterBoard();
+
+        // The A9 cluster has a private peripherals that need to be clocked
+        periph_clockdivider : ClockDivider("div"=2);
+    }
+
+    connection
+    {
+        // Daughterboard <-> cluster connections
+        daughterboard.cpu_clk       => cluster.clk_in;
+        daughterboard.cpu_clk       => periph_clockdivider.clk_in;
+        periph_clockdivider.clk_out => cluster.periphclk_in;
+        cluster.pvbus_m0            => daughterboard.cpu_pvbus;
+        daughterboard.cpu_irqs      => cluster.ints;
+
+        // Motherboard <-> Daughterboard connections
+        motherboard.masterclk  => daughterboard.clk_in;
+        motherboard.interrupts => daughterboard.interrupts;
+        daughterboard.smb_cs   => motherboard.smb_cs;
+        motherboard.clcd_pvbus => daughterboard.clcd_pvbus;
+        daughterboard.mmb      => motherboard.mmb_db1;
+        motherboard.CB[0]      => daughterboard.CB;
+
+        // Motherboard <-> cluster connections
+        cluster.ticks => motherboard.cluster0_ticks;
+
+        motherboard.virtio_m => cluster.virtio_s;
+    }
+
+    behaviour setupGlobalSystemAttributes()
+    {
+#ifdef HIDE_PARAMS
+    hideParameter("cluster.CLUSTER_ID");
+    hideParameter("cluster.dic-spi_count");
+    hideParameter("cluster.FILTEREN");
+    hideParameter("cluster.FILTERSTART");
+    hideParameter("cluster.FILTEREND");
+    hideParameter("cluster.CFGSDISABLE");
+    hideParameter("cluster.icache-state_modelled");
+    hideParameter("cluster.dcache-state_modelled");
+    hideParameter("cluster.device-accurate-tlb");
+
+    hideParameter("cluster.cpu0.vfp-present");
+    hideParameter("cluster.cpu0.ase-present");
+    hideParameter("cluster.cpu0.CFGEND");
+    hideParameter("cluster.cpu0.CFGNMFI");
+    hideParameter("cluster.cpu0.CP15SDISABLE");
+    hideParameter("cluster.cpu0.TEINIT");
+    hideParameter("cluster.cpu0.VINITHI");
+    hideParameter("cluster.cpu0.SMPnAMP");
+    hideParameter("cluster.cpu0.POWERCTLI");
+    hideParameter("cluster.cpu0.vfp-enable_at_reset");
+    hideParameter("cluster.cpu0.dcache-size");
+    hideParameter("cluster.cpu0.icache-size");
+
+    hideParameter("cluster.cpu1.vfp-present");
+    hideParameter("cluster.cpu1.ase-present");
+    hideParameter("cluster.cpu1.CFGEND");
+    hideParameter("cluster.cpu1.CFGNMFI");
+    hideParameter("cluster.cpu1.CP15SDISABLE");
+    hideParameter("cluster.cpu1.TEINIT");
+    hideParameter("cluster.cpu1.VINITHI");
+    hideParameter("cluster.cpu1.SMPnAMP");
+    hideParameter("cluster.cpu1.POWERCTLI");
+    hideParameter("cluster.cpu1.vfp-enable_at_reset");
+    hideParameter("cluster.cpu1.dcache-size");
+    hideParameter("cluster.cpu1.icache-size");
+
+    hideParameter("cluster.cpu2.vfp-present");
+    hideParameter("cluster.cpu2.ase-present");
+    hideParameter("cluster.cpu2.CFGEND");
+    hideParameter("cluster.cpu2.CFGNMFI");
+    hideParameter("cluster.cpu2.CP15SDISABLE");
+    hideParameter("cluster.cpu2.TEINIT");
+    hideParameter("cluster.cpu2.VINITHI");
+    hideParameter("cluster.cpu2.SMPnAMP");
+    hideParameter("cluster.cpu2.POWERCTLI");
+    hideParameter("cluster.cpu2.vfp-enable_at_reset");
+    hideParameter("cluster.cpu2.dcache-size");
+    hideParameter("cluster.cpu2.icache-size");
+
+    hideParameter("cluster.cpu3.vfp-present");
+    hideParameter("cluster.cpu3.ase-present");
+    hideParameter("cluster.cpu3.CFGEND");
+    hideParameter("cluster.cpu3.CFGNMFI");
+    hideParameter("cluster.cpu3.CP15SDISABLE");
+    hideParameter("cluster.cpu3.TEINIT");
+    hideParameter("cluster.cpu3.VINITHI");
+    hideParameter("cluster.cpu3.SMPnAMP");
+    hideParameter("cluster.cpu3.POWERCTLI");
+    hideParameter("cluster.cpu3.vfp-enable_at_reset");
+    hideParameter("cluster.cpu3.dcache-size");
+    hideParameter("cluster.cpu3.icache-size");
+
+    hideParameter("motherboard.vis.window_title");
+
+    hideParameter("motherboard.vis.cpu_name");
+    hideParameter("motherboard.vis.recorder.recordingFileName");
+    hideParameter("motherboard.vis.recorder.playbackFileName");
+    hideParameter("motherboard.vis.recorder.recordingTimeBase");
+    hideParameter("motherboard.vis.recorder.verbose");
+    hideParameter("motherboard.daughter_led_count");
+    hideParameter("motherboard.daughter_user_switch_count");
+    hideParameter("motherboard.vis.recorder.checkInstructionCount");
+
+    hideParameter("motherboard.ve_sysregs.tilePresent");
+    hideParameter("motherboard.proc_id0");
+    hideParameter("motherboard.proc_id1");
+
+    hideParameter("motherboard.sp805_wdog.simhalt");
+
+    hideParameter("motherboard.pl011_uart3.clock_rate");
+    hideParameter("motherboard.pl011_uart3.baud_rate");
+    hideParameter("motherboard.pl011_uart3.uart_enable");
+    hideParameter("motherboard.pl011_uart3.out_file");
+    hideParameter("motherboard.pl011_uart3.in_file");
+    hideParameter("motherboard.pl011_uart3.in_file_escape_sequence");
+    hideParameter("motherboard.pl011_uart2.clock_rate");
+    hideParameter("motherboard.pl011_uart2.baud_rate");
+    hideParameter("motherboard.pl011_uart2.uart_enable");
+    hideParameter("motherboard.pl011_uart2.out_file");
+
+    hideParameter("daughterboard.introuter.num_interrupts");
+
+    hideParameter("motherboard.vis.window_title");
+
+    hideParameter("motherboard.vis.cpu_name");
+    hideParameter("motherboard.vis.recorder.recordingFileName");
+    hideParameter("motherboard.vis.recorder.playbackFileName");
+    hideParameter("motherboard.vis.recorder.recordingTimeBase");
+    hideParameter("motherboard.vis.recorder.verbose");
+    hideParameter("motherboard.daughter_led_count");
+    hideParameter("motherboard.daughter_user_switch_count");
+    hideParameter("motherboard.vis.recorder.checkInstructionCount");
+
+    hideParameter("motherboard.ve_sysregs.tilePresent");
+    hideParameter("motherboard.proc_id0");
+    hideParameter("motherboard.proc_id1");
+
+    hideParameter("motherboard.sp805_wdog.simhalt");
+
+    hideParameter("motherboard.pl011_uart3.clock_rate");
+    hideParameter("motherboard.pl011_uart3.baud_rate");
+    hideParameter("motherboard.pl011_uart3.uart_enable");
+    hideParameter("motherboard.pl011_uart3.out_file");
+    hideParameter("motherboard.pl011_uart3.in_file");
+    hideParameter("motherboard.pl011_uart3.in_file_escape_sequence");
+    hideParameter("motherboard.pl011_uart2.clock_rate");
+    hideParameter("motherboard.pl011_uart2.baud_rate");
+    hideParameter("motherboard.pl011_uart2.uart_enable");
+    hideParameter("motherboard.pl011_uart2.out_file");
+    hideParameter("motherboard.pl011_uart2.in_file");
+    hideParameter("motherboard.pl011_uart2.in_file_escape_sequence");
+    hideParameter("motherboard.pl011_uart1.clock_rate");
+    hideParameter("motherboard.pl011_uart1.baud_rate");
+    hideParameter("motherboard.pl011_uart1.uart_enable");
+    hideParameter("motherboard.pl011_uart1.out_file");
+    hideParameter("motherboard.pl011_uart1.in_file");
+    hideParameter("motherboard.pl011_uart1.in_file_escape_sequence");
+    hideParameter("motherboard.pl011_uart0.clock_rate");
+    hideParameter("motherboard.pl011_uart0.baud_rate");
+    hideParameter("motherboard.pl011_uart0.uart_enable");
+    hideParameter("motherboard.pl011_uart0.out_file");
+    hideParameter("motherboard.pl011_uart0.in_file");
+    hideParameter("motherboard.pl011_uart0.in_file_escape_sequence");
+
+    hideParameter("motherboard.mmc.p_prodName");
+    hideParameter("motherboard.mmc.p_prodRev");
+    hideParameter("motherboard.mmc.p_manid");
+    hideParameter("motherboard.mmc.p_OEMid");
+    hideParameter("motherboard.mmc.p_sernum");
+#endif
+    }
+}

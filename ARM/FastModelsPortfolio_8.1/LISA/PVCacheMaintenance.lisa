@@ -1,0 +1,95 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ *
+ * This defines protocols and components that are private, subject to change
+ * and that should not be used outside of ARM.
+ */
+
+protocol PVCacheMaintenance
+{
+    includes
+    {
+#include "pv/PVBusAddr.h"
+#include "pv/PVTransaction.h"
+    }
+
+    properties {
+        version = "8.1.37";
+        description = "PVCacheMaintenance Protocol";
+        // documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    /*! Clean entire cache, flushing all dirty lines. */
+    slave behaviour clean_all();
+
+    /*! Clean by pa, evicting the lines that match. */
+    slave behaviour clean_by_addr(pv::bus_addr_t addr, bool is_non_secure);
+
+    /*! Clean by set/way.
+     * secure evicts any, non-secure only evicts non-secure entries
+     */
+    slave behaviour clean_by_set_way(uint32_t set, uint32_t way, bool is_non_secure);
+
+
+    /*! Invalidate entire cache, evicting all lines without cleaning. */
+    slave behaviour invalidate_all();
+
+    /*! Invalidate by pa, evicting the lines that match./ */
+    slave behaviour invalidate_by_addr(pv::bus_addr_t addr, bool is_non_secure);
+
+    /*! Invalidate by set/way.
+     * Secure evicts any, non-secure only evicts non-secure entries
+     */
+    slave behaviour invalidate_by_set_way(uint32_t set, uint32_t way, bool is_non_secure);
+
+    /*! Preload a line into this particular layer of cache.
+     *
+     * If you ask for it to be unique then it will perform all the cache
+     * coherency operations to make it unique to that cache (assuming it is
+     * shared).  This will then mean that a write to that cache will not have to
+     * perform extra coherency operations (assuming it is still unique in the
+     * cache at that point).  This is intended as a primitive to model preload
+     * for read and preload for write.
+     *
+     * NOTE that the security world is encoded in the \a memory_attributes_.
+     * The exclusive, cache maintenance and debug flags are ignored.
+     */
+    slave behaviour preload(
+        const pv::MemoryAttributes   &memory_attributes_,
+        pv::bus_addr_t                address_,
+        bool                          make_unique_
+        ) : pv::Tx_Result;
+
+
+    /*! Set bit-array controlling which cache ways are locked down. */
+    slave behaviour setLockDown(uint32_t lock);
+
+    /*! Get bit-array controlling which cache ways are locked down. */
+    slave behaviour  getLockDown() : uint32_t;
+
+    //! Set domain for cache as inner or not (outer).
+    slave behaviour setIsInner(bool is_inner);
+
+    //! Get enabled state.
+    slave behaviour  getEnabled(bool is_non_secure) : bool;
+
+    //! Set enabled state.
+    slave behaviour  setEnabled(bool enabled, bool is_non_secure);
+
+    /*! Enable/disable which of the upstream ports are currently accepting ACE snoop request.
+        This is used to override the local cache behaviour.
+     */
+    slave behaviour  enableUpstreamAcceptsSnoopRequests( unsigned upstream_port_, bool on_ );
+
+    /*! Enable/disable which of the upstream ports are currently accepting DVM snoop request.
+      This is used to override the local cache behaviour.
+    */
+    slave behaviour  enableUpstreamAcceptsDVM( unsigned upstream_port_, bool on_ );
+
+    /*! Enable/disable if the current cache will locally handle DVM messages.
+        When the cache was created then there may have been the option of
+        telling it to startup to ignore_local_dvm_messages or not.  This now
+        makes that a dynamic behaviour. */
+    slave behaviour  enableLocalDVMMessageProcessing( bool on_ );
+
+}

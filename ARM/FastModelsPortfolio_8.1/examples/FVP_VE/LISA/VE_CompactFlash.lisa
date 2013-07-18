@@ -1,0 +1,54 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */ 
+
+// A place holder compact flash device that will just drop all writes,
+// and reply to all reads with 0xffffffff - which seems to be what is
+// required to say that the device is not present, or at least disabled.
+// NOTE: The important address seems to be at 0x300 for replying to
+//       reads, not sure if any other address will be probed so long as 
+//       we return 0xffffffff from that address...
+
+component VE_CompactFlash
+{
+    properties
+    {
+        version = "8.1.37";
+    }
+
+    composition
+    {
+        bus_slave : PVBusSlave(size = 0x1000);
+    }
+
+    connection
+    {
+        self.pvbus => bus_slave.pvbus_s;
+        bus_slave.device => self.device;
+    }
+
+    slave port<PVBus> pvbus;
+
+    internal slave port<PVDevice> device
+    {
+        behavior read(pv::ReadTransaction tx):pv::Tx_Result
+        {
+            return tx.setReturnData32(0xffffffff);
+        }
+
+        behavior write(pv::WriteTransaction tx):pv::Tx_Result
+        {
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }
+    }
+}

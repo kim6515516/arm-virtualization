@@ -1,0 +1,1295 @@
+/*
+* Copyright 2007 ARM Limited. All rights reserved.
+* Copyright 2008 ARM Limited. All rights reserved.
+*/
+
+//  LISA Implementation of a ARM PrimeCell Advanced Audio CODEC interface (PL041)
+
+component PL041_AACI
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell Advanced Audio CODEC Interface(PL041)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes
+    {
+        #include    "components/ac97_defs.h"
+        #include    "stdlib.h"
+        #include    "string.h"
+        #define AACI_TRACE if(!0) ; else printf
+        
+        // Bit positions
+        #define TXCR_TXEN       (1<<0)
+        #define TXCR_TX1        (1<<1)
+        #define TXCR_TX2        (1<<2)
+        #define TXCR_TX3        (1<<3)
+        #define TXCR_TX4        (1<<4)
+        #define TXCR_TX5        (1<<5)
+        #define TXCR_TX6        (1<<6)
+        #define TXCR_TX7        (1<<7)
+        #define TXCR_TX8        (1<<8)
+        #define TXCR_TX9        (1<<9)
+        #define TXCR_TX10       (1<<10)
+        #define TXCR_TX11       (1<<11)
+        #define TXCR_TX12       (1<<12)
+        #define TXCR_TSIZE_MASK (0x3<<13)
+        #define TXCR_16B        (0x0<<13)
+        #define TXCR_18B        (0x1<<13)
+        #define TXCR_20B        (0x2<<13)
+        #define TXCR_12B        (0x3<<13)
+        #define TXCR_COMPACT    (1<<15)
+        #define TXCR_FEN        (1<<16)
+        
+        #define SR_TXFE         (1<<1)
+        #define SR_TXHE         (1<<3)
+        #define SR_TXFF         (1<<5)
+        #define SR_TXUR         (1<<9)
+        
+        #define ISR_TXCINTR     (1<<0)
+        #define ISR_TXINTR      (1<<2)
+        #define ISR_URINTR      (1<<5)
+        
+        #define INTCLR_TXUEC1   (1<<5)
+        
+        #define MAINCR_SL2TXEN (1<<6)
+        #define MAINCR_SL2RXEN (1<<5)
+        #define MAINCR_SL1TXEN (1<<4)
+        #define MAINCR_SL1RXEN (1<<3)
+        #define MAINCR_IFE     (1<<0)
+        
+        #define SLFR_SL2TXEMPTY (1<<9)
+        #define SLFR_SL2RXVALID (1<<8)
+        #define SLFR_SL1TXEMPTY (1<<7)
+        #define SLFR_SL1RXVALID (1<<6)
+    }
+    
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+        timer : ClockTimer;
+    }
+    
+    resources
+    {   
+        // Real depth of FIFO in Normal (non compact) mode
+        size_t              depth;
+        // The effective depth of the FIFO in stereo samples
+        size_t              effectiveDepth;
+        // Half effective depth of the FIFO in stereo samples
+        size_t              effectiveHalfDepth;
+        
+        // Underlying Audio Buffer
+        PVAudioBuffer*      audioBuf;
+        
+        // Time in ticks of input clock between updates
+        uint32_t            tDelta;
+        // Number of samples which ought to have drained from the FIFO during
+        // the tDelta period.
+        uint32_t            sampleDelta;
+        
+        // Is the data being written stereo?
+        bool                isStereo;
+        
+        // Is the AACI set to compact mode?
+        bool                isCompact;
+        
+        // Is the AACI in a legal config (ie only slot 3 or 4 enabled) we can't
+        // deal with other configurations.
+        bool                isLegal;
+        
+        // Are we writing into the audio buffer if DR1 is written to? We can
+        // only write on every second sample as we must write stereo samples.
+        bool                isWrite;
+        
+        // The previous sample so we can write stereo samples into the audio
+        // buffer.
+        int16_t             prevSample;
+        
+        // Is transmit enabled (and therefore is the FIFO being drained)
+        bool                isRunning;
+        
+        // Interrupt Status
+        bool                irq_signal;
+        
+        // AACI Registers
+        uint32_t rxcr1;
+        uint32_t txcr1;
+        uint32_t sr1;
+        /*! Contains the actual status of the interrupts must be masked with
+        * ie1 to generate the real isr1 for reading */
+        uint32_t isr1;
+        uint32_t ie1;
+        
+        uint32_t rxcr2;
+        uint32_t txcr2;
+        uint32_t sr2;
+        /*! Contains the actual status of the interrupts must be masked with
+        * ie2 to generate the real isr2 for reading */
+        uint32_t isr2;
+        uint32_t ie2;
+        
+        uint32_t rxcr3;
+        uint32_t txcr3;
+        uint32_t sr3;
+        /*! Contains the actual status of the interrupts must be masked with
+        * ie3 to generate the real isr3 for reading */
+        uint32_t isr3;
+        uint32_t ie3;
+        
+        uint32_t rxcr4;
+        uint32_t txcr4;
+        uint32_t sr4;
+        /*! Contains the actual status of the interrupts must be masked with
+        * ie4 to generate the real isr4 for reading */
+        uint32_t isr4;
+        uint32_t ie4;
+        
+        uint32_t sl1rx;
+        uint32_t sl1tx;
+        uint32_t sl2rx;
+        uint32_t sl2tx;
+        uint32_t sl12rx;
+        uint32_t sl12tx;
+        
+        uint32_t slfr;
+        /*! Contains the actual status of the interrupts must be masked with
+        * slien to generate the real slistat for reading */
+        uint32_t slistat;
+        uint32_t slien;
+        uint32_t maincr;
+        uint32_t rst;
+        uint32_t sync;
+        uint32_t mainfr;
+        
+        uint8_t* SmBuffer0;
+        uint8_t* SmBuffer1;
+        uint8_t* SmBuffer2;
+        uint8_t* SmBuffer3;
+        
+        // LM4529A Registers
+        uint32_t masterVol;
+        uint32_t auxVol;
+        uint32_t monoVol;
+        uint32_t beepVol;
+        uint32_t phoneVol;
+        uint32_t micVol;
+        uint32_t lineVol;
+        uint32_t cdVol;
+        uint32_t videoVol;
+        uint32_t auxinVol;
+        uint32_t pcmVol;
+        uint32_t recVol;
+        uint32_t recSel;
+        uint32_t recGain;
+        uint32_t gen;
+        uint32_t pdctrl;
+        uint32_t eaid;
+        uint32_t eactrl;
+        uint32_t pcmDACRate;
+        uint32_t pcmADCRate;
+        
+        // REGISTERS available to the debugger. No registers are currently read sensitive
+        REGISTER { description("Channel Receive control"),  read_function(debug_read), write_function(debug_write), reg_number(0x000) } RXCR1;
+        REGISTER { description("Channel Transmit control"), read_function(debug_read), write_function(debug_write), reg_number(0x004) } TXCR1;
+        REGISTER { description("Channel Status"),           read_function(debug_read), write_function(debug_write), reg_number(0x008) } SR1;
+        REGISTER { description("Channel Interrupt status"), read_function(debug_read), write_function(debug_write), reg_number(0x00c) } ISR1;
+        REGISTER { description("Channel Interrupt enable"), read_function(debug_read), write_function(debug_write), reg_number(0x010) } IE1;
+        REGISTER { description("Channel Receive control"),  read_function(debug_read), write_function(debug_write), reg_number(0x014) } RXCR2;
+        REGISTER { description("Channel Transmit control"), read_function(debug_read), write_function(debug_write), reg_number(0x018) } TXCR2;
+        REGISTER { description("Channel Status"),           read_function(debug_read), write_function(debug_write), reg_number(0x01c) } SR2;
+        REGISTER { description("Channel Interrupt status"), read_function(debug_read), write_function(debug_write), reg_number(0x020) } ISR2;
+        REGISTER { description("Channel Interrupt enable"), read_function(debug_read), write_function(debug_write), reg_number(0x024) } IE2;
+        REGISTER { description("Channel Receive control"),  read_function(debug_read), write_function(debug_write), reg_number(0x028) } RXCR3;
+        REGISTER { description("Channel Transmit control"), read_function(debug_read), write_function(debug_write), reg_number(0x02c) } TXCR3;
+        REGISTER { description("Channel Status"),           read_function(debug_read), write_function(debug_write), reg_number(0x030) } SR3;
+        REGISTER { description("Channel Interrupt status"), read_function(debug_read), write_function(debug_write), reg_number(0x034) } ISR3;
+        REGISTER { description("Channel Interrupt enable"), read_function(debug_read), write_function(debug_write), reg_number(0x038) } IE3;
+        REGISTER { description("Channel Receive control"),  read_function(debug_read), write_function(debug_write), reg_number(0x03c) } RXCR4;
+        REGISTER { description("Channel Transmit control"), read_function(debug_read), write_function(debug_write), reg_number(0x040) } TXCR4;
+        REGISTER { description("Channel Status"),           read_function(debug_read), write_function(debug_write), reg_number(0x044) } SR4;
+        REGISTER { description("Channel Interrupt status"), read_function(debug_read), write_function(debug_write), reg_number(0x048) } ISR4;
+        REGISTER { description("Channel Interrupt enable"), read_function(debug_read), write_function(debug_write), reg_number(0x04c) } IE4;
+        REGISTER { description("Slot1 receive data"),       read_function(debug_read), write_function(debug_write), reg_number(0x050) } SL1RX;
+        REGISTER { description("Slot1 transmit data"),      read_function(debug_read), write_function(debug_write), reg_number(0x054) } SL1TX;
+        REGISTER { description("Slot2 receive data"),       read_function(debug_read), write_function(debug_write), reg_number(0x058) } SL2RX;
+        REGISTER { description("Slot2 transmit data"),      read_function(debug_read), write_function(debug_write), reg_number(0x05c) } SL2TX;
+        REGISTER { description("Slot12 receive data"),      read_function(debug_read), write_function(debug_write), reg_number(0x060) } SL12RX;
+        REGISTER { description("Slot12 transmit data"),     read_function(debug_read), write_function(debug_write), reg_number(0x064) } SL12TX;
+        REGISTER { description("Slot flag register"),       read_function(debug_read), write_function(debug_write), reg_number(0x068) } LSFR;
+        REGISTER { description("Slot interrupt status"),    read_function(debug_read), write_function(debug_write), reg_number(0x06c) } SLISTAT;
+        REGISTER { description("Slot interrupt enable"),    read_function(debug_read), write_function(debug_write), reg_number(0x070) } SLIEN;
+        REGISTER { description("All interrupts clear"),     read_function(debug_read), write_function(debug_write), reg_number(0x074) } ALLINTCLR;
+        REGISTER { description("Main control"),             read_function(debug_read), write_function(debug_write), reg_number(0x078) } MAINCR;
+        REGISTER { description("Reset control"),            read_function(debug_read), write_function(debug_write), reg_number(0x07c) } RESET;
+        REGISTER { description("Sync control"),             read_function(debug_read), write_function(debug_write), reg_number(0x080) } SYNC;
+        REGISTER { description("All interrupts status"),    read_function(debug_read), write_function(debug_write), reg_number(0x084) } ALLINTS;
+        REGISTER { description("Main flags"),               read_function(debug_read), write_function(debug_write), reg_number(0x088) } MAINFR;
+        
+        // the fifo write registers are not currently shown to the debugger
+    }
+    
+    // Reference 25MHz Clock
+    slave           port<ClockSignal>   clk_in_ref; 
+    master          port<AudioControl>  audio;
+    slave           port<PVBus>         pvbus;  
+    master          port<Signal>        irq;
+    
+    // DMA port
+    master port<PL080_DMAC_DmaPortProtocol> dma_rx
+    {
+        behaviour response(uint32_t response)
+        {
+            // Do nothing
+        }
+    }
+    master port<PL080_DMAC_DmaPortProtocol> dma_tx
+    {
+        behaviour response(uint32_t response)
+        {
+            // Do nothing
+        }
+    }
+    
+    internal slave  port<TimerCallback> timer_cbHandler
+    {
+        behaviour signal() : uint32_t
+        {
+            AACI_TRACE("AACI Timer CallBack Signaled\n");
+            updateFIFO1(sampleDelta); 
+            updateInterrupts();
+            return tDelta;
+        }
+    }
+    
+    internal slave port<PVDevice> device
+    {
+        behaviour read(pv::ReadTransaction tx)
+        : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32((uint32_t)registerRead(tx.getAddress() & ~3));
+        }
+        
+        behaviour write(pv::WriteTransaction tx)
+        : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(),
+                tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }    
+    
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        
+        self.clk_in_ref => timer.clk_in;
+        timer.timer_callback => self.timer_cbHandler;
+    }
+    
+    // Internal Behaviours
+    behavior ResetRegisters()
+    {
+        rxcr1   = 0x0;
+        txcr1   = 0x0;
+        sr1     = 0x0b;
+        isr1    = 0x0;
+        ie1     = 0x0;
+        
+        rxcr2   = 0x0;
+        txcr2   = 0x0;
+        sr2     = 0x0b;
+        isr2    = 0x0;
+        ie2     = 0x0;
+        
+        rxcr3   = 0x0;
+        txcr3   = 0x0;
+        sr3     = 0x0b;
+        isr3    = 0x0;
+        ie3     = 0x0;
+        
+        rxcr4   = 0x0;
+        txcr4   = 0x0;
+        sr4     = 0x0b;
+        isr4    = 0x0;
+        ie4     = 0x0; 
+        
+        sl1rx   = 0x0;
+        sl1tx   = 0x0;
+        sl2rx   = 0x0;
+        sl2tx   = 0x0;
+        sl12rx  = 0x0;
+        sl12tx  = 0x0;
+        
+        slfr    = 0x0a80;
+        slistat = 0; 
+        slien   = 0;
+        maincr  = 0;
+        rst     = 1;
+        sync    = 1;
+        mainfr  = 0x0;
+    }
+    
+    behaviour resetLM4549Registers()
+    {
+        masterVol   = 0x8000;
+        auxVol      = 0x8000;
+        monoVol     = 0x8000;
+        beepVol     = 0x0000;
+        phoneVol    = 0x8008;
+        micVol      = 0x8008;
+        lineVol     = 0x8808;
+        cdVol       = 0x8808;
+        videoVol    = 0x8808;
+        auxinVol    = 0x8808;
+        pcmVol      = 0x8808;
+        recSel      = 0x0000;
+        recGain     = 0x8000;
+        gen         = 0x0000;
+        pdctrl      = 0x000F;
+        eaid        = 0x0001;
+        eactrl      = 0x0000;
+        pcmDACRate  = 0xBB80;
+        pcmADCRate  = 0xBB80;
+    }
+    
+    behaviour updateInterrupts()
+    {
+        // In order for an interrupt be asserted it must be both enabled and
+        // signaled.
+        
+        // Check if any of the four FIFO's interrupts are enabled and unmasked.
+        bool signal = ((isr1 & ie1) != 0) ||
+        ((isr2 & ie2) != 0) ||
+        ((isr3 & ie3) != 0) ||
+        ((isr4 & ie4) != 0);
+        
+        // Check if any slot interrupts are enabled and unmasked.
+        signal = (signal || ((slistat & slien) != 0));
+        
+        // Change the interrupt status if need be
+        if(signal != irq_signal) {
+            irq.setValue( (signal) ? sg::Signal::Set : sg::Signal::Clear );
+            irq_signal = signal;
+        }
+        
+    }
+    
+    // Data coming from codec to AACI on Slot 1
+    behaviour setSlot1rx(uint32_t data)
+    {
+        if((maincr & MAINCR_SL1RXEN) == MAINCR_SL1RXEN)
+        {
+            sl1rx = data;
+            slfr |= SLFR_SL1RXVALID;
+        }
+    }
+    
+    // Data coming from codec to AACI on Slot 2
+    behaviour setSlot2rx(uint32_t data)
+    {
+        if((maincr & MAINCR_SL2RXEN) == MAINCR_SL2RXEN)
+        {
+            sl2rx = data;
+            slfr |= SLFR_SL2RXVALID;
+        }
+    }
+    
+    // Host reads data from AACI (codec)
+    behaviour getSlot2rx() : uint32_t
+    {
+        //slfr &= ~SLFR_SL2RXVALID;
+        return sl2rx; 
+    }
+    
+    
+    behaviour getSlot2tx(uint32_t* dest)
+    {
+        if((maincr & MAINCR_SL2TXEN) == MAINCR_SL2TXEN)
+        {
+            *dest = SL2TOVAL(sl2tx); 
+        }
+    }
+    
+    behaviour slot1tx()
+    {
+        // DDI 0173B P 3-18
+        //  - If sl1tx is enabled
+        //  - Clear indication of sl1rx and sl2rx
+        //  - If the data written into sl1tx was valid then
+        //      - Indicate SL1 transmission complete
+        //      - If sl1rx is enabled setup and indicate data in sl1rx in slfr
+        //      - If sl2rx is enablad setup and indicate data in sl2rx in slfr.
+        
+        if((maincr & MAINCR_SL1TXEN) == MAINCR_SL1TXEN)
+        {
+            const uint32_t maskedVal = (sl1tx & SL1MASK);
+            const bool     read      = ((sl1tx & SL1READ) == SL1READ);
+            bool           valid     = true;
+            
+            slfr &= ~SLFR_SL2RXVALID;
+            slfr &= ~SLFR_SL1RXVALID;
+            
+            slfr |= SLFR_SL1TXEMPTY;
+            
+            switch(maskedVal)
+            {   
+            case REGTOSL1(PV_AC97_RESET):
+                AACI_TRACE("%s","   SL1TX AC97 VendorID 1\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(PV_LM4519A_RESET));
+                } else {
+                    resetLM4549Registers();
+                }
+                break;
+            case REGTOSL1(PV_AC97_MASTERVOL):
+                AACI_TRACE("%s","   SL1TX AC97 Master Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(masterVol));
+                } else {
+                    getSlot2tx(&masterVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_AUXVOL):
+                AACI_TRACE("%s","   SL1TX AC97 Aux Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(auxVol));
+                } else {
+                    getSlot2tx(&auxVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_MONOVOL):
+                AACI_TRACE("%s","   SL1TX AC97 Mono Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(auxVol));
+                } else {
+                    getSlot2tx(&auxVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_BEEPVOL):
+                AACI_TRACE("%s","   SL1TX AC97 BEEP Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(beepVol));
+                } else {
+                    getSlot2tx(&beepVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_PHONEVOL):
+                AACI_TRACE("%s","   SL1TX AC97 Phone Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(phoneVol));
+                } else {
+                    getSlot2tx(&phoneVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_MICVOL):
+                AACI_TRACE("%s","   SL1TX AC97 Mic Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(micVol));
+                } else {
+                    getSlot2tx(&micVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_LINEVOL):
+                AACI_TRACE("%s","   SL1TX AC97 Line Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(lineVol));
+                } else {
+                    getSlot2tx(&lineVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_CDVOL):
+                AACI_TRACE("%s","   SL1TX AC97 CD Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(cdVol));
+                } else {
+                    getSlot2tx(&cdVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_VIDEOVOL):
+                AACI_TRACE("%s","   SL1TX AC97 Video Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(videoVol));
+                } else {
+                    getSlot2tx(&videoVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_AUXINVOL):
+                AACI_TRACE("%s","   SL1TX AC97 Aux in Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(auxinVol));
+                } else {
+                    getSlot2tx(&auxinVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_PCMVOL):
+                AACI_TRACE("%s","   SL1TX AC97 PCM Volume\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(pcmVol));
+                } else {
+                    getSlot2tx(&pcmVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_RECSEL):
+                AACI_TRACE("%s","   SL1TX AC97 Record Select\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(recVol));
+                } else {
+                    getSlot2tx(&recVol);
+                }
+                break;
+            case REGTOSL1(PV_AC97_RECGAIN):
+                AACI_TRACE("%s","   SL1TX AC97 Record Gain\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(recGain));
+                } else {
+                    getSlot2tx(&recGain);
+                }
+                break;
+            case REGTOSL1(PV_AC97_GEN):
+                AACI_TRACE("%s","   SL1TX AC97 General Purpose\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(gen));
+                } else {
+                    getSlot2tx(&gen);
+                }
+                break;
+            case REGTOSL1(PV_AC97_3DCTRL):
+                AACI_TRACE("%s","   SL1TX AC97 3DCTRL\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(PV_LM4519A_3DCTL));
+                }
+                break;
+            case REGTOSL1(PV_AC97_PDCTRL):
+                AACI_TRACE("%s","   SL1TX AC97 PowerDown Control\n");
+                if(read) {
+                    // For now just always claim to be powered up, it may
+                    // be required to deal with power management correctly
+                    // in the future.
+                    setSlot2rx(VALTOSL2(PV_LM4519A_PDCTRL));
+                } else {
+                    getSlot2tx(&pdctrl);
+                }
+                break;
+            case REGTOSL1(PV_AC97_EXTAUDID):
+                AACI_TRACE("%s","   SL1TX AC97 Extended Audio ID\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(PV_LM4519A_EXTID));
+                }
+                break;
+            case REGTOSL1(PV_AC97_EXTAUDCTRL):
+                AACI_TRACE("%s","   SL1TX AC97 Extended Audio Control\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(eactrl));
+                } else {
+                    getSlot2tx(&eactrl);
+                }                    
+                break;
+            case REGTOSL1(PV_AC97_PCMFDACRATE):
+                AACI_TRACE("%s","   SL1TX AC97 PCM Front DAC Rate\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(pcmDACRate));
+                } else {
+                    // ignore writes for the moment - prevents setting to
+                    // anything other than default 48k
+                    // uncommenting the next line merely allows the rate setter
+                    // to read back what it wrote
+                    // getSlot2tx(&pcmDACRate);
+                }
+                break;
+            case REGTOSL1(PV_AC97_PCMLRADCRATE):
+                AACI_TRACE("%s","   SL1TX AC97 PCM ADC Rate\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(pcmADCRate));
+                } else {
+                    getSlot2tx(&pcmADCRate);
+                }
+                break;
+            case REGTOSL1(PV_AC97_VID1):
+                AACI_TRACE("%s","   SL1TX AC97 VendorID 1\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(PV_LM4519A_VID1));
+                }
+                break;
+            case REGTOSL1(PV_AC97_VID2):
+                AACI_TRACE("%s","   SL1TX AC97 VendorID 2\n");
+                if(read) {
+                    setSlot2rx(VALTOSL2(PV_LM4519A_VID2));
+                }
+                break;
+            default:
+                AACI_TRACE("%s %x\n","   SL1TX Unsupported register", SL1TOREG(maskedVal));
+                valid = false;
+            }
+            
+            if(valid) {
+                setSlot1rx(maskedVal);
+            } else {
+                // LM4549A.pdf p24 Reserved registers will return 0000h if read
+                if(read) {
+                    setSlot1rx(maskedVal);
+                    setSlot2rx(0x0);
+                }
+            }
+            
+        }
+        else
+        {
+            AACI_TRACE("%s\n","   WARNING SL1TXEN not enabled");
+        }
+        
+    }
+    
+    behaviour handleIntClr(uint32_t data)
+    {
+        if((data & INTCLR_TXUEC1) == INTCLR_TXUEC1)
+        {
+            sr1 &= ~SR_TXUR;
+            isr1 &= ~ISR_URINTR;
+        }
+        
+        updateInterrupts();
+    }
+    
+    behaviour handleMainCR(uint32_t newValue)
+    {
+        // Reset the FIFOs if the interface was disabled
+        // and is being turned on now
+        if(((maincr & MAINCR_IFE) == 0) && ((newValue & MAINCR_IFE) == MAINCR_IFE))
+        {
+            audioBuf->reset();
+            if (isRunning)
+            {
+                audioBuf->start();
+            }
+        }
+    }
+    
+    behaviour updateFIFO1(uint32_t sim_ms)
+    {
+        const size_t  buflevel = audioBuf->getLevel(sim_ms);
+        
+        AACI_TRACE("AACI BUFLEVEL %lu\n",(long unsigned)buflevel);
+        
+        if(buflevel == 0)
+        {
+            // FIFO is empty and therefore cannot be full
+            sr1  &= ~SR_TXFF;
+            sr1  |= SR_TXFE;
+            isr1 |= ISR_TXCINTR;
+            
+            // If the FIFO is empty then it must be less than half full
+            sr1 |= SR_TXHE;
+            isr1 |= ISR_TXINTR;
+        }
+        else
+        {   
+            // FIFO cannot be empty
+            sr1 &= ~SR_TXFE;
+            isr1 &= ~ISR_TXCINTR;
+            
+            if(buflevel >= effectiveDepth)
+            {
+                // FIFO is full
+                sr1 |= SR_TXFF;
+                // ..and not half empty
+                sr1 &= ~SR_TXHE;
+                isr1 &= ~ISR_TXINTR;
+                //dma_tx.request(PL080_REQ_BURST);
+            }
+            else
+            {
+                // Fifo is not full
+                sr1  &= ~SR_TXFF;
+                if(buflevel < effectiveHalfDepth)
+                {
+                    sr1 |= SR_TXHE;
+                    isr1 |= ISR_TXINTR;
+                    //dma_tx.request(PL080_REQ_SINGLE);
+                }
+                else
+                {
+                    sr1 &= ~SR_TXHE;
+                    isr1 &= ~ISR_TXINTR;
+                    //dma_tx.request(PL080_REQ_BURST);
+                }
+            }
+        }
+    }
+    
+    behaviour writeFIFO1(uint32_t data)
+    {
+        if(isStereo)
+        {
+            if(isCompact)
+            {
+                const int16_t sd0 = (int16_t)(data & 0xFFFF);
+                const int16_t sd1 = (int16_t)((data >> 16) & 0xFFFF);
+                
+                switch(txcr1 & TXCR_TSIZE_MASK)
+                {
+                case TXCR_16B:
+                    audioBuf->write(sd0,sd1);
+                    break;
+                case TXCR_12B:
+                    audioBuf->write(sd0 << 4,sd1 << 4);
+                    break;
+                case TXCR_18B:
+                    // Can't be compact if 18 bit
+                    assert(false);
+                    break;
+                case TXCR_20B:
+                    // Can't be compact if 20 bit
+                    assert(false);
+                    break;
+                }
+            }
+            else
+            {
+                int32_t sd0 = (int32_t)data;
+                
+                switch(txcr1 & TXCR_TSIZE_MASK)
+                {
+                case TXCR_12B:
+                    sd0 = sd0 << 4;
+                    break;
+                case TXCR_18B:
+                    sd0 = sd0 >> 2;
+                    break;
+                case TXCR_20B:
+                    sd0 = sd0 >> 4;
+                    break;
+                }
+                
+                if(isWrite)
+                {
+                    audioBuf->write(prevSample,(int16_t)sd0);
+                    isWrite = false;
+                }
+                else
+                {
+                    prevSample = (int16_t)sd0;
+                    isWrite = true;
+                }
+            }
+        }
+        else
+        {
+            if(isCompact)
+            {
+                const int16_t sd0 = (int16_t)(data & 0xFFFF);
+                const int16_t sd1 = (int16_t)((data >> 16) & 0xFFFF);
+                
+                switch(txcr1 & TXCR_TSIZE_MASK)
+                {
+                case TXCR_16B:
+                    audioBuf->write(sd0,sd0);
+                    audioBuf->write(sd1,sd1);
+                    break;
+                case TXCR_12B:
+                    audioBuf->write(sd0 << 4,sd0 << 4);
+                    audioBuf->write(sd1 << 4,sd1 << 4);
+                    break;
+                case TXCR_18B:
+                    // Can't be compact if 18 bit
+                    assert(false);
+                    break;
+                case TXCR_20B:
+                    // Can't be compact if 20 bit
+                    assert(false);
+                    break;
+                }
+            }
+            else
+            {
+                const int32_t sd0 = (int32_t)data;
+                
+                switch(txcr1 & TXCR_TSIZE_MASK)
+                {
+                case TXCR_16B:
+                    audioBuf->write(sd0,sd0);
+                    break;
+                case TXCR_12B:
+                    audioBuf->write(sd0 << 4,sd0 << 4);
+                    break;
+                case TXCR_18B:
+                    audioBuf->write(sd0 >> 2,sd0 >> 2);
+                    break;
+                case TXCR_20B:
+                    audioBuf->write(sd0 >> 4,sd0 >> 4);
+                    break;
+                }
+            }
+        }
+    }
+    
+    // External Behaviours
+    behavior init()
+    {
+        depth               = 512;
+        audioBuf            = NULL;
+        effectiveDepth      = depth/2;
+        effectiveHalfDepth  = depth/4;
+        isWrite             = false;
+        isRunning           = false;
+        irq_signal          = false;        
+        ResetRegisters();
+        composition.init();
+    }
+    
+    behavior terminate()
+    {
+        // Explicitly invoke subcomponent's terminate() behavior.
+        composition.terminate();
+    }
+    
+    behaviour reset(int level)
+    {
+        composition.reset(level);
+        if(audioBuf != NULL)
+        {
+            audio.releasePVAudioBuffer(audioBuf);
+        }
+        audioBuf = audio.getPVAudioBuffer((uint32_t)effectiveDepth);
+        
+        isWrite             = false;
+        isRunning           = false;
+        
+        ResetRegisters();
+        updateControl1();
+    }
+    
+    behaviour   updateControl1()
+    {
+        const bool threeEn  = ((txcr1 & TXCR_TX3) == TXCR_TX3);
+        const bool fourEn   = ((txcr1 & TXCR_TX4) == TXCR_TX4);
+        const bool other    = ((txcr1 & TXCR_TX1) == TXCR_TX1) ||
+        ((txcr1 & TXCR_TX2) == TXCR_TX2) ||
+        ((txcr1 & TXCR_TX1) == TXCR_TX4) ||
+        ((txcr1 & TXCR_TX2) == TXCR_TX5) ||
+        ((txcr1 & TXCR_TX1) == TXCR_TX6) ||
+        ((txcr1 & TXCR_TX2) == TXCR_TX7) ||
+        ((txcr1 & TXCR_TX1) == TXCR_TX9) ||
+        ((txcr1 & TXCR_TX2) == TXCR_TX10) ||
+        ((txcr1 & TXCR_TX1) == TXCR_TX11) ||
+        ((txcr1 & TXCR_TX2) == TXCR_TX12);
+        
+        isStereo    = (threeEn && fourEn);
+        
+        isCompact   = ((txcr1 & TXCR_COMPACT) == TXCR_COMPACT);
+        
+        if(isCompact)
+        {
+            AACI_TRACE("Using: COMPACT FIFO ");
+        }
+        else
+        {
+            AACI_TRACE("Using: NORMAL FIFO ");
+        }
+        
+        isLegal     = (threeEn || fourEn) && !other;
+        
+        // Because the real FIFO halves in depth if you put it into compact
+        // mode but stores double the number of samples the effective depth is
+        // always depth/2. The same is true in mono except this time we can
+        // store double the number of samples.
+        
+        size_t newEffectiveDepth;
+        
+        if(isStereo)
+        {
+            newEffectiveDepth   = depth/2;
+            AACI_TRACE("Stereo\n");
+        }
+        else
+        {
+            newEffectiveDepth   = depth;
+            AACI_TRACE("Mono\n");
+        }
+        
+        if(newEffectiveDepth != effectiveDepth)
+        {
+            effectiveDepth = newEffectiveDepth;
+            effectiveHalfDepth = effectiveDepth/2;
+            
+            AACI_TRACE("Effective: %lu Half: %lu\n",
+                       (unsigned long)effectiveDepth,
+                       (unsigned long)effectiveHalfDepth);
+            
+            audioBuf->changeDepth(effectiveDepth);
+            
+            // Now initialise the time delta to update interrupts on.
+            // 
+            // Assuming that the simulation can keep up with the realtime output as
+            // a first guess when we are playing we want to update often enough
+            // that the buffer does not drain before we can raise and interrupt but
+            // not so often that we get swamped with callbacks or interrupts.
+            //
+            // As a first guess this number is set to the simulated time it would
+            // take to empty the FIFO over 8 but this can be tuned as we are
+            // running.
+            // 
+            // Since the input clock is at 25MHz and the AudioBuffer is being
+            // drained in stereo at 48KHz there are approximately 520 simulated
+            // clock ticks per output stereo sample.
+            // 
+            // So the number of ticks to wait is
+            
+            sampleDelta = uint32_t(effectiveDepth / 64 );
+            tDelta = sampleDelta * 520;
+        }
+    }
+    
+    behaviour registerRead(pv::bus_addr_t device_addr) : uint32_t
+    {               
+        AACI_TRACE("AACI READ %x ",(uint32_t)device_addr);
+        switch(device_addr)
+        {
+        case 0x000: // Control register for receive FIFO1
+            AACI_TRACE("%s %08x\n","RXCR1", rxcr1);
+            return rxcr1;
+        case 0x004: // Control register for transmit FIFO1
+            AACI_TRACE("%s %08x\n","TXCR1",txcr1);
+            return txcr1;
+        case 0x008: // Status register channel 1
+            updateFIFO1(0);
+            AACI_TRACE("%s %08x\n","SR1",sr1);
+            return sr1;            
+        case 0x00c: // Interrupt status channel 1
+            updateFIFO1(0);
+            AACI_TRACE("%s %08x\n","ISR1",(isr1 & ie1));
+            return (isr1 & ie1);
+        case 0x010: // Interrupt enable channel 1
+            AACI_TRACE("%s %08x\n","IE1",ie1);
+            return ie1;
+        case 0x014: // Control register for receive FIFO
+            AACI_TRACE("%s %08x\n","RXCR1",rxcr2);
+            return rxcr2;
+        case 0x018: // Control register for transmit FIFO2
+            AACI_TRACE("%s %08x\n","TXCR2",txcr2);
+            return txcr2;
+        case 0x01c: // Status register channel 2
+            AACI_TRACE("%s %08x\n","SR2",sr2);
+            return sr2;
+        case 0x020: // Interrupt status channel 2
+            AACI_TRACE("%s %08x\n","ISR2",(isr2 & ie2));
+            return (isr2 & ie2);
+        case 0x024: // Interrupt enable channel 2
+            AACI_TRACE("%s %08x\n","IE2",ie2);
+            return ie2;
+        case 0x028: // Control register for receive FIFO3
+            AACI_TRACE("%s %08x\n","RXCR3",rxcr3);
+            return rxcr3;
+        case 0x02c: // Control register for transmit FIFO3
+            AACI_TRACE("%s %08x\n","TXCR3",txcr3);
+            return txcr3;
+        case 0x030:  // Status register channel 3
+            AACI_TRACE("%s %08x\n","SR3",sr3);
+            return sr3;
+        case 0x034: // Interrupt status channel 3
+            AACI_TRACE("%s %08x\n","ISR3",(isr3 & ie3));
+            return (isr3 & ie3);
+        case 0x038: // Interrupt enable channel 3
+            AACI_TRACE("%s %08x\n","IE3",ie3);
+            return ie3;
+        case 0x03c: // Control register for receive FIFO4
+            AACI_TRACE("%s %08x\n","RXCR4",rxcr4);
+            return rxcr4;
+        case 0x040: // Control register for transmit FIFO4
+            AACI_TRACE("%s %08x\n","TXCR4",txcr4);
+            return txcr4;
+        case 0x044: // Status register channel 4
+            AACI_TRACE("%s %08x\n","SR4",sr4);
+            return sr4;
+        case 0x048: // Interrupt status channel 4
+            AACI_TRACE("%s %08x\n","ISR4",(isr4 & ie4));
+            return (isr4 & ie4);
+        case 0x04c: // Interrupt enable channel 4
+            AACI_TRACE("%s %08x\n","IE4",ie4);
+            return ie4;
+        case 0x050: // Data received on slot 1
+            AACI_TRACE("%s %08x\n","SL1RX",sl1rx);
+            return sl1rx;
+        case 0x054: // Data transmited on slot 1
+            AACI_TRACE("%s %08x\n","SL1TX",sl1tx);
+            return sl1tx;
+        case 0x058: // Data received on slot 2
+            AACI_TRACE("%s %08x\n","SL2RX",sl2rx);
+            return (getSlot2rx());
+        case 0x05c: // Data transmited on slot 2
+            AACI_TRACE("%s %08x\n","SL2TX",sl2tx);
+            return sl2tx;
+        case 0x060: // Data received on slot 12
+            AACI_TRACE("%s %08x\n","SL12RX",sl12rx);
+            return sl12rx;
+        case 0x064: // Data transmited on slot 12
+            AACI_TRACE("%s %08x\n","SL12TX",sl12tx);
+            return sl12tx;
+        case 0x068: // Slot flag register
+            AACI_TRACE("%s %08x\n","SLFR",slfr);
+            return slfr;
+        case 0x06c: // Slot interrupt status register
+            AACI_TRACE("%s %08x\n","SLISTAT",(slistat & slien));
+            return (slistat & slien);
+        case 0x070: // Slot interrupt enable register
+            AACI_TRACE("%s %08x\n","SLIEN",slien);
+            return slien;
+        case 0x074: /* Register 0x074 is write only */
+            AACI_TRACE("%s\n","*** READING WRITE ONLY REGISTER ***");
+            return 0;
+        case 0x078: // Main control register
+            AACI_TRACE("%s %08x\n","MAINCR",maincr);
+            return maincr;
+        case 0x07C: // RESET control register
+            AACI_TRACE("%s %08x\n","RESET",rst);
+            return rst;
+        case 0x080: // SYNC control register
+            AACI_TRACE("%s %08x\n","SYNC",sync);
+            return sync;
+        case 0x084: // All FIFO interrupt status register
+            {
+                const uint32_t allints = (((isr4 & ie4) << 21) |
+                    ((isr3 & ie3) << 14) |
+                    ((isr2 & ie2) << 7) |
+                    (isr1 & ie1) );
+                AACI_TRACE("%s %08x\n","ALLINTS",allints);
+                return allints;
+            }
+        case 0x088: // Main flag register
+            AACI_TRACE("%s %08x\n","MAINFR",mainfr);
+            return mainfr;
+            /* As captures is not suported yet DR[1-4] are effectively write only
+            */
+        case 0xfe0: // Peripheral ID register 0
+            AACI_TRACE("%s %08x\n","PERIPHID0",0x041);
+            return 0x041;
+        case 0xfe4: // Peripheral ID register 1
+            AACI_TRACE("%s %08x\n","PERIPHID1",0x010);
+            return 0x010;            
+        case 0xfe8: // Peripheral ID register 2
+            AACI_TRACE("%s %08x\n","PERIPHID2",0x004);
+            return 0x004;
+        case 0xfec: // Peripheral ID register 3
+            AACI_TRACE("%s %08x\n","PERIPHID3",0x000);
+            return 0x000;
+        case 0xff0: // Primecell ID register 0
+            AACI_TRACE("%s %08x\n","PCELLID0",0x00d);
+            return 0x00d;
+        case 0xff4: // Primecell ID register 1
+            AACI_TRACE("%s %08x\n","PCELLID1",0x0f0);
+            return 0x0f0;
+        case 0xff8: // Primecell ID register 2
+            AACI_TRACE("%s %08x\n","PCELLID2",0x005);
+            return 0x005;            
+        case 0xffc: // Primecell ID register 3
+            AACI_TRACE("%s %08x\n","PCELLID3",0x0b1);
+            return 0x0b1;            
+        }
+        
+        AACI_TRACE("%s\n", "*** READING UNSUPPORTED REGISTER ***");
+        return 0;
+    }
+    
+    behaviour registerWrite(pv::bus_addr_t device_addr, uint32_t data)
+    {   
+        AACI_TRACE("AACI WRITE %x ",(uint32_t)device_addr);
+        switch (device_addr)
+        {
+        case 0x000:    
+            rxcr1 = data;
+            AACI_TRACE("%s %08x\n","RXCR1", rxcr1);
+            break ;                       
+        case 0x004:
+            txcr1 = data;
+            AACI_TRACE("%s %08x\n","TXCR1",txcr1);
+            updateControl1();
+            if((txcr1 & TXCR_TXEN) == TXCR_TXEN) {
+                // If we are not already running start
+                if(!isRunning)
+                {
+                    isWrite = false;
+                    if(isLegal)
+                    {
+                        isRunning = true;
+                        audioBuf->start();
+                        timer.timer_control.set(tDelta);
+                    }
+                }
+            } else {
+                // If we are running stop
+                if(isRunning)
+                {
+                    isRunning = false;
+                    timer.timer_control.cancel();
+                    audioBuf->stop();
+                }
+            }
+            updateFIFO1(0);
+            break;            
+        case 0x010:
+            ie1 = data;
+            AACI_TRACE("%s %08x\n","IE1",ie1);
+            updateInterrupts();
+            break;
+            
+        case 0x014:    
+            rxcr2 = data;
+            AACI_TRACE("%s %08x\n","RXCR1",rxcr2);
+            break;                       
+        case 0x018:
+            txcr2 = data;
+            AACI_TRACE("%s %08x\n","TXCR2",txcr2);
+            break;            
+        case 0x024:
+            ie2 = data;
+            AACI_TRACE("%s %08x\n","IE2",ie2);
+            break;
+            
+        case 0x028:    
+            rxcr3 = data;
+            AACI_TRACE("%s %08x\n","RXCR3",rxcr3);
+            break ;                       
+        case 0x02c:
+            txcr3 = data;
+            AACI_TRACE("%s %08x\n","TXCR3",txcr3);
+            break;            
+        case 0x038:
+            ie3 = data;
+            AACI_TRACE("%s %08x\n","IE3",ie3);
+            break;
+            
+        case 0x03c:    
+            rxcr4 = data;
+            AACI_TRACE("%s %08x\n","RXCR4",rxcr4);
+            break ;                       
+        case 0x040:
+            txcr4 = data;
+            AACI_TRACE("%s %08x\n","TXCR4",txcr4);
+            break;            
+        case 0x04c:
+            ie4 = data;
+            AACI_TRACE("%s %08x\n","IE4",ie4);
+            break;            
+            
+        case 0x054:
+            sl1tx = data;
+            AACI_TRACE("%s %08x\n","SL1TX",sl1tx);
+            slot1tx();
+            break;
+        case 0x05C:
+            sl2tx = data;
+            AACI_TRACE("%s %08x\n","SL2TX",sl2tx);
+            break;
+        case 0x064:
+            sl12tx = data;
+            AACI_TRACE("%s %08x\n","SL12TX",sl12tx);
+            break;
+            
+        case 0x068:
+            slfr = data;
+            AACI_TRACE("%s %08x\n","SLFR",slfr);
+            break;   
+        case 0x070:
+            slien = data;
+            AACI_TRACE("%s %08x\n","SLIEN",slien);
+            break;
+        case 0x074:
+            AACI_TRACE("%s %08x\n","ALLINTCLR",data);
+            handleIntClr(data);
+            break;
+        case 0x078:
+            handleMainCR(data);
+            maincr = data;
+            AACI_TRACE("%s %08x\n","MAINCR",maincr);
+            break;   
+            
+        case 0x07C:
+            rst = data;
+            AACI_TRACE("%s %08x\n","RESET",rst);
+            break;   
+        case 0x080:
+            sync = data;
+            AACI_TRACE("%s %08x\n","SYNC",sync);
+            break;   
+            
+        case 0x090:
+        case 0x094:
+        case 0x098:
+        case 0x09C:
+        case 0x0A0:
+        case 0x0A4:
+        case 0x0A8:
+        case 0x0AC:
+            AACI_TRACE("%s %08x\n","DR1",data);
+            writeFIFO1(data);
+            break;
+            
+        case 0x0B0:
+        case 0x0B4:
+        case 0x0B8:
+        case 0x0BC:
+        case 0x0C0:
+        case 0x0C4:
+        case 0x0C8:
+        case 0x0CC:
+            AACI_TRACE("%s %08x\n","DR2",data);
+            break;
+            
+        case 0x0D0:
+        case 0x0D4:
+        case 0x0D8:
+        case 0x0DC:
+        case 0x0E0:
+        case 0x0E4:
+        case 0x0E8:
+        case 0x0EC:
+            AACI_TRACE("%s %08x\n","DR3",data);
+            break;
+            
+        case 0x0F0:
+        case 0x0F4:
+        case 0x0F8:
+        case 0x0FC:
+        case 0x100:
+        case 0x104:
+        case 0x108:
+        case 0x10C:
+            AACI_TRACE("%s %08x\n","DR4",data);
+            break;
+            
+        default:
+            AACI_TRACE("%s\n", "*** WRITING UNSUPPORTED REGISTER ***");
+        }
+    }
+    
+    // debugger support
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+        
+        return ACCESS_FUNC_OK;
+    }
+    
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+        
+        return ACCESS_FUNC_OK;
+    }
+}

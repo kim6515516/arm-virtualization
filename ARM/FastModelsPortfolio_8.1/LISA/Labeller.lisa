@@ -1,0 +1,81 @@
+/*
+ * Copyright 2012 ARM Limited. All rights reserved.
+ */
+//
+// Labeller
+//
+// As FastModels have no direct concept of AXI ID then those components that use
+// AXI ID information have to use a proxy for it.
+//
+// FastModels have a master_id (see PVMemoryAttributes.h) and the top 16 bits of
+// this we use to place a 'label' into it.
+//
+// Those components that need to know an analog of AXI ID should have a
+// configurable mapping from 'label' to its internal representation of AXI ID.
+//
+// When assembling a SoC then the designer has to place a labeller under every
+// component that has to be distinguished and assign it a unique label.
+//
+
+component Labeller
+{
+    properties {
+        version = "8.1.37";
+    }
+
+    // ----------------------------------------------------------------------
+    //                         Public Ports
+    // ----------------------------------------------------------------------
+
+    slave  port<PVBus>          pvbus_s;
+    master port<PVBus>          pvbus_m;
+
+    // ----------------------------------------------------------------------
+    //                    Configuration parameters
+    // ----------------------------------------------------------------------
+    //
+    // Typically the bottom two bits of the master id are the core number within
+    // a cluster if they are 
+
+    resources {
+        PARAMETER {
+            default(0),
+            description( "The label to apply to all transactions flowing through the labeller" ),
+            min(0),
+            max(0xFFFF),
+            type(uint16_t),
+            runtime(false)
+        } label;
+    }
+
+    // ----------------------------------------------------------------------
+    //                         Implementation
+    // ----------------------------------------------------------------------
+
+    includes {
+#include "pv/TransactionAttributes.h"
+#include "pv/RemapRequest.h"
+    }
+    
+    composition {
+    pvbusmapper : PVBusMapper();
+    }
+
+    internal port<PVBusMapperControl> control {
+        
+        slave behavior remap(
+            pv::RemapRequest& req_
+            ) : unsigned
+        {
+            pv::TransactionAttributes* attr = req_.getModifiableTransactionAttributes();
+            attr->setMasterID((attr->getMasterID() & 0xFFFF) | (label << 16));
+            return 0;
+        }
+    }
+
+    connection {
+        self.pvbus_s           => pvbusmapper.pvbus_s;
+        pvbusmapper.control    => self.control;
+        pvbusmapper.pvbus_m[0] => self.pvbus_m;
+    }
+}

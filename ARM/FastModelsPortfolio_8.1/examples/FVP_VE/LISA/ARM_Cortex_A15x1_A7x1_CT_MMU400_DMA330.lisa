@@ -1,0 +1,770 @@
+/*
+ * Copyright 2011 ARM Limited. All rights reserved.
+ */
+
+component ARM_Cortex_A15x1_A7x1_CT_MMU400_DMA330
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Dual cluster ARM Cortex-A15x1 and ARM Cortex-A7x1 Core Tile";
+    }
+    composition
+    {
+        mmu400_dma330 : MMU400_DMA330();
+        // **********************************************************************
+        // NOTE construction order is _VERY_ important
+        //
+        // dualclustersystemconfigurationblock drives values at reset into the clusters
+        // that _must_ be read at reset.  This means that it must be reset _before_ the
+        // clusters.
+        //
+        // **********************************************************************
+        dualclustersystemconfigurationblock : DualClusterSystemConfigurationBlock(
+            "DCSCB_PERIPHBASE".default=0x2C000000,
+            "NumberOfCoresInCluster0"=1,
+            "NumberOfCoresInCluster1"=1
+            );
+
+        // After dualclustersystemconfigurationblock
+        cluster0 : ARMCortexA15x1CT(
+            "internal_vgic"=0,
+            "l1_icache-state_modelled"=cache_state_modelled,
+            "l1_dcache-state_modelled"=cache_state_modelled,
+            "l2_cache-state_modelled"=cache_state_modelled
+            );
+
+        // After dualclustersystemconfigurationblock
+        cluster1 : ARMCortexA7x1CT(
+            "internal_vgic"=0,
+            "l1_icache-state_modelled"=cache_state_modelled,
+            "l1_dcache-state_modelled"=cache_state_modelled,
+            "l2_cache-state_modelled"=cache_state_modelled
+            );
+        v7_vgic  : v7_VGIC("number-of-ints"=224,"number-of-cores"=2);
+        cci400 : CCI400(
+            "cache_state_modelled"=cache_state_modelled,
+            "acchannelen"=0x1F /* Only ports 4 and 3 are enabled */
+            );
+        clockdivider1 : ClockDivider();
+        clockdivider : ClockDivider("mul"=1,"div"=1);
+        pvbusdecoder : PVBusMapper();
+
+    globalcounter: MemoryMappedCounterModule("non_arch_start_at_default"=true);
+    }
+
+    resources
+    {
+        PARAMETER {
+            name("cache_state_modelled"),
+                description("Model the cache state."),
+                type(bool),
+        default(false)
+                } cache_state_modelled;
+
+        PARAMETER {
+            description("The physical base address of the set of DMA-330's register file"),
+                type(uint64_t)
+                } dmac_base_addr;
+        PARAMETER {
+            description("The base SPI number for the first dmac0 interrupt.  This maps to interrupt id SPI number + 32."),
+                type(unsigned), min(0), max(192)
+                } dmac0_int_base;
+        PARAMETER {
+            description("The base SPI number for the first dmac1 interrupt.  This maps to interrupt id SPI number + 32."),
+                type(unsigned), min(0), max(192)
+                } dmac1_int_base;
+        PARAMETER {
+            description("The base SPI number for the first dmac2 interrupt.  This maps to interrupt id SPI number + 32."),
+                type(unsigned), min(0), max(192)
+                } dmac2_int_base;
+        PARAMETER {
+            description("The base SPI number for the first dmac3 interrupt.  This maps to interrupt id SPI number + 32."),
+                type(unsigned), min(0), max(192)
+                } dmac3_int_base;
+
+        PARAMETER {
+            description("The base SPI number for the master abort interrupt from the DMACs.  These are allocated consecutively from this number.  The actual interrupt number is the SPI number + 32."),
+                type(unsigned), min(0), max(220)
+                } master_dmac_int_base;
+
+        PARAMETER {
+            description("The base address of the MMU-400 register file"),
+            type(uint64_t)
+        } smmu_base_addr;
+
+        PARAMETER {
+            description("The SPI number for cfg_flt_irpt_s (Configuration Fault Interrupt for Secure).  The actual interrupt number is the SPI number + 32."),
+                type(int), min(-1), max(223), default(-1)
+                } int_cfg_flt_irpt_s;
+        PARAMETER {
+            description("The SPI number for cfg_flt_irpt_ns (Configuration Fault Interrupt for Non-Secure).  The actual interrupt number is the SPI number + 32."),
+                type(int), min(-1), max(223), default(-1)
+                } int_cfg_flt_irpt_ns;
+        PARAMETER {
+            description("The SPI number for glbl_flt_irpt_s (Global Fault Interrupt for Secure).  The actual interrupt number is the SPI number + 32."),
+                type(int), min(-1), max(223), default(-1)
+                } int_glbl_flt_irpt_s;
+        PARAMETER {
+            description("The SPI number for glbl_flt_irpt_ns (Global Fault Interrupt for Non-Secure).  The actual interrupt number is the SPI number + 32."),
+                type(int), min(-1), max(223), default(-1)
+                } int_glbl_flt_irpt_ns;
+        PARAMETER {
+            description("The SPI number cxt_irpt_ns (Context Fault Interrupt -- all contexts are Non-Secure).  The actual interrupt number is the SPI number + 32."),
+                type(int), min(-1), max(223), default(-1)
+                } int_cxt_irpt_ns;
+
+        struct r_t {
+            r_t(std::string name_, std::pair<uint64_t, uint64_t> range_)
+                : name(name_), range(range_) {}
+            std::string name;
+            std::pair<uint64_t, uint64_t> range;
+        };
+
+        uint64_t periphbase_value;
+    }
+
+    //
+    // The legacy IRQ/FIQ signals should be bound to these internal node, from
+    // which it fans out to the PPI ports and the legacy IRQ/FIQ inputs to the
+    // VGIC.
+    //
+    internal port<Signal> vgic_legacy_irq[/*VGIC_MAX_CORES*/ 8];
+    internal port<Signal> vgic_legacy_fiq[/*VGIC_MAX_CORES*/ 8];
+
+    //
+    // All SPI (Shared Peripheral Interrupts) pins first go here, we then fan
+    // them out to the external VGIC or the cores themselves so that we only
+    // have to get the wiring right here.
+    //
+    internal port<Signal> spis[224];
+
+    //
+    // All SPI (Shared Peripheral Interrupts) pins first go here, we then fan
+    // them out to the external VGIC or the cores themselves so that we only
+    // have to get the wiring right here.
+    //
+    internal port<Signal> interrupts_from_dmac0[32] {
+        behavior setValue(unsigned index_, sg::Signal::State t_) {
+            irqs[dmac0_int_base + index_].setValue(t_);
+        }
+    }
+    internal port<Signal> interrupts_from_dmac1[32] {
+        behavior setValue(unsigned index_, sg::Signal::State t_) {
+            irqs[dmac1_int_base + index_].setValue(t_);
+        }
+    }
+    internal port<Signal> interrupts_from_dmac2[32] {
+        behavior setValue(unsigned index_, sg::Signal::State t_) {
+            irqs[dmac2_int_base + index_].setValue(t_);
+        }
+    }
+    internal port<Signal> interrupts_from_dmac3[32] {
+        behavior setValue(unsigned index_, sg::Signal::State t_) {
+            irqs[dmac3_int_base + index_].setValue(t_);
+        }
+    }
+    
+    internal port<Signal> master_interrupts_from_dmacs[/*number_of_dmacs*/4] {
+        behavior setValue(unsigned index_, sg::Signal::State t_) {
+            irqs[master_dmac_int_base + index_].setValue(t_);
+        }
+    }
+
+    internal port<Signal> interrupt_cfg_flt_irpt_s {
+        behavior setValue(sg::Signal::State t_) {
+            if (int_cfg_flt_irpt_s != -1)
+                irqs[int_cfg_flt_irpt_s].setValue(t_);
+        }
+    }
+    
+    internal port<Signal> interrupt_cfg_flt_irpt_ns {
+        behavior setValue(sg::Signal::State t_) {
+            if (int_cfg_flt_irpt_ns != -1)
+                irqs[int_cfg_flt_irpt_ns].setValue(t_);
+        }
+    }
+    
+    internal port<Signal> interrupt_glbl_flt_irpt_s {
+        behavior setValue(sg::Signal::State t_) {
+            if (int_glbl_flt_irpt_s != -1)
+                irqs[int_glbl_flt_irpt_s].setValue(t_);
+        }
+    }
+    
+    internal port<Signal> interrupt_glbl_flt_irpt_ns {
+        behavior setValue(sg::Signal::State t_) {
+            if (int_glbl_flt_irpt_ns != -1)
+                irqs[int_glbl_flt_irpt_ns].setValue(t_);
+        }
+    }
+
+    internal port<Signal> interrupt_cxt_irpt_ns {
+        behavior setValue(sg::Signal::State t_) {
+            if (int_cxt_irpt_ns != -1)
+                irqs[int_cxt_irpt_ns].setValue(t_);
+        }
+    }
+
+    //
+    // The reset for cluster0 and cluster1 is also wired to the CCI model so that
+    // it can perform linting operations.
+    //
+    internal port<Signal> cluster0_l2reset;
+    internal port<Signal> cluster1_l2reset;
+
+    internal slave port<Value_64> periphbase_port {
+        behavior setValue(uint64_t value)
+        {
+            periphbase_value = value;
+            control.allBusMapChanging();
+        }
+    }
+
+    internal port<PVBusMapperControl> control {
+        slave behavior remap(
+            pv::RemapRequest& req_
+            ) : unsigned
+        {
+            pv::bus_addr_t const addr = req_.getPageBase();
+
+            unsigned const size_of_dmac    = 0x1000;
+            unsigned const number_of_dmacs = 4; // dmac0..dmac3
+
+            if (dmac_base_addr <= addr && addr <= dmac_base_addr + size_of_dmac * number_of_dmacs - 1)
+            {
+                unsigned const dmac_n = (addr - dmac_base_addr) / size_of_dmac;
+                bool const     ns     = req_.getModifiableTransactionAttributes()->isNormalWorld();
+
+                req_.setRemapPageBase( addr & (size_of_dmac - 1) );
+                // 16 dmac0 secure
+                // 17 dmac0 non-secure
+                // ...
+                return 16 + (dmac_n * 2) + unsigned(ns);
+            }
+
+            unsigned const size_of_smmu = 0x10000;
+            if (smmu_base_addr <= addr && addr <= smmu_base_addr + size_of_smmu)
+            {
+                req_.setRemapPageBase( addr & (size_of_smmu - 1) );
+                return 3;
+            }
+
+            // NOTE that the DCSCB is _not_ based off PERIPHBASE
+            if ((0x60000000 <= addr && addr <= 0x60000fff)
+                || // Legacy alias to support pre RS1 memory map
+                (0x10020000 <= addr && addr <= 0x10020fff))
+                return 1;
+
+            // PERIPHBASE + 0x1000
+            if (periphbase_value + 0x1000 <= addr && addr <= periphbase_value + 0x7fff)
+            {
+                // remapped to 0x1000..0x7fff
+                req_.setRemapPageBase( addr & 0x7fff );
+                return 2;
+            }
+
+            // Otherwise go downstream
+            return 0;
+        }
+    }
+
+    behavior intersects(std::pair<uint64_t,uint64_t> range0_,
+                         std::pair<uint64_t,uint64_t> range1_) : bool
+    {
+        return range0_.second >= range1_.first && range0_.first <= range1_.second;
+    }
+
+    includes {
+#include <utility>
+#include <vector>
+    }
+
+    behavior init()
+    {
+        // Check the parameters
+
+        std::vector< r_t > r;
+        
+        r.push_back( r_t("dmac_base_addr" , std::make_pair( dmac_base_addr, dmac_base_addr + 0x1000 - 1  )) );
+        r.push_back( r_t("smmu_base_addr" , std::make_pair( smmu_base_addr, smmu_base_addr + 0x10000 - 1 )) );
+        r.push_back( r_t("dcscb_range1"   , std::make_pair( 0x60000000, 0x60000fff ))                       );
+        r.push_back( r_t("dcscb_range2"   , std::make_pair( 0x10020000, 0x10020fff ))                       );
+        r.push_back( r_t("cci_range"      , std::make_pair( 0x2c001000, 0x2c007fff ))                       );
+
+        std::ostringstream error;
+        for (unsigned i = 0; i != r.size() - 1; ++ i)
+        {
+            for (unsigned j = i + 1; j != r.size(); ++ j)
+            {
+                assert( j < r.size() );
+                assert( i < j        );
+                if (intersects(r.at(i).range, r.at(j).range))
+                {
+                    error << "*** ERROR *** : Configured range : " << r.at(i).name << " [" << std::hex << r.at(i).range.first << ", " << r.at(i).range.second << "]\n"
+                              << "                intersects       : " << r.at(j).name << " [" << std::hex << r.at(j).range.first << ", " << r.at(j).range.second << "]\n";
+                }
+            }
+        }
+
+        if (!error.str().empty())
+            message(error.str(), MSG_FATAL_ERROR);
+
+        // Carry on instantiating.
+        composition.init();
+    }        
+
+    connection
+    {
+        cluster0.ticks => self.cluster0_ticks;
+        cluster1.ticks => self.cluster1_ticks;
+
+        self.irqs => self.spis;
+        self.spis => cluster0.irqs;
+        self.spis => cluster1.irqs;
+
+        cluster0.event => cluster1.event;
+
+//
+// Bus connections
+//
+        // Cortex-A15 is 'Cluster0' and is connected to port3 on the CCI
+        cluster0.pvbus_m0 => cci400.pvbus_s_ace_3;
+        self.cluster0_l2reset => cci400.lint_ace_3_reset_state;
+        // Cortex-A7 is 'Cluster1' and is connected to port4 on the CCI
+        cluster1.pvbus_m0 => cci400.pvbus_s_ace_4;
+        self.cluster1_l2reset => cci400.lint_ace_4_reset_state;
+
+        self.cluster0_l2reset => cluster0.l2reset;
+        self.cluster1_l2reset => cluster1.l2reset;
+
+
+        mmu400_dma330.pvbus_m                    => cci400.pvbus_s_ace_lite_plus_dvm_0;
+        
+        mmu400_dma330.interrupt_glbl_flt_irpt_s  => self.interrupt_glbl_flt_irpt_s;
+        mmu400_dma330.interrupt_glbl_flt_irpt_ns => self.interrupt_glbl_flt_irpt_ns;
+        mmu400_dma330.interrupt_cxt_irpt_ns      => self.interrupt_cxt_irpt_ns;
+        mmu400_dma330.interrupt_cfg_flt_irpt_s   => self.interrupt_cfg_flt_irpt_s;
+        mmu400_dma330.interrupt_cfg_flt_irpt_ns  => self.interrupt_cfg_flt_irpt_ns;
+        // The cci400.pvbus_s_ace_lite_plus_dvm_(2|1) are not connected
+        // at the moment to anything.
+        
+        cci400.pvbus_m => pvbusdecoder.pvbus_s;
+        pvbusdecoder.control    => self.control;
+        pvbusdecoder.pvbus_m[0] => self.pvbus_m;
+        pvbusdecoder.pvbus_m[1] => dualclustersystemconfigurationblock.pvbus;
+        pvbusdecoder.pvbus_m[2] => v7_vgic.pvbus_s;
+        pvbusdecoder.pvbus_m[3] => mmu400_dma330.mmu_apb4_control;
+
+        pvbusdecoder.pvbus_m[16] => mmu400_dma330.dmac0_pvbus_s;
+        pvbusdecoder.pvbus_m[17] => mmu400_dma330.dmac0_pvbus_s_ns;
+        pvbusdecoder.pvbus_m[18] => mmu400_dma330.dmac1_pvbus_s;
+        pvbusdecoder.pvbus_m[19] => mmu400_dma330.dmac1_pvbus_s_ns;
+        pvbusdecoder.pvbus_m[20] => mmu400_dma330.dmac2_pvbus_s;
+        pvbusdecoder.pvbus_m[21] => mmu400_dma330.dmac2_pvbus_s_ns;
+        pvbusdecoder.pvbus_m[22] => mmu400_dma330.dmac3_pvbus_s;
+        pvbusdecoder.pvbus_m[23] => mmu400_dma330.dmac3_pvbus_s_ns;
+
+        mmu400_dma330.interrupts_from_dmac0 => self.interrupts_from_dmac0;
+        mmu400_dma330.interrupts_from_dmac1 => self.interrupts_from_dmac1;
+        mmu400_dma330.interrupts_from_dmac2 => self.interrupts_from_dmac2;
+        mmu400_dma330.interrupts_from_dmac3 => self.interrupts_from_dmac3;
+
+        mmu400_dma330.master_interrupts_from_dmacs[0] => self.master_interrupts_from_dmacs[0];
+        mmu400_dma330.master_interrupts_from_dmacs[1] => self.master_interrupts_from_dmacs[1];
+        mmu400_dma330.master_interrupts_from_dmacs[2] => self.master_interrupts_from_dmacs[2];
+        mmu400_dma330.master_interrupts_from_dmacs[3] => self.master_interrupts_from_dmacs[3];
+//
+// Clock connections
+//
+        self.clk_in => cluster0.clk_in;
+        self.clk_in => clockdivider.clk_in;
+        self.clk_in => globalcounter.clk_in;
+        self.clk_in => mmu400_dma330.clk_in;
+        clockdivider.clk_out => cluster1.clk_in;
+//!!        periph_clockdivider.clk_out => cluster0.periphclk_in;
+//!!        periph_clockdivider.clk_out => cluster1.periphclk_in;
+        clockdivider1.clk_out => dualclustersystemconfigurationblock.clk_in;
+
+
+//
+// Dual Cluster System Configuration connections
+//
+        dualclustersystemconfigurationblock.periphbase => cci400.periphbase;
+        dualclustersystemconfigurationblock.periphbase => self.periphbase_port;
+
+        dualclustersystemconfigurationblock.cluster0_clusterid => cluster0.clusterid;
+        dualclustersystemconfigurationblock.cluster0_cfgend[0] => cluster0.cfgend[0];
+        dualclustersystemconfigurationblock.cluster0_cfgend[1] => cluster0.cfgend[1];
+        dualclustersystemconfigurationblock.cluster0_cfgend[2] => cluster0.cfgend[2];
+        dualclustersystemconfigurationblock.cluster0_cfgend[3] => cluster0.cfgend[3];
+        dualclustersystemconfigurationblock.cluster0_corereset[0] => cluster0.reset[0];
+        dualclustersystemconfigurationblock.cluster0_corereset[1] => cluster0.reset[1];
+        dualclustersystemconfigurationblock.cluster0_corereset[2] => cluster0.reset[2];
+        dualclustersystemconfigurationblock.cluster0_corereset[3] => cluster0.reset[3];
+        dualclustersystemconfigurationblock.cluster0_cpuporeset[0] => cluster0.cpuporeset[0];
+        dualclustersystemconfigurationblock.cluster0_cpuporeset[1] => cluster0.cpuporeset[1];
+        dualclustersystemconfigurationblock.cluster0_cpuporeset[2] => cluster0.cpuporeset[2];
+        dualclustersystemconfigurationblock.cluster0_cpuporeset[3] => cluster0.cpuporeset[3];
+        dualclustersystemconfigurationblock.cluster0_cpuporeset[0] => cluster0.presetdbg;
+//!!        dualclustersystemconfigurationblock.cluster0_cpuporeset[1] => cluster0.presetdbg[1];
+//!!        dualclustersystemconfigurationblock.cluster0_cpuporeset[2] => cluster0.presetdbg[2];
+//!!        dualclustersystemconfigurationblock.cluster0_cpuporeset[3] => cluster0.presetdbg[3];
+        dualclustersystemconfigurationblock.cluster0_cfgte[0] => cluster0.teinit[0];
+        dualclustersystemconfigurationblock.cluster0_cfgte[1] => cluster0.teinit[1];
+        dualclustersystemconfigurationblock.cluster0_cfgte[2] => cluster0.teinit[2];
+        dualclustersystemconfigurationblock.cluster0_cfgte[3] => cluster0.teinit[3];
+        dualclustersystemconfigurationblock.cluster0_l2reset => self.cluster0_l2reset;
+//!!        dualclustersystemconfigurationblock.cluster0_l2reset => cluster0.periphreset;
+//!!        dualclustersystemconfigurationblock.cluster0_l2reset => cluster0.wdreset[0];
+//!!        dualclustersystemconfigurationblock.cluster0_l2reset => cluster0.wdreset[1];
+//!!        dualclustersystemconfigurationblock.cluster0_l2reset => cluster0.wdreset[2];
+//!!        dualclustersystemconfigurationblock.cluster0_l2reset => cluster0.wdreset[3];
+//!!        dualclustersystemconfigurationblock.system_reset => cluster0.sysporeset;
+
+        dualclustersystemconfigurationblock.system_reset => mmu400_dma330.reset_in;
+
+        dualclustersystemconfigurationblock.cluster0_vinithi[0] => cluster0.vinithi[0];
+        dualclustersystemconfigurationblock.cluster0_vinithi[1] => cluster0.vinithi[1];
+        dualclustersystemconfigurationblock.cluster0_vinithi[2] => cluster0.vinithi[2];
+        dualclustersystemconfigurationblock.cluster0_vinithi[3] => cluster0.vinithi[3];
+        dualclustersystemconfigurationblock.periphbase => cluster0.periphbase;
+
+        cluster0.standbywfi[0] => dualclustersystemconfigurationblock.cluster0_standbywfi[0];
+        cluster0.standbywfi[1] => dualclustersystemconfigurationblock.cluster0_standbywfi[1];
+        cluster0.standbywfi[2] => dualclustersystemconfigurationblock.cluster0_standbywfi[2];
+        cluster0.standbywfi[3] => dualclustersystemconfigurationblock.cluster0_standbywfi[3];
+
+
+        dualclustersystemconfigurationblock.cluster1_clusterid => cluster1.clusterid;
+        dualclustersystemconfigurationblock.cluster1_cfgend[0] => cluster1.cfgend[0];
+        dualclustersystemconfigurationblock.cluster1_cfgend[1] => cluster1.cfgend[1];
+        dualclustersystemconfigurationblock.cluster1_cfgend[2] => cluster1.cfgend[2];
+        dualclustersystemconfigurationblock.cluster1_cfgend[3] => cluster1.cfgend[3];
+        dualclustersystemconfigurationblock.cluster1_corereset[0] => cluster1.reset[0];
+        dualclustersystemconfigurationblock.cluster1_corereset[1] => cluster1.reset[1];
+        dualclustersystemconfigurationblock.cluster1_corereset[2] => cluster1.reset[2];
+        dualclustersystemconfigurationblock.cluster1_corereset[3] => cluster1.reset[3];
+        dualclustersystemconfigurationblock.cluster1_cpuporeset[0] => cluster1.cpuporeset[0];
+        dualclustersystemconfigurationblock.cluster1_cpuporeset[1] => cluster1.cpuporeset[1];
+        dualclustersystemconfigurationblock.cluster1_cpuporeset[2] => cluster1.cpuporeset[2];
+        dualclustersystemconfigurationblock.cluster1_cpuporeset[3] => cluster1.cpuporeset[3];
+        dualclustersystemconfigurationblock.cluster1_cpuporeset[0] => cluster1.presetdbg;
+//!!        dualclustersystemconfigurationblock.cluster1_cpuporeset[1] => cluster1.presetdbg[1];
+//!!        dualclustersystemconfigurationblock.cluster1_cpuporeset[2] => cluster1.presetdbg[2];
+//!!        dualclustersystemconfigurationblock.cluster1_cpuporeset[3] => cluster1.presetdbg[3];
+        dualclustersystemconfigurationblock.cluster1_teinit[0] => cluster1.teinit[0];
+        dualclustersystemconfigurationblock.cluster1_teinit[1] => cluster1.teinit[1];
+        dualclustersystemconfigurationblock.cluster1_teinit[2] => cluster1.teinit[2];
+        dualclustersystemconfigurationblock.cluster1_teinit[3] => cluster1.teinit[3];
+        dualclustersystemconfigurationblock.cluster1_scureset => self.cluster1_l2reset;
+//!!        dualclustersystemconfigurationblock.cluster1_scureset => cluster1.periphreset;
+//!!        dualclustersystemconfigurationblock.cluster1_scureset => cluster1.wdreset[0];
+//!!        dualclustersystemconfigurationblock.cluster1_scureset => cluster1.wdreset[1];
+//!!        dualclustersystemconfigurationblock.cluster1_scureset => cluster1.wdreset[2];
+//!!        dualclustersystemconfigurationblock.cluster1_scureset => cluster1.wdreset[3];
+//!!        dualclustersystemconfigurationblock.system_reset => cluster1.sysporeset;
+        dualclustersystemconfigurationblock.cluster1_vinithi[0] => cluster1.vinithi[0];
+        dualclustersystemconfigurationblock.cluster1_vinithi[1] => cluster1.vinithi[1];
+        dualclustersystemconfigurationblock.cluster1_vinithi[2] => cluster1.vinithi[2];
+        dualclustersystemconfigurationblock.cluster1_vinithi[3] => cluster1.vinithi[3];
+        dualclustersystemconfigurationblock.periphbase => cluster1.periphbase;
+
+        cluster1.standbywfi[0] => dualclustersystemconfigurationblock.cluster1_standbywfi[0];
+        cluster1.standbywfi[1] => dualclustersystemconfigurationblock.cluster1_standbywfi[1];
+        cluster1.standbywfi[2] => dualclustersystemconfigurationblock.cluster1_standbywfi[2];
+        cluster1.standbywfi[3] => dualclustersystemconfigurationblock.cluster1_standbywfi[3];
+
+        dualclustersystemconfigurationblock.vgic_configuration_port => v7_vgic.configuration;
+
+        self.user_switches => dualclustersystemconfigurationblock.daughter_user_switches;
+        dualclustersystemconfigurationblock.daughter_leds_state => self.leds;
+
+    // v7_VGIC Connections
+    //
+    // NOTE that it is up to us to wire this correctly, the VGIC won't do it for us.
+    //
+
+    //
+    // Outputs of the (V)IRQ/(V)FIQ pins that go to the cores
+    //
+    v7_vgic.irq_out[0] => cluster0.irq[0];
+    v7_vgic.irq_out[1] => cluster0.irq[1];
+    v7_vgic.irq_out[2] => cluster0.irq[2];
+    v7_vgic.irq_out[3] => cluster0.irq[3];
+    v7_vgic.irq_out[4] => cluster1.irq[0];
+    v7_vgic.irq_out[5] => cluster1.irq[1];
+    v7_vgic.irq_out[6] => cluster1.irq[2];
+    v7_vgic.irq_out[7] => cluster1.irq[3];
+
+    v7_vgic.fiq_out[0] => cluster0.fiq[0];
+    v7_vgic.fiq_out[1] => cluster0.fiq[1];
+    v7_vgic.fiq_out[2] => cluster0.fiq[2];
+    v7_vgic.fiq_out[3] => cluster0.fiq[3];
+    v7_vgic.fiq_out[4] => cluster1.fiq[0];
+    v7_vgic.fiq_out[5] => cluster1.fiq[1];
+    v7_vgic.fiq_out[6] => cluster1.fiq[2];
+    v7_vgic.fiq_out[7] => cluster1.fiq[3];
+
+    v7_vgic.virq_out[0] => cluster0.virq[0];
+    v7_vgic.virq_out[1] => cluster0.virq[1];
+    v7_vgic.virq_out[2] => cluster0.virq[2];
+    v7_vgic.virq_out[3] => cluster0.virq[3];
+    v7_vgic.virq_out[4] => cluster1.virq[0];
+    v7_vgic.virq_out[5] => cluster1.virq[1];
+    v7_vgic.virq_out[6] => cluster1.virq[2];
+    v7_vgic.virq_out[7] => cluster1.virq[3];
+
+    v7_vgic.vfiq_out[0] => cluster0.vfiq[0];
+    v7_vgic.vfiq_out[1] => cluster0.vfiq[1];
+    v7_vgic.vfiq_out[2] => cluster0.vfiq[2];
+    v7_vgic.vfiq_out[3] => cluster0.vfiq[3];
+    v7_vgic.vfiq_out[4] => cluster1.vfiq[0];
+    v7_vgic.vfiq_out[5] => cluster1.vfiq[1];
+    v7_vgic.vfiq_out[6] => cluster1.vfiq[2];
+    v7_vgic.vfiq_out[7] => cluster1.vfiq[3];
+
+    //
+    // Legacy IRQ/FIQ inputs are wired to the legacy inputs of the VGIC
+    // and also to a PPI.  NOTE with care the PPI numbers, see
+    // <201009021657/>.
+    //
+    // We wire up the legacy IRQ to ID31 and the legacy FIQ to ID28.
+    //
+
+    self.vgic_legacy_irq => v7_vgic.irq_in; // array-to-array connection
+    self.vgic_legacy_fiq => v7_vgic.fiq_in; // array-to-array connection
+
+    self.vgic_legacy_irq[0] => v7_vgic.ppi_core0[15]; // ID31
+    self.vgic_legacy_irq[1] => v7_vgic.ppi_core1[15]; // ID31
+    self.vgic_legacy_irq[2] => v7_vgic.ppi_core2[15]; // ID31
+    self.vgic_legacy_irq[3] => v7_vgic.ppi_core3[15]; // ID31
+    self.vgic_legacy_irq[4] => v7_vgic.ppi_core4[15]; // ID31
+    self.vgic_legacy_irq[5] => v7_vgic.ppi_core5[15]; // ID31
+    self.vgic_legacy_irq[6] => v7_vgic.ppi_core6[15]; // ID31
+    self.vgic_legacy_irq[7] => v7_vgic.ppi_core7[15]; // ID31
+
+    self.vgic_legacy_fiq[0] => v7_vgic.ppi_core0[12]; // ID28
+    self.vgic_legacy_fiq[1] => v7_vgic.ppi_core1[12]; // ID28
+    self.vgic_legacy_fiq[2] => v7_vgic.ppi_core2[12]; // ID28
+    self.vgic_legacy_fiq[3] => v7_vgic.ppi_core3[12]; // ID28
+    self.vgic_legacy_fiq[4] => v7_vgic.ppi_core4[12]; // ID28
+    self.vgic_legacy_fiq[5] => v7_vgic.ppi_core5[12]; // ID28
+    self.vgic_legacy_fiq[6] => v7_vgic.ppi_core6[12]; // ID28
+    self.vgic_legacy_fiq[7] => v7_vgic.ppi_core7[12]; // ID28
+
+
+    //
+    // Outputs of the cores _to_ the VGIC
+    //
+    // Connect the Private Peripheral Interrupts that have been exported
+    // from the core to the PPI interface here.
+    //
+    // <201009021657>
+    // NOTE that the PPI ports
+    // are numbered 0..15 however, this corresponds to interrupt IDs 16..31
+    // and that the TRMs for cores label PPIs as PPI0..N however, these
+    // do _not_ map onto IDs 16..31 in any sensible manner.
+    // </201009021657>
+    //
+
+    cluster0.CNTPNSIRQ[0] => v7_vgic.ppi_core0[14]; // ID30
+    cluster0.CNTPSIRQ[0]  => v7_vgic.ppi_core0[13]; // ID29
+    cluster0.CNTVIRQ[0]   => v7_vgic.ppi_core0[11]; // ID27
+    cluster0.CNTHPIRQ[0]  => v7_vgic.ppi_core0[10]; // ID26
+
+    cluster0.CNTPNSIRQ[1] => v7_vgic.ppi_core1[14]; // ID30
+    cluster0.CNTPSIRQ[1]  => v7_vgic.ppi_core1[13]; // ID29
+    cluster0.CNTVIRQ[1]   => v7_vgic.ppi_core1[11]; // ID27
+    cluster0.CNTHPIRQ[1]  => v7_vgic.ppi_core1[10]; // ID26
+
+    cluster0.CNTPNSIRQ[2] => v7_vgic.ppi_core2[14]; // ID30
+    cluster0.CNTPSIRQ[2]  => v7_vgic.ppi_core2[13]; // ID29
+    cluster0.CNTVIRQ[2]   => v7_vgic.ppi_core2[11]; // ID27
+    cluster0.CNTHPIRQ[2]  => v7_vgic.ppi_core2[10]; // ID26
+
+    cluster0.CNTPNSIRQ[3] => v7_vgic.ppi_core3[14]; // ID30
+    cluster0.CNTPSIRQ[3]  => v7_vgic.ppi_core3[13]; // ID29
+    cluster0.CNTVIRQ[3]   => v7_vgic.ppi_core3[11]; // ID27
+    cluster0.CNTHPIRQ[3]  => v7_vgic.ppi_core3[10]; // ID26
+
+    cluster1.CNTPNSIRQ[0] => v7_vgic.ppi_core4[14]; // ID30
+    cluster1.CNTPSIRQ[0]  => v7_vgic.ppi_core4[13]; // ID29
+    cluster1.CNTVIRQ[0]   => v7_vgic.ppi_core4[11]; // ID27
+    cluster1.CNTHPIRQ[0]  => v7_vgic.ppi_core4[10]; // ID26
+
+    cluster1.CNTPNSIRQ[1] => v7_vgic.ppi_core5[14]; // ID30
+    cluster1.CNTPSIRQ[1]  => v7_vgic.ppi_core5[13]; // ID29
+    cluster1.CNTVIRQ[1]   => v7_vgic.ppi_core5[11]; // ID27
+    cluster1.CNTHPIRQ[1]  => v7_vgic.ppi_core5[10]; // ID26
+
+    cluster1.CNTPNSIRQ[2] => v7_vgic.ppi_core6[14]; // ID30
+    cluster1.CNTPSIRQ[2]  => v7_vgic.ppi_core6[13]; // ID29
+    cluster1.CNTVIRQ[2]   => v7_vgic.ppi_core6[11]; // ID27
+    cluster1.CNTHPIRQ[2]  => v7_vgic.ppi_core6[10]; // ID26
+
+    cluster1.CNTPNSIRQ[3] => v7_vgic.ppi_core7[14]; // ID30
+    cluster1.CNTPSIRQ[3]  => v7_vgic.ppi_core7[13]; // ID29
+    cluster1.CNTVIRQ[3]   => v7_vgic.ppi_core7[11]; // ID27
+    cluster1.CNTHPIRQ[3]  => v7_vgic.ppi_core7[10]; // ID26
+
+    //
+    // ... and finally connect up the interrupt from the base-board to
+    // the VGIC.
+    //
+    self.spis => v7_vgic.spi;
+
+
+    //
+    // But the Dual Cluster System Configuration Block also has an interrupt generator in!
+    //
+    // We have to wire that up to the SPIs!
+    //
+    // Any pins that aren't configured to be used are undriven and so can be
+    // driven by other peripherals.
+    //
+    dualclustersystemconfigurationblock.intgen[0] => self.spis[191];
+    dualclustersystemconfigurationblock.intgen[1] => self.spis[190];
+    dualclustersystemconfigurationblock.intgen[2] => self.spis[189];
+    dualclustersystemconfigurationblock.intgen[3] => self.spis[188];
+    dualclustersystemconfigurationblock.intgen[4] => self.spis[187];
+    dualclustersystemconfigurationblock.intgen[5] => self.spis[186];
+    dualclustersystemconfigurationblock.intgen[6] => self.spis[185];
+    dualclustersystemconfigurationblock.intgen[7] => self.spis[184];
+    dualclustersystemconfigurationblock.intgen[8] => self.spis[183];
+    dualclustersystemconfigurationblock.intgen[9] => self.spis[182];
+    dualclustersystemconfigurationblock.intgen[10] => self.spis[181];
+    dualclustersystemconfigurationblock.intgen[11] => self.spis[180];
+    dualclustersystemconfigurationblock.intgen[12] => self.spis[179];
+    dualclustersystemconfigurationblock.intgen[13] => self.spis[178];
+    dualclustersystemconfigurationblock.intgen[14] => self.spis[177];
+    dualclustersystemconfigurationblock.intgen[15] => self.spis[176];
+    dualclustersystemconfigurationblock.intgen[16] => self.spis[175];
+    dualclustersystemconfigurationblock.intgen[17] => self.spis[174];
+    dualclustersystemconfigurationblock.intgen[18] => self.spis[173];
+    dualclustersystemconfigurationblock.intgen[19] => self.spis[172];
+    dualclustersystemconfigurationblock.intgen[20] => self.spis[171];
+    dualclustersystemconfigurationblock.intgen[21] => self.spis[170];
+    dualclustersystemconfigurationblock.intgen[22] => self.spis[169];
+    dualclustersystemconfigurationblock.intgen[23] => self.spis[168];
+    dualclustersystemconfigurationblock.intgen[24] => self.spis[167];
+    dualclustersystemconfigurationblock.intgen[25] => self.spis[166];
+    dualclustersystemconfigurationblock.intgen[26] => self.spis[165];
+    dualclustersystemconfigurationblock.intgen[27] => self.spis[164];
+    dualclustersystemconfigurationblock.intgen[28] => self.spis[163];
+    dualclustersystemconfigurationblock.intgen[29] => self.spis[162];
+    dualclustersystemconfigurationblock.intgen[30] => self.spis[161];
+    dualclustersystemconfigurationblock.intgen[31] => self.spis[160];
+    dualclustersystemconfigurationblock.intgen[32] => self.spis[159];
+    dualclustersystemconfigurationblock.intgen[33] => self.spis[158];
+    dualclustersystemconfigurationblock.intgen[34] => self.spis[157];
+    dualclustersystemconfigurationblock.intgen[35] => self.spis[156];
+    dualclustersystemconfigurationblock.intgen[36] => self.spis[155];
+    dualclustersystemconfigurationblock.intgen[37] => self.spis[154];
+    dualclustersystemconfigurationblock.intgen[38] => self.spis[153];
+    dualclustersystemconfigurationblock.intgen[39] => self.spis[152];
+    dualclustersystemconfigurationblock.intgen[40] => self.spis[151];
+    dualclustersystemconfigurationblock.intgen[41] => self.spis[150];
+    dualclustersystemconfigurationblock.intgen[42] => self.spis[149];
+    dualclustersystemconfigurationblock.intgen[43] => self.spis[148];
+    dualclustersystemconfigurationblock.intgen[44] => self.spis[147];
+    dualclustersystemconfigurationblock.intgen[45] => self.spis[146];
+    dualclustersystemconfigurationblock.intgen[46] => self.spis[145];
+    dualclustersystemconfigurationblock.intgen[47] => self.spis[144];
+    dualclustersystemconfigurationblock.intgen[48] => self.spis[143];
+    dualclustersystemconfigurationblock.intgen[49] => self.spis[142];
+    dualclustersystemconfigurationblock.intgen[50] => self.spis[141];
+    dualclustersystemconfigurationblock.intgen[51] => self.spis[140];
+    dualclustersystemconfigurationblock.intgen[52] => self.spis[139];
+    dualclustersystemconfigurationblock.intgen[53] => self.spis[138];
+    dualclustersystemconfigurationblock.intgen[54] => self.spis[137];
+    dualclustersystemconfigurationblock.intgen[55] => self.spis[136];
+    dualclustersystemconfigurationblock.intgen[56] => self.spis[135];
+    dualclustersystemconfigurationblock.intgen[57] => self.spis[134];
+    dualclustersystemconfigurationblock.intgen[58] => self.spis[133];
+    dualclustersystemconfigurationblock.intgen[59] => self.spis[132];
+    dualclustersystemconfigurationblock.intgen[60] => self.spis[131];
+    dualclustersystemconfigurationblock.intgen[61] => self.spis[130];
+    dualclustersystemconfigurationblock.intgen[62] => self.spis[129];
+    dualclustersystemconfigurationblock.intgen[63] => self.spis[128];
+    dualclustersystemconfigurationblock.intgen[64] => self.spis[127];
+    dualclustersystemconfigurationblock.intgen[65] => self.spis[126];
+    dualclustersystemconfigurationblock.intgen[66] => self.spis[125];
+    dualclustersystemconfigurationblock.intgen[67] => self.spis[124];
+    dualclustersystemconfigurationblock.intgen[68] => self.spis[123];
+    dualclustersystemconfigurationblock.intgen[69] => self.spis[122];
+    dualclustersystemconfigurationblock.intgen[70] => self.spis[121];
+    dualclustersystemconfigurationblock.intgen[71] => self.spis[120];
+    dualclustersystemconfigurationblock.intgen[72] => self.spis[119];
+    dualclustersystemconfigurationblock.intgen[73] => self.spis[118];
+    dualclustersystemconfigurationblock.intgen[74] => self.spis[117];
+    dualclustersystemconfigurationblock.intgen[75] => self.spis[116];
+    dualclustersystemconfigurationblock.intgen[76] => self.spis[115];
+    dualclustersystemconfigurationblock.intgen[77] => self.spis[114];
+    dualclustersystemconfigurationblock.intgen[78] => self.spis[113];
+    dualclustersystemconfigurationblock.intgen[79] => self.spis[112];
+    dualclustersystemconfigurationblock.intgen[80] => self.spis[111];
+    dualclustersystemconfigurationblock.intgen[81] => self.spis[110];
+    dualclustersystemconfigurationblock.intgen[82] => self.spis[109];
+    dualclustersystemconfigurationblock.intgen[83] => self.spis[108];
+    dualclustersystemconfigurationblock.intgen[84] => self.spis[107];
+    dualclustersystemconfigurationblock.intgen[85] => self.spis[106];
+    dualclustersystemconfigurationblock.intgen[86] => self.spis[105];
+    dualclustersystemconfigurationblock.intgen[87] => self.spis[104];
+    dualclustersystemconfigurationblock.intgen[88] => self.spis[103];
+    dualclustersystemconfigurationblock.intgen[89] => self.spis[102];
+    dualclustersystemconfigurationblock.intgen[90] => self.spis[101];
+    dualclustersystemconfigurationblock.intgen[91] => self.spis[100];
+    dualclustersystemconfigurationblock.intgen[92] => self.spis[99];
+    dualclustersystemconfigurationblock.intgen[93] => self.spis[98];
+    dualclustersystemconfigurationblock.intgen[94] => self.spis[97];
+    dualclustersystemconfigurationblock.intgen[95] => self.spis[96];
+    dualclustersystemconfigurationblock.intgen[96] => self.spis[95];
+    dualclustersystemconfigurationblock.intgen[97] => self.spis[94];
+    dualclustersystemconfigurationblock.intgen[98] => self.spis[93];
+    dualclustersystemconfigurationblock.intgen[99] => self.spis[92];
+    dualclustersystemconfigurationblock.intgen[100] => self.spis[91];
+    dualclustersystemconfigurationblock.intgen[101] => self.spis[90];
+    dualclustersystemconfigurationblock.intgen[102] => self.spis[89];
+    dualclustersystemconfigurationblock.intgen[103] => self.spis[88];
+    dualclustersystemconfigurationblock.intgen[104] => self.spis[87];
+    dualclustersystemconfigurationblock.intgen[105] => self.spis[86];
+    dualclustersystemconfigurationblock.intgen[106] => self.spis[85];
+    dualclustersystemconfigurationblock.intgen[107] => self.spis[84];
+    dualclustersystemconfigurationblock.intgen[108] => self.spis[83];
+    dualclustersystemconfigurationblock.intgen[109] => self.spis[82];
+    dualclustersystemconfigurationblock.intgen[110] => self.spis[81];
+    dualclustersystemconfigurationblock.intgen[111] => self.spis[80];
+    dualclustersystemconfigurationblock.intgen[112] => self.spis[79];
+    dualclustersystemconfigurationblock.intgen[113] => self.spis[78];
+    dualclustersystemconfigurationblock.intgen[114] => self.spis[77];
+    dualclustersystemconfigurationblock.intgen[115] => self.spis[76];
+    dualclustersystemconfigurationblock.intgen[116] => self.spis[75];
+    dualclustersystemconfigurationblock.intgen[117] => self.spis[74];
+    dualclustersystemconfigurationblock.intgen[118] => self.spis[73];
+    dualclustersystemconfigurationblock.intgen[119] => self.spis[72];
+    dualclustersystemconfigurationblock.intgen[120] => self.spis[71];
+    dualclustersystemconfigurationblock.intgen[121] => self.spis[70];
+    dualclustersystemconfigurationblock.intgen[122] => self.spis[69];
+    dualclustersystemconfigurationblock.intgen[123] => self.spis[68];
+    dualclustersystemconfigurationblock.intgen[124] => self.spis[67];
+    dualclustersystemconfigurationblock.intgen[125] => self.spis[66];
+    dualclustersystemconfigurationblock.intgen[126] => self.spis[65];
+    dualclustersystemconfigurationblock.intgen[127] => self.spis[64];
+
+    globalcounter.cntvalueb => cluster0.cntvalueb;
+    globalcounter.cntvalueb => cluster1.cntvalueb;
+    }
+
+    slave  port<ClockSignal> clk_in;
+    slave  port<Signal>      irqs[224];
+
+    master port<InstructionCount> cluster0_ticks[4];
+    master port<InstructionCount> cluster1_ticks[4];
+
+    master port<PVBus>       pvbus_m;
+
+    master port<ValueState> leds;
+    master port<ValueState> user_switches;
+}

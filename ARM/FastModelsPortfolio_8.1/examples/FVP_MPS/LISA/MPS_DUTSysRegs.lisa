@@ -1,0 +1,316 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// The model of MPS system registers
+
+component MPS_DUTSysRegs
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "MPS DUT system registers";
+        documentation_file = "../../../#DUI0423#";
+    }
+    
+    includes
+    {
+        #define MPSDUTSYSREG_TRACE if (!0) ; else printf
+        #include "eslapi/CADITypes.h"
+    }
+    
+    resources
+    {
+
+        PARAMETER { description("System Identification Register"), type(uint32_t), default(0x01590500) } sys_id;
+        PARAMETER { description("System peripheral configuration"), type(uint32_t), default(0x0) } percfg_value;
+        PARAMETER { description("User switches."), type(uint32_t), default(0x0) } user_switches_value;
+
+        REGISTER { description("Board and FPGA identifier"),       bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x00) } SYS_ID;
+        REGISTER { description("Peripheral control signals"),      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x04) } SYS_PERCFG;
+        REGISTER { description("Indicates user switch settings"),  bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x08) } SYS_SW;
+        REGISTER { description("Sets LED outputs"),                bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0C) } SYS_LED;
+        REGISTER { description("Sets LED outputs"),                bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x10) } SYS_7SEG;
+        REGISTER { description("Free running counter incrementing at 25MHz"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x14) } SYS_CNT25MHZ;
+        REGISTER { description("Free running counter incrementing at 100Hz"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x18) } SYS_CNT100HZ;
+        uint32_t RESET_TIME_25MHZ;
+        uint32_t RESET_TIME_100HZ;
+    }
+
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+        timer_25mhz : ClockTimer;
+        timer_100hz : ClockTimer;
+}
+
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        self.clk_in_25mhz => timer_25mhz.clk_in;
+        self.clk_in_100hz => timer_100hz.clk_in;
+        timer_25mhz.timer_callback => self.timer_callback_handler_25mhz;
+        timer_100hz.timer_callback => self.timer_callback_handler_100hz;
+    }
+
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32(registerRead(tx.getAddress() & ~3));
+        }
+        
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(),tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    slave port<PVBus> pvbus;
+    slave port<ClockSignal> clk_in_25mhz;
+    slave port<ClockSignal> clk_in_100hz;
+    master port<ValueState> percfg
+    {
+        behavior getValue() : uint32_t
+        {
+            return SYS_PERCFG;
+        }
+        behavior setValue(uint32_t data)
+        {
+            SYS_PERCFG = data;
+#if SYSTEM_GENERATOR_VERSION_AT_LEAST(4,3,0)
+            cadiRefresh(eslapi::CADI_REFRESH_REASON_REGISTERS);
+#endif
+            MPSDUTSYSREG_TRACE("MPS_DUTSysRegs:SYS_PERFG::setValue(0x%2X)\n", SYS_PERCFG);
+        }
+    }
+    master port<ValueState> user_switches
+    {
+        behavior getValue() : uint32_t
+        {
+            return SYS_SW;
+        }
+        behavior setValue(uint32_t data)
+        {
+            SYS_SW = data;
+#if SYSTEM_GENERATOR_VERSION_AT_LEAST(4,3,0)
+            cadiRefresh(eslapi::CADI_REFRESH_REASON_REGISTERS);
+#endif
+            MPSDUTSYSREG_TRACE("MPS_DUTSysRegs:user_switches::setValue(0x%2X)\n", SYS_SW);
+        }
+    }
+    master port<ValueState> leds
+    {
+        behavior getValue() : uint32_t
+        {
+            return SYS_LED;
+        }
+    }   
+    master port<ValueState> leds_7seg
+    {
+        behavior getValue() : uint32_t
+        {
+            return SYS_7SEG;
+        }
+    }   
+
+    // Handle event notifications from the timer.
+    internal slave port<TimerCallback> timer_callback_handler_25mhz
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            // MPSDUTSYSREG_TRACE("timer 25 callback ...\n");
+            return timer_callback_25mhz();
+        }
+    }
+    internal slave port<TimerCallback> timer_callback_handler_100hz
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            // MPSDUTSYSREG_TRACE("timer 100 callback ...\n");
+            return timer_callback_100hz();
+        }
+    }
+
+    behavior timer_callback_25mhz() : uint32_t
+    {
+        SYS_CNT25MHZ += RESET_TIME_25MHZ;
+        return RESET_TIME_25MHZ;
+    }
+
+    behavior timer_callback_100hz() : uint32_t
+    {
+        SYS_CNT100HZ += RESET_TIME_100HZ;
+        return RESET_TIME_100HZ;
+    }
+
+    behavior init()
+    {
+        composition.init();
+
+        RESET_TIME_25MHZ = 25000000;
+        RESET_TIME_100HZ = 100;
+        timer_25mhz.timer_control.set(RESET_TIME_25MHZ);
+        timer_100hz.timer_control.set(RESET_TIME_100HZ);
+        SYS_ID     = sys_id;
+        SYS_PERCFG = percfg_value;
+        SYS_SW     = 0;
+        SYS_LED    = 0;
+        SYS_7SEG   = 0;
+        SYS_CNT25MHZ = 0;
+        SYS_CNT100HZ = 0;
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        timer_25mhz.timer_control.cancel();
+        timer_100hz.timer_control.cancel();
+        SYS_ID     = sys_id;
+        SYS_PERCFG = percfg_value;
+        SYS_SW     = user_switches_value;
+        SYS_LED    = 0;
+        SYS_7SEG    = 0;
+        SYS_CNT25MHZ = 0;
+        SYS_CNT100HZ = 0;
+        RESET_TIME_25MHZ = 25000000;
+        RESET_TIME_100HZ = 100;
+        timer_25mhz.timer_control.set(RESET_TIME_25MHZ);
+        timer_100hz.timer_control.set(RESET_TIME_100HZ);
+    }
+                                                                         
+    
+    behavior registerRead(uint32_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+
+        switch(device_addr) 
+        {
+            case 0x00: // SYS_ID 
+                data = sys_id;
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: read(SYS_ID) -> %x\n", data);
+                break;
+
+            case 0x04: // SYS_PERCFG
+                data = SYS_PERCFG;
+ 
+                if (0 == (data & 1))
+                {
+                    // card removed -> write protection on
+                    data |= 2;
+                }  
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: read(SYS_PERCFG) -> %x\n", data);
+                break;
+
+            case 0x08: // SYS_SW
+                data = SYS_SW;
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: read(SYS_SW) -> %x\n", data);
+                break;
+
+            case 0x0C: // SYS_LED
+                data = SYS_LED;
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: read(SYS_LED) -> %x\n", data);
+                break;
+
+            case 0x10: // SYS_7SEG
+                data = SYS_7SEG;
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: read(SYS_7SEG) -> %x\n", data);
+                break;
+
+            case 0x14: // SYS_CNT25MHZ
+                data = SYS_CNT25MHZ + (RESET_TIME_25MHZ - timer_25mhz.timer_control.remaining());
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: read(SYS_CNT25MHZ) -> %d  SYS_CNT25MHZ=%d RESET_TIME_25MHZ=%d timer_25mhz.timer_control.remaining()=%d\n"
+                        , data, SYS_CNT25MHZ, RESET_TIME_25MHZ, timer_25mhz.timer_control.remaining());
+                break;
+
+            case 0x18: // SYS_CNT100HZ
+                data = SYS_CNT100HZ + (RESET_TIME_100HZ - timer_100hz.timer_control.remaining());
+        //        MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: read(SYS_CNT100HZ) -> %x\n", data);
+                break;
+
+            default:
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: read(Undefined register) 0x%x\n", device_addr);
+                break;
+
+        }
+        return data;
+    }
+    
+    behavior registerWrite(uint32_t device_addr, uint32_t data)
+    {
+        switch (device_addr)
+        {
+            case 0x00: // SYS_ID
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: write(SYS_ID) <- %x -- Read only\n", data);
+                break;
+
+            case 0x04: // SYS_PERCFG
+                SYS_PERCFG = data;
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: write(SYS_PERCFG) -> %x\n", data);
+                break;
+
+            case 0x08: // SYS_SW
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: write(SYS_SW) <- %x -- Read only\n", data);
+                break;
+
+            case 0x0C: // SYS_LED
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: write(SYS_LED) <- %x\n", data);
+                SYS_LED = data;
+                break;
+
+            case 0x10: // SYS_7SEG
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: write(SYS_7SEG) <- %x\n", data);
+                SYS_7SEG = data;
+                break;
+
+            case 0x14: // SYS_CNT25MHZ
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: write(SYS_CNT25MHZ) <- %x -- Read only\n", data);
+                break;
+
+            case 0x18: // SYS_CNT100HZ
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: write(SYS_CNT100HZ) <- %x -- Read only\n", data);
+                break;
+
+            default:
+                MPSDUTSYSREG_TRACE("MPS_DUTSysRegs: write(Undefined register) 0x%x\n", device_addr);
+                break;
+
+        }
+    }
+    
+    // debugger register access support
+    behaviour debug_read(CASIU32 reg_id, CASIU64* datap, bool side_effects) : CADIReturn_t
+    {
+        *datap = registerRead(reg_id);
+
+        return eslapi::CADI_STATUS_OK;
+    }
+
+    behaviour debug_write(CASIU32 reg_id, const CASIU64* datap, bool side_effects) : CADIReturn_t
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+
+        return eslapi::CADI_STATUS_OK;
+    }
+}

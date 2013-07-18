@@ -1,0 +1,99 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component PL111_CLCD
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell Color LCD Controller(PL111)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    composition
+    {
+        pl11x_clcd : PL11x_CLCD(pl11x_behavior = 1, pixel_double_limit = pixel_double_limit);
+    }
+    
+    resources
+    {
+        PARAMETER { description("Minimum LCD pixel width before display will be zoomed"), type(uint32_t), default(300) }  pixel_double_limit;
+        // APB registers
+        REGISTER { description("Horizontal control(RW)"),               bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x000) }  LCDTiming0;
+        REGISTER { description("Vertical control(RW)"),                 bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x004) }   LCDTiming1;
+        REGISTER { description("Clock and polarity control(RW)"),       bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x008) } LCDTiming2;
+        REGISTER { description("Line end control(RW)"),                 bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x00C) } LCDTiming3;  // 17 bits
+        REGISTER { description("Upper panel frame base address(RW)"),   bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x010) } LCDUPBASE;
+        REGISTER { description("Lower panel frame base address(RW)"),   bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x014) } LCDLPBASE;
+        REGISTER { description("Interrupt mask(RW)"),                   bitwidth(8 ), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x018) } LCDControl;  // 5 bits
+        REGISTER { description("Control(RW)"),                          bitwidth(16), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x01C) } LCDIMSC;
+        REGISTER { description("Raw interrupt status(RO)"),             bitwidth(8 ), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x020) } LCDRIS;    // 5 bits
+        REGISTER { description("Masked interrupt status(RO)"),          bitwidth(8 ), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x024) } LCDMIS;   // 5 bits
+        REGISTER { description("Interrupt clear(WO)"),                  bitwidth(8 ), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x028) } LCDICR;    // 5 bits
+        REGISTER { description("Upper panel current address(RO)"),      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x02C) } LCDUPCURR;
+        REGISTER { description("Lower panel current address(RO)"),      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x030) } LCDLPCURR;
+        
+        // Palette registers
+        REGISTER { description("LCD Palette(RW)"),  read_function(debug_read), write_function(debug_write), display_format("hex") } LCDPalette[128]; // 0x200-0x3FC
+        
+        // Hardware cursor registers
+        REGISTER { description("Cursor Image RAM(RW)"), read_function(debug_read), write_function(debug_write), display_format("hex") } CursorImage[256]; // 0x800-0xBFC
+        REGISTER { description("Cursor Control(RW)"),                   bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC00)} ClcdCrsrCtrl;
+        REGISTER { description("Cursor Configuration(RW)"),             bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC04)} ClcdCrsrConfig;
+        REGISTER { description("Cursor Palette(RW)"),                   bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC08)} ClcdCrsrPalette0;
+        REGISTER { description("Cursor Palette(RW)"),                   bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC0C)} ClcdCrsrPalette1;
+        REGISTER { description("Cursor XY Position(RW)"),               bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC10)} ClcdCrsrXY;
+        REGISTER { description("Cursor Clip Position(RW)"),             bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC14)} ClcdCrsrClip;
+        REGISTER { description("Cursor Interrupt Mask Set/Clear(RW)"),  bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC20)} ClcdCrsrIMSC;
+        REGISTER { description("Cursor Interrupt Clear(WO)"),           bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC24)} ClcdCrsrICR;
+        REGISTER { description("Cursor Raw Interrupt Status(RO)"),      bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC28)} ClcdCrsrRIS;
+        REGISTER { description("Cursor Masked Interrupt Status(RO)"),   bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC2C)} ClcdCrsrMIS;
+        
+        // PrimeCell registers
+        REGISTER { description("Peripheral identification register bits [7:0](RO)"),    bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFE0) } CLCDPERIPHID0;
+        REGISTER { description("Peripheral identification register bits [15:8](RO)"),   bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFE4) } CLCDPERIPHID1;
+        REGISTER { description("Peripheral identification register bits [23:16](RO)"),  bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFE8) } CLCDPERIPHID2;  // 4 bits
+        REGISTER { description("Peripheral identification register bits [31:23](RO)"),  bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFEC) } CLCDPERIPHID3;
+        REGISTER { description("PrimeCell identification register bits [7:0](RO)"),     bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFF0) } CLCDPCELLID0;
+        REGISTER { description("PrimeCell identification register bits [15:8](RO)"),    bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFF4) } CLCDPCELLID1;
+        REGISTER { description("PrimeCell identification register bits [23:16](RO)"),   bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFF8) } CLCDPCELLID2;
+        REGISTER { description("PrimeCell identification register bits [31:23](RO)"),   bitwidth(8), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xFFC) } CLCDPCELLID3;
+    }
+    
+    connection
+    {
+        self.clk_in => pl11x_clcd.clk_in;
+        self.control => pl11x_clcd.control;
+        self.pvbus => pl11x_clcd.pvbus;
+        pl11x_clcd.display => self.display;
+        pl11x_clcd.intr => self.intr;
+        pl11x_clcd.pvbus_m => self.pvbus_m;
+    }
+    slave port<ClockSignal> clk_in;
+    slave port<Value> control;
+    slave port<PVBus> pvbus;
+    master port<LCD> display;
+    master port<Signal> intr;
+    master port<PVBus> pvbus_m;
+    
+    // debugger support - slightly more complicated than normal because of the way that register arrays are handled
+    
+    // debugger register access support
+    
+    behavior debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = pl11x_clcd.registerRead(reg_id);
+        
+        return ACCESS_FUNC_OK;
+    }
+    
+    behavior debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        pl11x_clcd.registerWrite(reg_id, (uint32_t)*datap);
+        
+        return ACCESS_FUNC_OK;
+    }
+}

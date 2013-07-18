@@ -1,0 +1,103 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */ 
+
+component VEDCC
+{
+    properties 
+    {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Daughterboard Configuration Control (DCC).";
+        documentation_file = "../../../Docs/DUI0423G_fast_model_portfolio_rm.pdf";
+    }
+    includes
+    {
+        #define VEDCC_TRACE if (!0) ; else printf
+    }
+    composition
+    {
+    }
+    
+    resources
+    {
+        // function
+        enum
+        {
+            SYS_CFG_OSC = 1,
+            SYS_CFG_VOLT,
+            SYS_CFG_AMP,
+            SYS_CFG_TEMP,
+            SYS_CFG_RESET,
+            SYS_CFG_SYSCON,
+            SYS_CFG_MUXFPGA,
+            SYS_CFG_SHUTDOWN,
+            SYS_CFG_REBOOT,
+            SYS_CFG_DVIMODE = 11, // 10 is reserved
+            SYS_CFG_POWER
+        };   
+        uint32_t clockCLCD[3];
+    }
+    
+    connection
+    {
+    }
+
+    
+    behavior init()
+    {
+    }
+    
+    behavior reset(int level)
+    {
+        clockCLCD[0] = 45000000; // EXTSAXICLK (OSC0)
+        clockCLCD[1] = 23750000; // default for CLCD clock (OSC1)
+        clockCLCD[2] = 66670000; // TCREFCLK (OSC2)
+    }
+
+    slave port<VECBProtocol> CB
+    {
+        behavior read(const uint8_t func, const uint16_t device, uint32_t *data):bool
+        {
+            VEDCC_TRACE("VEDCC::read, device: %d, function: %d, data: %d\n", device, func, *data);
+            switch (func)
+            {
+            case SYS_CFG_OSC:
+                if (device < 3) 
+                {
+                    *data = clockCLCD[device];
+                    return true; // success
+                }
+                else
+                    return false;
+                break;
+            default:
+                return false;
+                break;
+            }
+        }
+
+        behavior write(const uint8_t func, const uint16_t device, const uint32_t data):bool
+        {
+            VEDCC_TRACE("VEDCC::write, device: %d, function: %d, data: %d\n", device, func, data);
+            switch (func)
+            {
+            case SYS_CFG_OSC:
+                if ((device < 3) && OSC[device].set.implemented())
+                {
+                    clockCLCD[device] = data;
+                    OSC[device].set(clockCLCD[device],1); // adapt CLCD clock
+                    return true; // success
+                }
+                else
+                    return false;
+                break;
+            default:
+                return false;
+                break;
+            }
+        }
+
+    }
+    master port<ClockRateControl> OSC[3];
+}

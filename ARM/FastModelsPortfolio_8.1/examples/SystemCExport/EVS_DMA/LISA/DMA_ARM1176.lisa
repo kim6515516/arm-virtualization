@@ -1,0 +1,56 @@
+/*
+ * Copyright 2011-2012 ARM Limited.
+ * All rights reserved.
+ */
+
+component DMA
+{
+
+    composition
+    {
+        Core : ARM1176CT();
+        ProgMem : RAMDevice(size=0x34000000);
+        SrcMem : RAMDevice(size=0x2000);
+        PVBus : PVBusDecoder();
+        Clock100MHz : ClockDivider(mul=100000000);
+        AMBAPVBus : PVBus2AMBAPV(size=0x34005000);
+        AMBAPVBridge : AMBAPV2PVBus(base_addr=0x35000000);
+        SignalBridge : AMBAPVSignal2SGSignal();
+        ReverseBridge : SGSignal2AMBAPVSignal();
+        Clock1Hz : MasterClock()
+    }
+
+    connection
+    {
+        AMBAPVBus.amba_pv_m => self.amba_pv_m;
+        self.irq_in => SignalBridge.amba_pv_signal_s;
+        self.amba_pv_s => AMBAPVBridge.amba_pv_s;
+        Clock1Hz.clk_out => Clock100MHz.clk_in;
+        AMBAPVBridge.pvbus_m => PVBus.pvbus_s;
+        PVBus.pvbus_m_range[0x0..0x33ffffff] => ProgMem.pvbus;
+        PVBus.pvbus_m_range[0x34000000..0x34004fff] => AMBAPVBus.pvbus_s[0x34000000..0x34004fff];
+        PVBus.pvbus_m_range[0x35000000..0x35001fff] => SrcMem.pvbus;
+        SignalBridge.sg_signal_m => ReverseBridge.sg_signal_s;
+        ReverseBridge.amba_pv_signal_m => self.irq_out;
+        Core.pvbus_m => PVBus.pvbus_s;
+        Clock100MHz.clk_out => Core.clk_in;
+        SignalBridge.sg_signal_m => Core.irq;
+     }
+
+    properties
+    {
+        component_type = "System";
+    }
+
+    // AMBA-PV master port (out)
+    master port<AMBAPV> amba_pv_m;
+
+    // AMBA-PV slave port (in)
+    slave port<AMBAPV> amba_pv_s;
+
+    // Signal slave port (in)
+    slave port<AMBAPVSignal> irq_in;
+
+    // Signal master port (out)
+    master port<AMBAPVSignal> irq_out;
+}

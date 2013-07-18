@@ -1,0 +1,33 @@
+/*
+ * Copyright 2011, 2012 ARM Limited.
+ * All rights reserved.
+ */
+
+component Dhrystone
+{
+
+    composition
+    {
+        Core : ARMCortexA7x2CT();
+        Clock100MHz : ClockDivider(mul=100000000);
+        AMBAPVBus : PVBus2AMBAPV(size=0x34000100);
+        Clock1Hz : MasterClock();
+        BusDecoder : PVBusDecoder()
+    }
+    
+    connection
+    {
+        AMBAPVBus.amba_pv_m => self.amba_pv_m;
+        Clock1Hz.clk_out => Clock100MHz.clk_in;
+        BusDecoder.pvbus_m_range[0x0..0x340000ff] => AMBAPVBus.pvbus_s;
+        Clock100MHz.clk_out => Core.clk_in;
+        Core.pvbus_m0 => BusDecoder.pvbus_s;
+    }
+
+    properties
+    {
+        component_type = "System";
+    }
+    
+    master port<AMBAPV> amba_pv_m;
+}

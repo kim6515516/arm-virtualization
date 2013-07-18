@@ -1,0 +1,58 @@
+//
+//  PVCache_DebugRamProtocol.lisa - Protocol for the PVCache debug_ram port
+//
+//  Copyright 2013 ARM Limited. All rights reserved.
+//
+
+protocol PVCacheDebugRam
+{
+    properties
+    {
+        version = "8.1.37";
+        description = "PVCache debug_ram port protocol";
+    }
+
+    includes
+    {
+       #include  "pv/PVCache_DebugRamPort.h"
+    }
+
+    //! Obtain cache configuration (mainly geometry for now)
+    slave behaviour getConfig(pv::PVCache_DebugConfig& config) : void;
+
+    //! Peek cache line location, tag and content.
+    //
+    //  \param filter_  Reference to a cache lookup filter. Filters can be constructed for lookup by address,
+    //                  index, set/way etc.
+    //  \param buffer_  Reference to a buffer for returned cache line location, tag and content. If buffer_
+    //                  is constructed with a zero cache line length then cache line content will not be returned.
+    //                  If cache lookup is by address and fails to hit then the location member of buffer_
+    //                  will be updated with the first way in the cache where the cache line could have been.
+    //
+    //  \return cache lookup/hit status. If false then tag and content in buffer will not be updated.
+    //          For lookup by index or set/way, as long as the selected line is within the
+    //          boundary of the cache, the routine will return true and the tag.valid data member in
+    //          buffer will indicate whether the cache line tag and content members contain valid data. For
+    //          lookup by address the return status indicates a hit or miss in the cache. A miss will not
+    //          cause any further transactions downstream or allocation into the cache.
+    slave behaviour peekLine(const pv::PVCache_DebugFilter& filter, pv::PVCache_DebugLine& buffer) : bool;
+
+    //! Poke cache line tag and content data.
+    //
+    //  The cache may not be able to accept all cache line tag modifications and may ignore some or all
+    //  such modifications. But overwriting cache line content will always be supported by the cache.
+    //
+    //  \param filter_  Reference to a cache lookup filter. Filters can be constructed for lookup by address,
+    //                  index, set/way etc.
+    //  \param buffer_  Reference to a buffer with cache line tag and content data to set. The cache line
+    //                  location member in buffer_ is ignored. If buffer_ is constructed with a zero cache
+    //                  line length then cache line content will not be set.
+    //
+    //  \return cache lookup/hit status. For lookup by index or set/way, as long as the selected 
+    //          line is within the boundary of the cache, the routine will return true and cache line state
+    //          data inside the cache will have been modified. For lookup by address the return status
+    //          indicates a hit or miss in the cache. A miss will not cause any further transactions
+    //          downstream, allocation into the cache or any modification of cache line state.
+    slave behaviour pokeLine(const pv::PVCache_DebugFilter& filter, const pv::PVCache_DebugLine& buffer) : bool;
+}
+

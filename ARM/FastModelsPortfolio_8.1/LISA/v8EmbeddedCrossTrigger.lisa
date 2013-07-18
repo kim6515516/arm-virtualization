@@ -1,0 +1,131 @@
+/*
+ * Copyright (C) 2011 ARM Limited. All rights reserved.
+ */
+
+protocol v8EmbeddedCrossTrigger_controlprotocol
+{
+    slave behaviour init (unsigned number_of_triggers, unsigned intack_mask, unsigned number_of_claim_bits);
+
+    slave behaviour reg_read(bool is_memory_mapped, uint32_t addr) : uint32_t;
+    slave behaviour reg_write(bool is_memory_mapped, uint32_t addr, uint32_t data);
+
+    slave behaviour setValue_inputTrigger(unsigned index, sg::Signal::State state);
+    master behaviour setValue_outputTrigger(unsigned index, sg::Signal::State state);
+
+    master behaviour getPeripheralIdByte(unsigned pidn) : uint8_t;
+    master behaviour getComponentIdByte(unsigned pidn) : uint8_t;
+}
+
+extern component v8EmbeddedCrossTrigger_Matrix
+{
+    properties {
+        executes_software = 0;
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "v8 Embedded Cross Trigger Matrix";
+    }
+
+    resources
+    {
+        PARAMETER { name("number-of-channels"), description("number of channels in cross trigger matrix"), type(uint32_t), default(4), min(3), max(32) } number_of_channels;
+        PARAMETER { name("has_CTIAUTHSTATUS"), description("has the optional CTIAUTHSTATUS register"), type(bool), default(1), min(0), max(1) } has_CTIAUTHSTATUS;
+    }
+
+    slave port<v8EmbeddedCrossTrigger_controlprotocol> cti[ 16 /*v8ECT_MAX_CPU_INTERFACES*/];
+}
+
+component v8EmbeddedCrossTrigger_Interface
+{
+    properties {
+        executes_software = 0;
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "v8 Embedded Cross Trigger Interface";
+    }
+
+    resources
+    {
+        PARAMETER { name("number_of_triggers"), description("number of event triggers"), type(uint32_t), default(8), min(1), max(8) } number_of_triggers;
+        PARAMETER { name("intack_mask"), description("set bits represent that the corresponding trigger requires software acknowledge via CTIINTACK"), type(uint32_t), default(0), min(0), max(0xff) } intack_mask;
+        PARAMETER { name("number_of_claim_bits"), description("number of bits implemented in CTICLAIMSET"), type(uint32_t), default(0), min(0), max(31) } number_of_claim_bits;
+        PARAMETER { name("peripheral_id"), description("peripheral identification number"), type(uint64_t), default(0x040003b000), min(0), max(0xffffffffff) } peripheral_id;
+        PARAMETER { name("component_id"), description("component identification number"), type(uint32_t), default(0xb105900d), min(0), max(0xffffffff) } component_id;
+    }
+
+    composition
+    {
+        regs_slave_memory_mapped : PVBusSlave(size = 0x1000);
+        regs_slave_external : PVBusSlave(size = 0x1000);
+    }
+    
+    connection
+    {
+        self.cti_regs_memory_mapped => regs_slave_memory_mapped.pvbus_s;
+        regs_slave_memory_mapped.device => self.pvdevice[1];
+
+        self.cti_regs_external => regs_slave_external.pvbus_s;
+        regs_slave_external.device => self.pvdevice[0];
+    }
+    
+    behaviour init
+    {
+        ctm.init(number_of_triggers, intack_mask,number_of_claim_bits);
+    }
+
+    internal slave port<PVDevice> pvdevice[2]
+    {
+        behaviour read(unsigned port_index, pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            uint32_t device_addr = (uint32_t)tx.getAddress();
+            uint32_t data = ctm.reg_read(port_index, device_addr);
+            return tx.setReturnData32(data);
+        }
+
+        behaviour write(unsigned port_index, pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            uint32_t device_addr = (uint32_t)tx.getAddress();
+            uint32_t data = tx.getData32();
+            ctm.reg_write(port_index, device_addr, data);
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(unsigned port_index, pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return pvdevice[port_index].read(tx);
+        }
+
+        behavior debugWrite(unsigned port_index, pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return pvdevice[port_index].write(tx);
+        }        
+    }
+
+    slave  port<PVBus> cti_regs_memory_mapped; // memory mapped interface (implements CTILAR/CTILSR)
+    slave  port<PVBus> cti_regs_external;
+
+    
+    slave  port<Signal> inputTrigger[ 8 /*v8ECT_MAX_INPUT_TRIGGERS*/]
+    {
+        behaviour setValue(unsigned index, sg::Signal::State state)
+        {
+            ctm.setValue_inputTrigger(index,state);
+        }
+    }
+    master port<Signal> outputTrigger[ 8 /*v8ECT_MAX_OUTPUT_TRIGGERS*/];
+
+    master port<v8EmbeddedCrossTrigger_controlprotocol> ctm
+    {
+        behaviour setValue_outputTrigger(unsigned index, sg::Signal::State state)
+        {
+            outputTrigger[index].setValue(state);
+        }
+        behaviour getPeripheralIdByte(unsigned pidn) : uint8_t
+        {
+            return (peripheral_id >> (pidn*8)) & 0xff;
+        }
+        behaviour getComponentIdByte(unsigned cidn) : uint8_t
+        {
+            return (component_id >> (cidn*8)) & 0xff;
+        }
+    }
+}

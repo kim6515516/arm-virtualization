@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# call this script "./maxview" when calling from same directory!!!
+LD_LIBRARY_PATH=`echo $0|sed 's,maxview$,../lib,g'`:${LD_LIBRARY_PATH}
+
+export LD_LIBRARY_PATH
+
+#echo LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+
+# start the modeldebugger.exec binary:
+exec `echo $0|sed 's,maxview$,modeldebugger,g'`.exec "$@"

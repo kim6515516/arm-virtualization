@@ -1,0 +1,109 @@
+/*
+ * Copyright 2012 ARM Limited.
+ * All rights reserved.
+ */
+
+component LinuxBoot
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Top level component of Cortex-A15x4 LinuxBoot EVS.";
+    }
+    composition
+    {
+        clusterbusbridge : PVBus2AMBAPV();
+        cpubusbridge : AMBAPV2PVBus();
+        ratebridge3: SGValue2AMBAPVValue64();
+        ratebridge2: SGValue2AMBAPVValue64();
+        ratebridge1: SGValue2AMBAPVValue64();
+        ratebridge0: SGValue2AMBAPVValue64();
+        timerbusbridge: PVBus2AMBAPV();
+        clockratecontrolstub: LinuxBoot_ClockRateConversion();
+        intrbridge3: AMBAPVSignal2SGSignal();
+        intrbridge2: AMBAPVSignal2SGSignal();
+        intrbridge1: AMBAPVSignal2SGSignal();
+        intrbridge0: AMBAPVSignal2SGSignal();
+
+        // These items are on the testchip
+        cluster : ARMCortexA15x4CT("PERIPHBASE"=0x2C000000,
+                                   "cpu0.semihosting-heap_base".default   = 0x00000000,
+                                   "cpu0.semihosting-heap_limit".default  = 0xff000000,
+                                   "cpu0.semihosting-stack_limit".default = 0xff000000,
+                                   "cpu0.semihosting-stack_base".default  = 0xffff0000,
+                                   "cpu1.semihosting-heap_base".default   = 0x00000000,
+                                   "cpu1.semihosting-heap_limit".default  = 0xff000000,
+                                   "cpu1.semihosting-stack_limit".default = 0xff000000,
+                                   "cpu1.semihosting-stack_base".default  = 0xffff0000,
+                                   "cpu2.semihosting-heap_base".default   = 0x00000000,
+                                   "cpu2.semihosting-heap_limit".default  = 0xff000000,
+                                   "cpu2.semihosting-stack_limit".default = 0xff000000,
+                                   "cpu2.semihosting-stack_base".default  = 0xffff0000,
+                                   "cpu3.semihosting-heap_base".default   = 0x00000000,
+                                   "cpu3.semihosting-heap_limit".default  = 0xff000000,
+                                   "cpu3.semihosting-stack_limit".default = 0xff000000,
+                                   "cpu3.semihosting-stack_base".default  = 0xffff0000);
+
+        // Motherboard and Daughter Card
+        motherboard   : LinuxBoot_VEMotherBoard(proc_id0.default=0x14000000);
+        daughterboard : VEDaughterBoard();
+    }
+    connection
+    {
+        // Daughterboard <-> cluster connections
+        daughterboard.cpu_clk => cluster.clk_in;
+        daughterboard.cpu_irqs => cluster.irqs;  
+        cluster.pvbus_m0 => clusterbusbridge.pvbus_s;
+        cpubusbridge.pvbus_m => daughterboard.cpu_pvbus;
+        clusterbusbridge.amba_pv_m => self.cluster_m;
+        self.cpu_s => cpubusbridge.amba_pv_s;
+
+        // Motherboard <-> Daughterboard connections
+        motherboard.masterclk  => daughterboard.clk_in;
+        motherboard.interrupts => daughterboard.interrupts;
+        daughterboard.smb_cs   => motherboard.smb_cs;
+        motherboard.clcd_pvbus => daughterboard.clcd_pvbus;
+        daughterboard.mmb      => motherboard.mmb_db1;
+        motherboard.CB[0]      => daughterboard.CB;
+
+        // Motherboard <-> cluster connections
+        cluster.ticks => motherboard.cluster0_ticks;
+
+        // Timer interrupts <-> AMBA-PV ports
+        timerbusbridge.amba_pv_m => self.timer_bus_m;
+        self.intr_0 => intrbridge0.amba_pv_signal_s;
+        self.intr_1 => intrbridge1.amba_pv_signal_s;
+        self.intr_2 => intrbridge2.amba_pv_signal_s;
+        self.intr_3 => intrbridge3.amba_pv_signal_s;
+        motherboard.timer_en[0] => clockratecontrolstub.rate_ctrl[0];
+        motherboard.timer_clock => clockratecontrolstub.clock;
+        motherboard.timer_en[1] => clockratecontrolstub.rate_ctrl[1];
+        motherboard.timer_en[2] => clockratecontrolstub.rate_ctrl[2];
+        motherboard.timer_en[3] => clockratecontrolstub.rate_ctrl[3];
+        ratebridge0.amba_pv_value_m => self.rate_hz_0;
+        ratebridge1.amba_pv_value_m => self.rate_hz_1;
+        ratebridge2.amba_pv_value_m => self.rate_hz_2;
+        ratebridge3.amba_pv_value_m => self.rate_hz_3;
+        clockratecontrolstub.rate_hz[0] => ratebridge0.sg_value_s;
+        clockratecontrolstub.rate_hz[1] => ratebridge1.sg_value_s;
+        clockratecontrolstub.rate_hz[2] => ratebridge2.sg_value_s;
+        clockratecontrolstub.rate_hz[3] => ratebridge3.sg_value_s;
+        motherboard.timer_pvbus => timerbusbridge.pvbus_s;
+        intrbridge0.sg_signal_m => motherboard.timer_irq_in[0];
+        intrbridge1.sg_signal_m => motherboard.timer_irq_in[1];
+        intrbridge2.sg_signal_m => motherboard.timer_irq_in[2];
+        intrbridge3.sg_signal_m => motherboard.timer_irq_in[3];
+    }
+    master port<AMBAPV> timer_bus_m;
+    slave port<AMBAPVSignal> intr_0;
+    slave port<AMBAPVSignal> intr_1;
+    slave port<AMBAPVSignal> intr_2;
+    slave port<AMBAPVSignal> intr_3;
+    master port<AMBAPVValue64> rate_hz_0;
+    master port<AMBAPVValue64> rate_hz_1;
+    master port<AMBAPVValue64> rate_hz_2;
+    master port<AMBAPVValue64> rate_hz_3;
+    slave port<AMBAPV> cpu_s;
+    master port<AMBAPV> cluster_m;
+}

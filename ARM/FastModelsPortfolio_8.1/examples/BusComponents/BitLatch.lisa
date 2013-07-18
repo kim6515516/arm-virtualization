@@ -1,0 +1,45 @@
+// Test using PVBusSlave to implement a device
+
+component BitLatch
+{
+    properties {
+        version = "8.1.37";
+    }
+    resources {
+        bool flag;
+    }
+    slave port<PVBus> pvbus_s;
+
+    slave port<PVDevice> device_port {
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result {
+            if (tx.getAddress() != 0) {
+                return tx.generateAbort();
+            }
+            return tx.setReturnData8(flag ? 1 : 0);
+        }
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result {
+            if (tx.getAddress() != 0) {
+                return tx.generateAbort();
+            }
+            flag = ((tx.getData8() & 1) != 0);
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device_port.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device_port.write(tx);
+        }        
+    }
+    composition {
+        busslave : PVBusSlave(size=0x1000);
+    }
+    connection {
+        self.pvbus_s => busslave.pvbus_s;
+        busslave.device => self.device_port;
+    }
+}

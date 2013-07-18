@@ -1,0 +1,1305 @@
+//
+// DualClusterSystemConfigurationBlock
+//
+// Documents: PR419-PRDC-011771 big.LITTLE System Specification
+//
+// The Dual Cluster System Configuration Block is a set of registers that are
+// used to control resets in a dual-cluster + CCI400 System.
+//
+
+component DualClusterSystemConfigurationBlock
+{
+    composition
+    {
+    pvbusslave : PVBusSlave();
+        // timer for controlling interrupt-generation
+    timer : ClockTimer;
+    }
+
+    includes
+    {
+#include <sstream>
+#include "DCSCB/DualClusterSystemConfigurationBlock.h"
+#include "sg/SGComponentTraceHelper.h"
+
+    }
+
+    resources
+    {
+
+//
+// This is the build number reported by reading the DCS_ID field of the
+// SystemConfigurationBlock.  The intent is that as new versions of the
+// model are built to correct bugs then we increment this number manually.
+//
+        PARAMETER {
+            default     ( 1                     ),
+            description ( "DCS_ID build number" ),
+            max         ( 999 ), min( 0         ),
+            name        ( "DCS_ID_BUILD_NUMBER" ),
+            type        ( uint32_t              ),
+            runtime     ( true                  )
+        } dcs_id_build_number;
+
+
+        PARAMETER {
+        default( 1 ),
+            description( "Select which cluster will come out of reset coming out of power-on: bit[0] for primary cluster (Cortex-A15), bit[1] for secondary cluster (Cortex-A7).  Value 0 is not allowed as it will hold both clusters in reset indefinitely!" ),
+            max( 3 ), min( 1 ),
+            name( "CFG_ACTIVECLUSTER" ),
+            type( uint32_t ),
+            runtime( true )} cfg_activecluster;
+
+        PARAMETER { default( 0 ), description( "ClusterId for primary cluster (Cortex-A15) on power-on reset" ), max( 0xF ), min( 0 ), name( "Cluster0IdOnPOReset" ), type( uint32_t ), runtime( true )} cluster0_id_on_poreset;
+
+        PARAMETER { default( 1 ), description( "ClusterId for secondary cluster (Cortex-A7) on power-on reset" ), max( 0xF ), min( 0 ), name( "Cluster1IdOnPOReset" ), type( uint32_t ), runtime( true )} cluster1_id_on_poreset;
+
+        PARAMETER { default( 0x1e000000 ), description( "PERIPHBASE" ), max( 0xFFFFffff ), min( 0 ), name( "DCSCB_PERIPHBASE" ), type( uint64_t ), runtime( true )} periphbase_parameter;
+
+        PARAMETER { default( 0 ), description( "DCS_SW represents eight switches on the board that form an 8-bit value that can be read from the Dual Cluster System Configuration Block" ), max( 0xFF ), min( 0 ), name( "DCS_SW" ), type( uint32_t ), runtime( true )} dcs_sw;
+
+        PARAMETER { default( 0 ), description( "DCS_LEDS represents eight LEDs on the board that form an 8-bit value that can be r/w from the Dual Cluster System Configuration Block" ), max( 0xFF ), min( 0 ), name( "DCS_LEDS" ), type( uint32_t ), runtime( true )} dcs_leds;
+
+        PARAMETER { default( 0 ), description( "DCS_AID is the Auxiliary ID Register" ), max( 0xFF ), min( 0 ), name( "DCS_AID" ), type( uint32_t ), runtime( true )} dcs_aid;
+
+        PARAMETER { default( 0 ), description( "The number of cores in the primary cluster" ), max( 4 ), min( 0 ), name( "NumberOfCoresInCluster0" ), type( uint32_t ), runtime( true )} number_of_cores_in_cluster0;
+        PARAMETER { default( 0 ), description( "The number of cores in the secondary cluster" ), max( 4 ), min( 0 ), name( "NumberOfCoresInCluster1" ), type( uint32_t ), runtime( true )} number_of_cores_in_cluster1;
+
+        PARAMETER { default( 0 ), description( "Reset value of the user switches on the daughterboard" ), max( 0xFF ), min( 0 ), name( "ResetValueOfDaughterUserSwitches" ), type( uint32_t ), runtime( true )} reset_value_of_daughter_user_switches;
+
+        PARAMETER {
+            default     ( 3                                                          ),
+            description ( "Number of custom IRQs controlled by interrupt generator is INTGEN_INTS * 32 + 32." ),
+            max         ( 3 ), min( 0 ),
+            name        ( "INTGEN_INTS"                                              ),
+            type        ( uint32_t                                                   ),
+            runtime     ( false                                                      )
+        } intgen_ints;
+
+        // (/*implementor-arm*/0x41u << 24)
+        //   | (/*variant-model*/1u << 20)
+        //   | (/*architecture-A15+A7*/2u << 16)
+        //   | (/*revision*/ 0u << 0) */
+        PARAMETER {
+            default (0x41120000),
+            description( "The value returned by the DCS_ID register." ),
+            min(0),
+            max(0xFFFFffff),
+            name( "DCS_ID"),
+            type(uint32_t),
+            runtime(false)
+            } dcs_id;
+
+        PARAMETER {
+            default (false),
+            description( "Flip the VGIC wiring round for cluster0 and cluster1.  With this false, then cpu0 of cluster0 is cpu interface 0 on the VGIC.  If this is true then cpu0 of cluster1 becomes cpu interface 0 on the VGIC." ),
+            name( "FlipVGICWiringForCluster0AndCluster1"),
+            type(bool),
+            runtime(false)
+            } flip_vgic_wiring_for_cluster0_and_cluster1;
+
+        PARAMETER { default(0), description("If non-zero the sequence_id of the SW trace mechanism on which to halt the simulator"), type(unsigned), runtime(true) } stop_on_sequence_id;
+
+
+        typedef DCSCBDetails::reset_register_handler_t handler_t;
+        typedef DCSCBDetails::interrupt_generator_t    interrupt_generator_t;
+
+        static unsigned const                MAX_CORES_PER_CLUSTER = handler_t::MAX_CORES_PER_CLUSTER;
+        static unsigned const                MAX_CLUSTERS          = handler_t::MAX_CLUSTERS;
+        static unsigned const                MAX_CORES             = MAX_CLUSTERS * MAX_CORES_PER_CLUSTER;
+
+        static unsigned const                CLUSTER0_INDEX     = 0;
+        static unsigned const                CLUSTER1_INDEX     = 1;
+
+        handler_t                            handler;
+        interrupt_generator_t                int_gen;
+
+        DCSCBDetails::cfg_t                  cfg_pins[MAX_CORES];
+
+        unsigned                             cfg_cluster_id[MAX_CLUSTERS];
+        bool                                 cfg_cluster0_iminlen;
+
+        bool                                 always_apply_cfg;
+
+        uint64_t                             last_periphbase;
+        uint32_t                             last_periphbase32;
+
+        static unsigned const                absolute_max_number_of_interrupts = 128;
+        unsigned                             max_number_of_interrupts;
+
+        bool                                 in_timer_callback;
+        unsigned                             sleep_for_interval;
+
+
+        static unsigned const bx_addr_registers_len
+            = ((DCSCBRegisters::BX_ADDR_CL1_CPU3_high - DCSCBRegisters::BX_ADDR_CL0_CPU0)
+               / (DCSCBRegisters::BX_ADDR_CL0_CPU0_high - DCSCBRegisters::BX_ADDR_CL0_CPU0))
+            + 1 ;
+
+        uint32_t bx_addr_registers[bx_addr_registers_len];
+
+
+        ///
+        /// \name User-defined tracing structure
+        ///
+        /// This consists of the following concepts:
+        ///
+        ///     * three LE 64 bit registers of arbitrary data that can be written
+        ///       (and retain their values).
+        ///     * a tube-like char register that when you write '\0' will
+        ///       generate an event with the current state of the 64-bit
+        ///       registers and with the characters sent to the device and a unique
+        ///       sequence_id.  If you set the parameter stop_on_sequence_id to
+        ///       non-zero then when the specified sequence_id is generated then
+        ///       the simulator will halt.
+        ///
+        /// All of these registers are banked and write-only, the trace event
+        /// will also output the cluster id and the cpu id.
+        ///
+        /// We can have multiple sets of trace registers which are distinguished
+        /// by a 'source'.
+        ///
+        /// NOTE that this SW sequence is not re-entrant safe and so it is up to
+        /// the SW to cope, or to deal with that the trace events will sometimes
+        /// get mangled.
+        ///
+        //@{
+
+        static unsigned const NUMBER_OF_TRACE_DATA_REGISTERS = 3;
+
+        struct trace_registers_t
+        {
+            uint64_t          data[NUMBER_OF_TRACE_DATA_REGISTERS];
+            std::vector<char> buffer;
+
+            trace_registers_t()
+            {
+                for (unsigned i = 0; i < NUMBER_OF_TRACE_DATA_REGISTERS; ++i) {
+                    data[i] = 0;
+                }
+            }
+        };
+
+        // The first 'cluster_id' is actually the cluster_id and a source id.
+        typedef std::map<std::pair<unsigned, unsigned>, trace_registers_t>  cluster_id_and_cpu_id_to_trace_registers_t;
+        cluster_id_and_cpu_id_to_trace_registers_t                          cluster_id_and_cpu_id_to_trace_registers;
+
+        trace_registers_t& get_trace_registers(
+            unsigned         source_,
+            unsigned         cluster_id_,
+            unsigned         cpu_id_
+            )
+        {
+            return cluster_id_and_cpu_id_to_trace_registers[ std::make_pair(source_ << 16 | cluster_id_, cpu_id_) ];
+        }
+
+        void write_trace_data_register( unsigned source_, unsigned cluster_id_, unsigned cpu_id_, unsigned byte_offset_, void const* data_, unsigned size_in_bytes_ )
+        {
+//            std::cerr << "DATA write from " << cluster_id_ << ", " << cpu_id_ << "\n";
+            trace_registers_t& t = get_trace_registers( source_, cluster_id_, cpu_id_ );
+            
+            // Note: extra bracketing around (std::min) is to avoid issues
+            // with Windows.h defining its own min() macro.
+            std::size_t const size_to_write = (std::min)( sizeof(t.data) - std::size_t(byte_offset_), std::size_t(size_in_bytes_) );
+            memcpy( reinterpret_cast<char*>(&t.data[0]) + byte_offset_, data_, size_to_write );
+        }
+
+        void write_trace_tube_register(  unsigned source_, unsigned cluster_id_, unsigned cpu_id_, char c_ )
+        {
+//            std::cerr << "TUBE write from " << cluster_id_ << ", " << cpu_id_ << " '" << c_ << "'\n";
+            trace_registers_t& t = get_trace_registers( source_, cluster_id_, cpu_id_ );
+
+            t.buffer.push_back( c_ );
+
+            if (c_ == '\0')
+            {
+                // Yeah!  Dump!
+                switch (source_)
+                {
+                case 0:
+                    sw_trace_event( ++ sequence_id, uint8_t(cluster_id_) << 8 | uint8_t(cpu_id_), t.data[0], t.data[1], t.data[2], &t.buffer[0] );
+                    break;
+                case 1:
+                    sw_trace_event2( ++ sequence_id, uint8_t(cluster_id_) << 8 | uint8_t(cpu_id_), t.data[0], t.data[1], t.data[2], &t.buffer[0] );
+                    break;
+                case 2:
+                    sw_trace_event3( ++ sequence_id, uint8_t(cluster_id_) << 8 | uint8_t(cpu_id_), t.data[0], t.data[1], t.data[2], &t.buffer[0] );
+                    break;
+                case 3:
+                    sw_trace_event4( ++ sequence_id, uint8_t(cluster_id_) << 8 | uint8_t(cpu_id_), t.data[0], t.data[1], t.data[2], &t.buffer[0] );
+                    break;
+                default:
+                    assert( 0 == "DualClusterSystemConfigurationBlock:  trace tube register source not understood?" );
+                }
+
+                if (sequence_id == stop_on_sequence_id)
+                {
+// Hmmm can't make it compile                    
+//                    message( "Stop from DCSCB as sequence id matched", sg::MSG_WARNING );
+                    std::cerr << "Stop from DCSCB as sequence id matched!" << std::endl;
+                    simHalt();
+                }
+
+                t.buffer.clear();
+            }
+        }
+
+        unsigned sequence_id;
+        DEFINE_SIMPLE_TRACE_SOURCE(
+            sw_trace_event,
+            "sw_trace_event",
+            "This is a trace event generate under SW control",
+            ( unsigned, uint16_t, uint64_t, uint64_t, uint64_t, trace_fixed_length_string<200> ),
+            (
+                "sequence_id",
+                "This is a unique id per emitted trace event.",
+
+                "cluster_and_cpu_id",
+                "The top byte represents the cluster id, the bottom byte the cpu id.",
+
+                "data0",
+                "SW defined data field 0.",
+
+                "data1",
+                "SW defined data field 1.",
+
+                "data2",
+                "SW defined data field 2.",
+
+                "message",
+                "A message from the SW."
+                )
+            );
+        DEFINE_SIMPLE_TRACE_SOURCE(
+            sw_trace_event2,
+            "sw_trace_event2",
+            "This is a trace event generate under SW control",
+            ( unsigned, uint16_t, uint64_t, uint64_t, uint64_t, trace_fixed_length_string<200> ),
+            (
+                "sequence_id",
+                "This is a unique id per emitted trace event.",
+
+                "cluster_and_cpu_id",
+                "The top byte represents the cluster id, the bottom byte the cpu id.",
+
+                "data0",
+                "SW defined data field 0.",
+
+                "data1",
+                "SW defined data field 1.",
+
+                "data2",
+                "SW defined data field 2.",
+
+                "message",
+                "A message from the SW."
+                )
+            );
+        DEFINE_SIMPLE_TRACE_SOURCE(
+            sw_trace_event3,
+            "sw_trace_event3",
+            "This is a trace event generate under SW control",
+            ( unsigned, uint16_t, uint64_t, uint64_t, uint64_t, trace_fixed_length_string<200> ),
+            (
+                "sequence_id",
+                "This is a unique id per emitted trace event.",
+
+                "cluster_and_cpu_id",
+                "The top byte represents the cluster id, the bottom byte the cpu id.",
+
+                "data0",
+                "SW defined data field 0.",
+
+                "data1",
+                "SW defined data field 1.",
+
+                "data2",
+                "SW defined data field 2.",
+
+                "message",
+                "A message from the SW."
+                )
+            );
+        DEFINE_SIMPLE_TRACE_SOURCE(
+            sw_trace_event4,
+            "sw_trace_event4",
+            "This is a trace event generate under SW control",
+            ( unsigned, uint16_t, uint64_t, uint64_t, uint64_t, trace_fixed_length_string<200> ),
+            (
+                "sequence_id",
+                "This is a unique id per emitted trace event.",
+
+                "cluster_and_cpu_id",
+                "The top byte represents the cluster id, the bottom byte the cpu id.",
+
+                "data0",
+                "SW defined data field 0.",
+
+                "data1",
+                "SW defined data field 1.",
+
+                "data2",
+                "SW defined data field 2.",
+
+                "message",
+                "A message from the SW."
+                )
+            );
+        
+        //@}
+    }
+
+    master port<v7_VGIC_Configuration_Protocol>     vgic_configuration_port;
+
+    behaviour init
+    {
+        composition.init();
+
+        register_objects_with_component_trace(*cadi__)
+            << sw_trace_event
+            << sw_trace_event2
+            << sw_trace_event3
+            << sw_trace_event4
+            ;
+
+        if (number_of_cores_in_cluster0 == 0)
+        {
+            message( "\n\n*** ERROR: DualClusterSystemConfigurationBlock: zero cores are declared in the primary cluster!\n\n", MSG_FATAL_ERROR );
+            number_of_cores_in_cluster0 = 4;
+        }
+        if (number_of_cores_in_cluster1 == 0)
+        {
+            message( "\n\n*** ERROR: DualClusterSystemConfigurationBlock: zero cores are declared in the secondary cluster!\n\n", MSG_FATAL_ERROR );
+            number_of_cores_in_cluster1 = 4;
+        }
+        handler.init(
+            number_of_cores_in_cluster0,
+            number_of_cores_in_cluster1
+            );
+
+        always_apply_cfg = true;
+
+        dcs_aid
+            = (0x00                & 0xFF) << 0  // No additional VE user-def config commands (CPREGNUM)
+            | (1                   &  0x1) << 9  // Does support setting of the LEDs (but writes will set them and they will
+                                                 // appear in the parameter when it is refreshed (LED_ENABLE)
+            | (1                   &  0x1) << 10 // Supports the DCS_SW register (SW_ENABLE)
+            | (1                   &  0x1) << 11 // Supports interrupt generation (INTGEN_PRESENT)
+            | (intgen_ints         &  0x3) << 12 // Encoded number of interrupts available (INTGEN_INTS)
+            | (dcs_id_build_number & 0xFF) << 24 // (BUILD)
+            ;
+
+        assert( absolute_max_number_of_interrupts == interrupt_generator_t::absolute_max_number_of_interrupts );
+
+        max_number_of_interrupts = intgen_ints * 32 + 32;
+        assert( max_number_of_interrupts <= absolute_max_number_of_interrupts );
+
+        int_gen.set_max_number_of_interrupts( max_number_of_interrupts );
+
+        // MSVC considers this dangerous:
+        //        std::fill_n( &bx_addr_registers[0], bx_addr_registers_len, uint32_t(0) );
+        // So do it the more dangerous way:
+        for (unsigned i = 0; i != bx_addr_registers_len; ++ i)
+            bx_addr_registers[i] = 0;
+
+        in_timer_callback = false;
+    }
+
+    //
+    // Reset management
+    //
+    master port<Signal> cluster0_corereset[4];
+    master port<Signal> cluster0_cxreset[4]; // NEON and VFP reset
+    master port<Signal> cluster0_l2reset;
+    master port<Signal> cluster0_cpuporeset[4];
+
+    master port<Signal> cluster1_corereset[4];
+    master port<Signal> cluster1_scureset;
+    master port<Signal> cluster1_cpuporeset[4];
+
+    master port<Signal> system_reset;
+
+    //
+    // Configuration management
+    //
+    master port<Signal> cluster0_cfgend[4];
+    master port<Signal> cluster0_vinithi[4];
+    master port<Signal> cluster0_cfgte[4];
+    master port<Value>  cluster0_clusterid;
+    master port<Signal> cluster0_iminlen;
+
+    master port<Signal> cluster1_cfgend[4];
+    master port<Signal> cluster1_vinithi[4];
+    master port<Signal> cluster1_teinit[4];
+    master port<Value>  cluster1_clusterid;
+
+    master port<Value_64> periphbase;
+    master port<Value>    periphbase_32;
+
+    master port<ValueState>  daughter_leds_state;
+    master port<ValueState>  daughter_user_switches;
+
+    //
+    // Interrupt generator
+    //
+    // NOTE that pins that are 'non-existent' according to INTGEN_INTS are never
+    // driven and so can be 'wire-ORed' with another peripheral.
+    //
+    master port<Signal>      intgen[/* absolute_max_number_of_interrupts */128];
+
+    behaviour tell_vgic_wiring(
+        unsigned    number_of_cores_,
+        unsigned    cluster_number_,
+        unsigned    cluster_id_,
+        unsigned    start_cpu_interface_
+        )
+    {
+        for (unsigned i = 0; i != number_of_cores_; ++ i)
+        {
+            bool const success = vgic_configuration_port.setMasterIdToCoreNumberMapping(
+                /* master_id             */ i | cluster_id_ << 2,
+                /* master_id_mask        */ 0xFFFFffff,
+                /* cpu_interface_number  */ i + start_cpu_interface_,
+                /* cluster_number        */ cluster_number_,
+                /* cpu_number_in_cluster */ i
+                );
+            if ( ! success )
+            {
+                std::ostringstream os;
+                os << "\n\n*** ERROR:  We suffered a problem establishing a master id to core number mapping on the VGIC.  This is probably due to the wrong number of cores being configured on the VGIC.\n";
+                message( os.str(), MSG_FATAL_ERROR );
+            }
+        }
+    }
+
+    behaviour reset( int level_ )
+    {
+        composition.reset( level_ );
+        (void)level_;
+        always_apply_cfg = true;
+
+        sequence_id = 0;
+
+        // A hack required by FastSim is that the primary and secondary
+        // cluster_id's are different.  This is so that the VGIC can distinguish
+        // masters.
+        if (cluster0_id_on_poreset == cluster1_id_on_poreset)
+        {
+            std::ostringstream os;
+            os << "\n\n*** ERROR:  Unfortunately, the Cluster IDs have to have different values (trying to set Cluster 0 to "
+               << cluster0_id_on_poreset
+               << " and Cluster 1 to "
+               << cluster1_id_on_poreset << ") ***\n\n";
+            message( os.str(), MSG_FATAL_ERROR );
+
+            cluster0_id_on_poreset = 0;
+            cluster1_id_on_poreset = 1;
+        }
+
+        if (vgic_configuration_port.getNumberOfCores.implemented())
+        {
+            unsigned const vgic_number_of_cores = vgic_configuration_port.getNumberOfCores();
+            unsigned const our_number_of_cores  = number_of_cores_in_cluster1 + number_of_cores_in_cluster0;
+
+            if (vgic_number_of_cores < our_number_of_cores)
+            {
+                std::ostringstream os;
+                os << "\n\n*** ERROR:  the VGIC has been configured to have " << vgic_configuration_port.getNumberOfCores()
+                   << " but the DCSCB has been configured for " << (number_of_cores_in_cluster1 + number_of_cores_in_cluster0)
+                   << "\n";
+                message( os.str(), MSG_FATAL_ERROR );
+            }
+            else if (vgic_number_of_cores > our_number_of_cores)
+            {
+                std::ostringstream os;
+                os << "\n\n*** WARNING:  the VGIC has been configured to have " << vgic_configuration_port.getNumberOfCores()
+                   << " but the DCSCB has been configured for " << (number_of_cores_in_cluster1 + number_of_cores_in_cluster0)
+                   << ", which is OK but the VGIC will have some unconnected interfaces.\n";
+                message( os.str(), MSG_WARNING );
+            }
+        }
+
+        if (vgic_configuration_port.setMasterIdToCoreNumberMapping.implemented())
+        {
+            //
+            // We supply magic knowledge to the VGIC to know the master id to
+            // core number mapping.
+            //
+            if (flip_vgic_wiring_for_cluster0_and_cluster1)
+            {
+                // Map primary cluster [cpu0..number_of_cores_in_cluster0) to VGIC interface
+                // [number_of_cores_in_cluster1 /*sic*/, number_of_cores_in_cluster0 + number_of_cores_in_cluster1)
+                tell_vgic_wiring(
+                    /* number of cores     */ number_of_cores_in_cluster0,
+                    /* cluster_number      */ 0,
+                    /* cluster_id          */ cluster0_id_on_poreset,
+                    /* start cpu interface */ number_of_cores_in_cluster1
+                    );
+                // Map secondary cluster [cpu0..number_of_cores_in_cluster1) to VGIC interface
+                // [0..number_of_cores_in_cluster0)
+                tell_vgic_wiring(
+                    /* number of cores     */ number_of_cores_in_cluster1,
+                    /* cluster_number      */ 1,
+                    /* cluster_id          */ cluster1_id_on_poreset,
+                    /* start cpu interface */ 0
+                    );
+            }
+            else
+            {
+                // Map primary cluster [cpu0..number_of_cores_in_cluster0) to VGIC interface [0..number_of_cores_in_cluster0)
+                tell_vgic_wiring(
+                    /* number of cores     */ number_of_cores_in_cluster0,
+                    /* cluster_number      */ 0,
+                    /* cluster_id          */ cluster0_id_on_poreset,
+                    /* start cpu interface */ 0
+                    );
+                // Map secondary cluster [cpu0..number_of_cores_in_cluster1) to VGIC interface
+                // [number_of_cores_in_cluster0 /*sic*/, number_of_cores_in_cluster0 + number_of_cores_in_cluster1)
+                tell_vgic_wiring(
+                    /* number of cores     */ number_of_cores_in_cluster1,
+                    /* cluster_number      */ 1,
+                    /* cluster_id          */ cluster1_id_on_poreset,
+                    /* start cpu interface */ number_of_cores_in_cluster0 // last core in cluster0 was numbered
+                                                                       // number_of_cores_in_cluster0 - 1
+                    );
+            }
+        }
+
+        handler.set_reset_cluster_cfg(
+            CLUSTER0_INDEX,
+            cluster0_id_on_poreset,
+            /*iminlen_*/ true
+            );
+        handler.set_reset_cluster_cfg(
+            CLUSTER1_INDEX,
+            cluster1_id_on_poreset,
+            /*iminlen_ -- irrelevant for Cortex-A7 */ true
+            );
+
+        // Setup a power-on reset that will toggle all the reset
+        // signals.
+        //
+        // NOTE that this must be _after_ the set_reset_cluster_cfg()
+        // in order for the new value of the cluster_id to be visible.
+        handler.reset( cfg_activecluster );
+        handler.set_dcs_id( dcs_id );
+
+        DCSCBDetails::apply_value_to(
+            always_apply_cfg,
+            periphbase,
+            periphbase_parameter,
+            &last_periphbase
+            );
+
+        DCSCBDetails::apply_value_to(
+            always_apply_cfg,
+            periphbase_32,
+            (uint32_t)periphbase_parameter,
+            &last_periphbase32
+            );
+
+        //
+        // This side and the remove side of the ports may not agree on the reset
+        // value.
+        //
+        // It is the responsibility of the remote connection to deal with that
+        // its reset may be called before or after this call.
+        //
+        // NOTE that handler() will ensure that deltas are produced for all
+        // reset pins.
+        HERE << "In reset()\n";
+        process_deltas();
+
+        update_leds();
+
+        // The user switches are not 'writable' but we can force a value in for
+        // reset!
+        if (daughter_user_switches.setValue.implemented())
+            daughter_user_switches.setValue( reset_value_of_daughter_user_switches );
+
+        int_gen.reset();
+        process_interrupt_deltas();
+
+        if ( ! clk_in.getClock.implemented()
+             || clk_in.getClock() == 0 )
+        {
+            std::ostringstream os;
+            os << "\n\n*** ERROR : " << getInstancePath()
+               << " : Dual Cluster System Configuration Block needs a clock for interrupt generation!\n\n";
+            message( os.str(), MSG_FATAL_ERROR );
+        }
+
+        // reset registers
+
+        // SDDKW-17398 reset values are non-zero
+        //bx_addr_registers[] = 0x80000000;
+        for (unsigned i = 0; i != bx_addr_registers_len; ++ i)
+            bx_addr_registers[i] = 0x80000000;
+
+        HERE << "Out of reset()\n\n" << std::endl;
+
+    }
+
+    behaviour process_delta( const DCSCBDetails::reset_handler_t::reset_pin_delta_t& delta_ )
+    {
+        unsigned const cluster_index = delta_.cluster_index;
+        bool const     is_cluster0      = cluster_index == CLUSTER0_INDEX;
+        unsigned const cpu_id        = delta_.local_cpu_id;
+        unsigned const cid           = delta_.local_cpu_id + cluster_index * MAX_CORES_PER_CLUSTER;
+
+        HEREQ << delta_ << std::endl;
+
+        //
+        // If this is during simulation reset then we wish to suppress the
+        // reset to 1 version of the signal as this will override the
+        // debugger-forced PC version.  We can detect we are in reset by
+        // always_apply_cfg being high.  However, we can only suppress the
+        // rising edge if we know there is going to be a falling edge --
+        // this we can get from cfg_activecluster -- bit messy.
+        //
+        bool const is_in_simulation_reset = always_apply_cfg;
+        bool const is_cluster_going_to_be_held_in_reset = (cfg_activecluster ^ 3) >> cluster_index & 1;
+        bool const suppress_reset_rising_edge
+            = is_in_simulation_reset
+            && ! is_cluster_going_to_be_held_in_reset
+            && delta_.valueQ()
+            ;
+
+        switch (delta_.get_pin())
+        {
+        case handler_t::cpu_reset_pin:
+        case handler_t::cpu_poreset_pin:
+        case handler_t::debug_reset_pin:
+            if (suppress_reset_rising_edge)
+            {
+                HEREQ << "SUPPRESSED!\n";
+                break;
+            }
+            DCSCBDetails::apply_cfg_to(
+                // When the simulation is started we must drive all pins with
+                // their values so that there is no ambiguity.
+                always_apply_cfg,
+
+                is_cluster0 ? cluster0_corereset[ cpu_id ]  : cluster1_corereset[ cpu_id ],
+                is_cluster0 ? &cluster0_cxreset[ cpu_id ]   : 0,
+                is_cluster0 ? cluster0_cpuporeset[ cpu_id ] : cluster1_cpuporeset[ cpu_id ],
+
+                is_cluster0 ? cluster0_cfgend[ cpu_id ]     : cluster1_cfgend[ cpu_id ],
+                is_cluster0 ? cluster0_vinithi[ cpu_id ]    : cluster1_vinithi[ cpu_id ],
+                is_cluster0 ? cluster0_cfgte[ cpu_id ]      : cluster1_teinit[ cpu_id ],
+
+                // Apply this delta
+                delta_,
+
+                // Store latest configuration in here.
+                cfg_pins[ cid ]
+                );
+            break;
+
+        case handler_t::cluster_reset_pin:
+            if (suppress_reset_rising_edge)
+            {
+                HEREQ << "SUPPRESSED!\n";
+                break;
+            }
+            DCSCBDetails::apply_value_to(
+                always_apply_cfg,
+                is_cluster0 ? cluster0_clusterid : cluster1_clusterid,
+                delta_.get_cluster_id(),
+                &cfg_cluster_id[ cluster_index ]
+                );
+            if (is_cluster0)
+            {
+                DCSCBDetails::apply_bool_to( always_apply_cfg, cluster0_iminlen, delta_.iminlenQ(), &cfg_cluster0_iminlen );
+            }
+            DCSCBDetails::apply_bool_to( is_cluster0 ? cluster0_l2reset : cluster1_scureset, delta_.valueQ() );
+            break;
+
+        case handler_t::system_debug_reset_pin:
+            ; // nothing to do.
+            break;
+
+        case handler_t::system_reset_pin:
+            DCSCBDetails::apply_bool_to(system_reset, delta_.valueQ());
+
+            // The user switches are not 'writable' but we can force a value in for
+            // reset!
+            if (daughter_user_switches.setValue.implemented())
+                daughter_user_switches.setValue( reset_value_of_daughter_user_switches );
+            break;
+        }
+    }
+
+    behaviour process_deltas() : void
+    {
+        if ( ! handler.are_there_reset_deltasQ() )
+            return;
+        std::pair<handler_t::reset_deltas_t::const_iterator,
+            handler_t::reset_deltas_t::const_iterator >
+            p = handler.get_reset_deltas();
+        while (p.first != p.second)
+        {
+            process_delta( *p.first );
+            ++ p.first;
+        }
+
+        // Signal the handler that we have disposed of all the deltas.
+        handler.reset_deltas_have_been_processed();
+
+        always_apply_cfg = false;
+    }
+
+    behaviour update_leds()
+    {
+        if (daughter_leds_state.setValue.implemented())
+            daughter_leds_state.setValue(dcs_leds);
+    }
+
+    behaviour process_interrupt_delta( interrupt_generator_t::delta_t delta_ )
+    {
+        if (delta_.id == interrupt_generator_t::timer_id)
+        {
+            sleep_for_interval = delta_.value;
+
+            // If we are in the timer-callback then the return value from the
+            // callback will be the time interval to sleep for.  If we are not
+            // then we can just call the timer directly.
+            if ( ! in_timer_callback )
+            {
+                if (sleep_for_interval == 0)
+                {
+                    timer.timer_control.cancel();
+                }
+                else
+                {
+                    timer.timer_control.set( sleep_for_interval );
+                }
+            }
+        }
+        else
+        {
+            assert( delta_.id < max_number_of_interrupts );
+            if (intgen[ delta_.id ].setValue.implemented())
+                intgen[ delta_.id ].setValue( delta_.value != 0 ? sg::Signal::Set : sg::Signal::Clear );
+        }
+    }
+
+    behaviour process_interrupt_deltas() : void
+    {
+        if (int_gen.are_there_deltasQ())
+        {
+            std::pair< interrupt_generator_t::deltas_t::const_iterator,
+                       interrupt_generator_t::deltas_t::const_iterator >
+                p = int_gen.get_deltas();
+
+            while (p.first != p.second)
+            {
+                process_interrupt_delta( *p.first );
+                ++ p.first;
+            }
+            int_gen.deltas_have_been_processed();
+        }
+        if ( ! int_gen.unpredictable.str().empty() )
+        {
+            message( int_gen.unpredictable.str(), MSG_WARNING );
+            // Clear out unpred message!
+            int_gen.unpredictable.str("");
+        }
+    }
+
+    slave port<ClockSignal>            clk_in;
+    internal slave port<TimerCallback> timer_callback
+    {
+        behaviour signal() : uint32_t
+        {
+            int_gen.timer_callback();
+            in_timer_callback = true;
+            {
+                process_interrupt_deltas();
+            }
+            in_timer_callback = false;
+            return sleep_for_interval;
+        }
+    }
+
+    //
+    // Status of the STANDBYWFI pins of the cores.  This can trigger
+    // resets of the cores.
+    //
+
+    slave port<Signal> cluster0_standbywfi[4]
+    {
+        behaviour setValue(uint32_t cpu_id_, sg::Signal::State state_)
+        {
+            HEREQ << "cluster0_standbywfi[" << cpu_id_ << "] = " << to_bit(state_) << std::endl;
+            if (handler.set_wfi_state( cpu_id_, CLUSTER0_INDEX, to_bit(state_) != 0 ))
+                process_deltas();
+
+            update_leds();
+        }
+    }
+    slave port<Signal> cluster1_standbywfi[4]
+    {
+        behaviour setValue(uint32_t cpu_id_, sg::Signal::State state_)
+        {
+            HEREQ << "cluster1_standbywfi[" << cpu_id_ << "] = " << to_bit(state_) << std::endl;
+            if (handler.set_wfi_state( cpu_id_, CLUSTER1_INDEX, to_bit(state_) != 0 ))
+                process_deltas();
+
+            update_leds();
+        }
+    }
+
+    //
+    // Wiring for inter-cluster SEV/WFE support
+    //
+    // Event pins are always wired together.
+    //
+    slave port<Signal> cluster0_evento
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            if (cluster1_eventi.setValue.implemented())
+                cluster1_eventi.setValue( state );
+        }
+    }
+
+    slave port<Signal> cluster1_evento
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            if (cluster0_eventi.setValue.implemented())
+                cluster0_eventi.setValue( state );
+        }
+    }
+
+    master port<Signal> cluster0_eventi;
+    master port<Signal> cluster1_eventi;
+
+    internal slave port<PVDevice> device
+    {
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            pv::bus_addr_t const offset = tx.getAddress() & DCSCBRegisters::INVALID_REGISTER;
+
+            if (tx.getAccessByteWidth() != 4
+                && ! (offset >= DCSCBRegisters::MODEL_SW_TRACE_TUBE
+                      && offset < DCSCBRegisters::MODEL_SW_TRACE_LAST)
+                )
+            {
+                return tx.generateAbort(); // non-word sized transactions not supported, assume abort!
+            }
+
+            DCSCBRegisters::register_identifier_t reg = DCSCBRegisters::to_register(tx);
+
+            switch (reg)
+            {
+            case DCSCBRegisters::RST_HOLD0    :
+                return tx.setReturnData32( handler.get_rst_hold(CLUSTER0_INDEX) );
+            case DCSCBRegisters::RST_HOLD1    :
+                return tx.setReturnData32( handler.get_rst_hold(CLUSTER1_INDEX) );
+            case DCSCBRegisters::SYS_SWRESET  :
+                return tx.setReturnData32( 0 ); // Write-only
+            case DCSCBRegisters::RST_STAT0    :
+                return tx.setReturnData32( handler.get_rst_stat(CLUSTER0_INDEX) );
+            case DCSCBRegisters::RST_STAT1    :
+                return tx.setReturnData32( handler.get_rst_stat(CLUSTER1_INDEX) );
+
+            case DCSCBRegisters::CLUSTER0_CFG_R    :
+                return tx.setReturnData32( handler.get_cfg_r( CLUSTER0_INDEX ) );
+            case DCSCBRegisters::CLUSTER0_CFG_W    :
+                return tx.setReturnData32( handler.get_cfg_w( CLUSTER0_INDEX ) );
+
+            case DCSCBRegisters::CLUSTER1_CFG_R    :
+                return tx.setReturnData32( handler.get_cfg_r( CLUSTER1_INDEX ) );
+            case DCSCBRegisters::CLUSTER1_CFG_W    :
+                return tx.setReturnData32( handler.get_cfg_w( CLUSTER1_INDEX ) );
+            case DCSCBRegisters::DCS_CFG_R    :
+                return tx.setReturnData32( 0
+                    | number_of_cores_in_cluster0      << (16)
+                    | number_of_cores_in_cluster1 << (16 + 4)
+                    | (cfg_activecluster & 0x3)     << 0
+                    );
+
+            case DCSCBRegisters::BX_ADDR_CL0_CPU0      :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU0_high :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU1      :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU1_high :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU2      :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU2_high :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU3      :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU3_high :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU0      :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU0_high :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU1      :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU1_high :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU2      :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU2_high :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU3      :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU3_high :
+                return tx.setReturnData32(
+                    bx_addr_registers[(reg - DCSCBRegisters::BX_ADDR_CL0_CPU0)/(DCSCBRegisters::BX_ADDR_CL0_CPU0_high - DCSCBRegisters::BX_ADDR_CL0_CPU0)]
+                    );
+
+            case DCSCBRegisters::DCS_LEDS:
+                return tx.setReturnData32( dcs_leds );
+            case DCSCBRegisters::DCS_SW:
+                if (daughter_user_switches.getValue.implemented())
+                {
+                    dcs_sw = daughter_user_switches.getValue();
+                }
+                return tx.setReturnData32( dcs_sw );
+
+            case DCSCBRegisters::INT_CTRL     : return tx.setReturnData32( int_gen.read_INT_CTRL()  );
+            case DCSCBRegisters::INT_FREQ     : return tx.setReturnData32( int_gen.read_INT_FREQ()  );
+            case DCSCBRegisters::INT_TYPE0    : return tx.setReturnData32( int_gen.read_INT_TYPE(0) );
+            case DCSCBRegisters::INT_TYPE1    : return tx.setReturnData32( int_gen.read_INT_TYPE(1) );
+            case DCSCBRegisters::INT_TYPE2    : return tx.setReturnData32( int_gen.read_INT_TYPE(2) );
+            case DCSCBRegisters::INT_TYPE3    : return tx.setReturnData32( int_gen.read_INT_TYPE(3) );
+            case DCSCBRegisters::INT_GENERATE : return tx.setReturnData32( /*RAZ*/ 0                   );
+            case DCSCBRegisters::INT_NUMBER   : return tx.setReturnData32( int_gen.read_INT_NUMBER()   );
+            case DCSCBRegisters::INT_ACK      : return tx.setReturnData32( /*RAW*/ 0                   );
+            case DCSCBRegisters::INT_SEQ_first: break; // range of 128 registers -- handled outside of the switch
+            case DCSCBRegisters::INT_SEQ_last : break; // last one!
+
+            case DCSCBRegisters::MODEL_SW_TRACE_TUBE  :
+            case DCSCBRegisters::MODEL_SW_TRACE2_TUBE :
+            case DCSCBRegisters::MODEL_SW_TRACE3_TUBE :
+            case DCSCBRegisters::MODEL_SW_TRACE4_TUBE :
+
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA0:
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA0_high:
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA1:
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA1_high:
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA2:
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA2_high:
+                
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA0:
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA0_high:
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA1:
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA1_high:
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA2:
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA2_high:
+                
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA0:
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA0_high:
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA1:
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA1_high:
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA2:
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA2_high:
+                
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA0:
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA0_high:
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA1:
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA1_high:
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA2:
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA2_high:
+
+            case DCSCBRegisters::MODEL_SW_TRACE_LAST:
+                return tx.setReturnData32(0);
+                
+            case DCSCBRegisters::DCS_AID:
+                return tx.setReturnData32( dcs_aid );
+            case DCSCBRegisters::DCS_ID:
+                return tx.setReturnData32( handler.get_dcs_id() );
+
+
+            case DCSCBRegisters::DBG_RST_CTRL    :
+            case DCSCBRegisters::DBG_RST_SCHED   :
+            {
+                std::ostringstream os;
+                os << "Attempt to read the DCSCB DBG_RST_* registers that are not modelled!\n"
+                   << "These registers are only intended for a debugger to write to, not for SW.\n"
+                    ;
+                message( MSG_ERROR, "%s", os.str().c_str() );
+                break;
+            }
+
+            case DCSCBRegisters::INVALID_REGISTER:
+            {
+                std::ostringstream os;
+                os << "Attempt to read an invalid register in the DCSCB!\n"
+                   << "Address = " << tx.getAddress() << ", AccessByteWidth = " << tx.getAccessByteWidth()
+                   << "\n"
+                    ;
+                message( MSG_WARNING, "%s", os.str().c_str() );
+                break;
+            }
+
+
+            }
+
+            // The 128 INT_SEQ registers are too many to put in the switch!
+            if (reg >= DCSCBRegisters::INT_SEQ_first
+                && reg <= DCSCBRegisters::INT_SEQ_last)
+            {
+                return tx.setReturnData32( int_gen.read_INT_SEQ( (reg - DCSCBRegisters::INT_SEQ_first)/4 ) );
+            }
+
+            return tx.setReturnData32( 0 ); // read-as-zero
+        }
+
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            pv::bus_addr_t const offset = tx.getAddress() & DCSCBRegisters::INVALID_REGISTER;
+
+            if (tx.getAccessByteWidth() != 4
+                && ! (offset >= DCSCBRegisters::MODEL_SW_TRACE_TUBE
+                      && offset < DCSCBRegisters::MODEL_SW_TRACE_LAST))
+            {
+                return tx.generateAbort(); // non-word sized transactions not supported, assume abort!
+            }
+
+            uint32_t const data = tx.getData32();
+
+            unsigned const cluster_id = (tx.getMasterID() >> 2) & 0xF; // ASSUMPTION
+            unsigned const cpu_id     = (tx.getMasterID() >> 0) & 0x3; // ASSUMPTION
+
+
+            HERE << ">>>>  Register write to DCSCB of offset " << DCSCBRegisters::to_register(tx) << " and data " << data << std::endl;
+
+            DCSCBRegisters::register_identifier_t reg = DCSCBRegisters::to_register(tx);
+
+            switch (reg)
+            {
+            case DCSCBRegisters::RST_HOLD0    :
+                handler.set_rst_hold(CLUSTER0_INDEX, data);
+                process_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::RST_HOLD1    :
+                handler.set_rst_hold(CLUSTER1_INDEX, data);
+                process_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::SYS_SWRESET  :
+                handler.set_sys_swreset( data );
+                process_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::RST_STAT0    :
+                ; // WI
+                return tx.writeComplete();
+            case DCSCBRegisters::RST_STAT1    :
+                ; // WI
+                return tx.writeComplete();
+
+            case DCSCBRegisters::CLUSTER0_CFG_R    :
+                ; // WI
+                return tx.writeComplete();
+            case DCSCBRegisters::CLUSTER0_CFG_W    :
+                handler.set_cfg_w( CLUSTER0_INDEX, data );
+                process_deltas();
+                return tx.writeComplete();
+
+            case DCSCBRegisters::CLUSTER1_CFG_R    :
+                ; // WI
+                return tx.writeComplete();
+            case DCSCBRegisters::CLUSTER1_CFG_W    :
+                handler.set_cfg_w( CLUSTER1_INDEX, data );
+                process_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::DCS_CFG_R    :
+                ; // WI
+                return tx.writeComplete();
+
+            case DCSCBRegisters::BX_ADDR_CL0_CPU0      :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU0_high :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU1      :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU1_high :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU2      :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU2_high :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU3      :
+            case DCSCBRegisters::BX_ADDR_CL0_CPU3_high :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU0      :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU0_high :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU1      :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU1_high :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU2      :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU2_high :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU3      :
+            case DCSCBRegisters::BX_ADDR_CL1_CPU3_high :
+                bx_addr_registers[(reg - DCSCBRegisters::BX_ADDR_CL0_CPU0)/(DCSCBRegisters::BX_ADDR_CL0_CPU0_high - DCSCBRegisters::BX_ADDR_CL0_CPU0)] = data;
+                return tx.writeComplete();
+                
+            case DCSCBRegisters::DCS_LEDS:
+                if (dcs_leds != data )
+                {
+                    dcs_leds = data;
+                    if (daughter_leds_state.setValue.implemented())
+                        update_leds();
+                    else
+                        DCSCBDetails::display_dcs_leds( std::cerr, dcs_leds );
+                }
+                return tx.writeComplete();
+            case DCSCBRegisters::DCS_SW:
+                dcs_sw = data;
+                return tx.writeComplete();
+
+            case DCSCBRegisters::INT_CTRL     :
+                int_gen.write_INT_CTRL(data);
+                process_interrupt_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::INT_FREQ     :
+                int_gen.write_INT_FREQ(data);
+                process_interrupt_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::INT_TYPE0    :
+                int_gen.write_INT_TYPE(0, data);
+                process_interrupt_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::INT_TYPE1    :
+                int_gen.write_INT_TYPE(1, data);
+                process_interrupt_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::INT_TYPE2    :
+                int_gen.write_INT_TYPE(2, data);
+                process_interrupt_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::INT_TYPE3    :
+                int_gen.write_INT_TYPE(3, data);
+                process_interrupt_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::INT_GENERATE :
+                int_gen.write_INT_GENERATE(data);
+                process_interrupt_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::INT_NUMBER   :
+                ; // write ignored
+                // int_gen.write_INT_NUMBER(data);
+                // process_interrupt_deltas();
+                return tx.writeComplete();
+            case DCSCBRegisters::INT_ACK      :
+                int_gen.write_INT_ACK(data);
+                return tx.writeComplete();
+            case DCSCBRegisters::INT_SEQ_first: break; // range of 128 registers -- handled outside of the switch
+            case DCSCBRegisters::INT_SEQ_last : break; // last one!
+
+            case DCSCBRegisters::MODEL_SW_TRACE_TUBE :
+                write_trace_tube_register( 0, cluster_id, cpu_id, uint8_t(data) );
+                return tx.writeComplete();
+            case DCSCBRegisters::MODEL_SW_TRACE2_TUBE :
+                write_trace_tube_register( 1, cluster_id, cpu_id, uint8_t(data) );
+                return tx.writeComplete();
+            case DCSCBRegisters::MODEL_SW_TRACE3_TUBE :
+                write_trace_tube_register( 2, cluster_id, cpu_id, uint8_t(data) );
+                return tx.writeComplete();
+            case DCSCBRegisters::MODEL_SW_TRACE4_TUBE :
+                write_trace_tube_register( 3, cluster_id, cpu_id, uint8_t(data) );
+                return tx.writeComplete();
+                
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA0:
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA0_high:
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA1:
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA1_high:
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA2:
+            case DCSCBRegisters::MODEL_SW_TRACE_DATA2_high:
+                
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA0:
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA0_high:
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA1:
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA1_high:
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA2:
+            case DCSCBRegisters::MODEL_SW_TRACE2_DATA2_high:
+                
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA0:
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA0_high:
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA1:
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA1_high:
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA2:
+            case DCSCBRegisters::MODEL_SW_TRACE3_DATA2_high:
+                
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA0:
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA0_high:
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA1:
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA1_high:
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA2:
+            case DCSCBRegisters::MODEL_SW_TRACE4_DATA2_high:
+            {
+                unsigned const size_of_each_interface = unsigned(
+                    DCSCBRegisters::MODEL_SW_TRACE2_DATA0
+                    - DCSCBRegisters::MODEL_SW_TRACE_DATA0 );
+                unsigned const source
+                    = (reg - DCSCBRegisters::MODEL_SW_TRACE_DATA0) / size_of_each_interface;
+
+                assert( source >= 0 && source <= 3 );
+
+                unsigned const offset_in_interface
+                    = ((tx.getAddress() & 0xFFF) - DCSCBRegisters::MODEL_SW_TRACE_DATA0) % size_of_each_interface;
+                
+                write_trace_data_register(
+                    source,
+                    cluster_id,
+                    cpu_id,
+                    offset_in_interface,
+                    tx.getPayload()->referenceDataValue(),
+                    tx.getAccessByteWidth()
+                    );
+                return tx.writeComplete();
+            }
+            case DCSCBRegisters::MODEL_SW_TRACE_LAST:
+                assert(0); // impossible!
+                
+            case DCSCBRegisters::DCS_AID:
+                ; // WI
+                return tx.writeComplete();
+            case DCSCBRegisters::DCS_ID:
+                ; // WI
+                return tx.writeComplete();
+
+            case DCSCBRegisters::DBG_RST_CTRL    :
+            case DCSCBRegisters::DBG_RST_SCHED   :
+            {
+                std::ostringstream os;
+                os << "Attempt to write to the DCSCB DBG_RST_* registers that are not modelled!\n"
+                   << "These registers are only intended for a debugger to write to, not for SW.\n"
+                    ;
+                message( MSG_ERROR, "%s", os.str().c_str() );
+                break;
+            }
+
+            case DCSCBRegisters::INVALID_REGISTER:
+            {
+                std::ostringstream os;
+                os << "Attempt to write to an invalid register in the DCSCB!\n"
+                   << "Address = " << tx.getAddress() << ", AccessByteWidth = " << tx.getAccessByteWidth()
+                   << "\n"
+                    ;
+                message( MSG_WARNING, "%s", os.str().c_str() );
+                break;
+            }
+
+            }
+
+            // The 128 INT_SEQ registers are too many to put in the switch!
+            if (reg >= DCSCBRegisters::INT_SEQ_first
+                && reg <= DCSCBRegisters::INT_SEQ_last)
+            {
+                int_gen.write_INT_SEQ( (reg - DCSCBRegisters::INT_SEQ_first)/4, data );
+                return tx.writeComplete();
+            }
+
+            return tx.writeComplete(); // Write Ignored
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+
+    connection
+    {
+        self.pvbus => pvbusslave.pvbus_s;
+        pvbusslave.device => self.device;
+        self.clk_in => timer.clk_in;
+        timer.timer_callback => self.timer_callback;
+    }
+
+    // This is the externally published bus.  The PVBus protocol is
+    // internal to FastSim and we use the PVBusSlave to convert it to
+    // PVDevice that is easier to use.
+    slave port<PVBus>   pvbus;
+}

@@ -1,0 +1,111 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// An ARMCortexR4CT CPU component.
+
+extern component ARMCortexR4CT
+{
+    properties {
+        executes_software = 1; 
+        version = "8.1.37";
+        component_type = "Core";
+        description = "ARMCortexR4CT CPU component";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    resources
+    {
+        PARAMETER { name("implements_vfp"), type(bool), default(true), description("Set whether the model has been built with VFP support") } implements_vfp;
+        PARAMETER { name("VINITHI"), type(bool), default(false), description("Initialize with high vectors enabled") } VINITHI;
+        PARAMETER { name("CFGIE"), type(bool), default(false), description("Initialize to take exceptions in T32 state. Model starts in T32 state") } CFGIE;
+        PARAMETER { name("vfp-enable_at_reset"), type(bool), default(false), description("Enable coprocessor access and VFP at reset") } vfp_enable_at_reset;
+        PARAMETER { name("semihosting-enable"), type(bool), default(true), description("Enable semihosting SVC traps. Applications that do not use semihosting must set this parameter to false") } semihosting_enable;
+        PARAMETER { name("semihosting-ARM_SVC"), type(uint32_t), default(0x123456), min(0x0), max(0xFFFFFFFF), description("A32 SVC number for semihosting") } semihosting_ARM_SVC;
+        PARAMETER { name("semihosting-Thumb_SVC"), type(uint32_t), default(0xAB), min(0x0), max(0xFFFFFFFF), description("T32 SVC number for semihosting") } semihosting_Thumb_SVC;
+        PARAMETER { name("semihosting-cmd_line"), type(string), default(""), description("Command line available to semihosting SVC calls") } semihosting_cmd_line;
+        PARAMETER { name("semihosting-heap_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Virtual address of heap base") } semihosting_heap_base;
+        PARAMETER { name("semihosting-heap_limit"), type(uint32_t), default(0xF000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of top of heap") } semihosting_heap_limit;
+        PARAMETER { name("semihosting-stack_base"), type(uint32_t), default(0x10000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of base of descending stack") } semihosting_stack_base;
+        PARAMETER { name("semihosting-stack_limit"), type(uint32_t), default(0xF000000), min(0x0), max(0xFFFFFFFF), description("Virtual address of stack limit") } semihosting_stack_limit;
+        PARAMETER { name("semihosting-cwd"), type(string), default(""), description("virtual address of CWD")} semihosting_cwd;
+        PARAMETER { name("min_sync_level"), type(uint32_t), default(0), min(0), max(3), runtime(true), description("force minimum syncLevel (0=off=default,1=syncState,2=postInsnIO,3=postInsnAll)") } min_sync_level;
+        PARAMETER { name("CFGNMFI"), type(bool), default(false), description("Enable nonmaskable FIQ interrupts on startup") } CFGNMFI;
+        PARAMETER { name("CFGTE"), type(bool), default(false), description("Initialize to take exceptions in T32 state. Model starts in T32 state") } CFGTE;
+        PARAMETER { name("CFGEND0"), type(bool), default(false), description("Initialize to BE8 endianness") } CFGEND0;
+        PARAMETER { name("INITRAMI"), type(bool), default(false), description("Set or reset the INITRAMI signal") } INITRAMI;
+        PARAMETER { name("INITRAMD"), type(bool), default(false), description("Set or reset the INITRAMD signal") } INITRAMD;
+        PARAMETER { name("LOCZRAMI"), type(bool), default(false), description("Set or reset the LOCZRAMI signal") } LOCZRAMI;
+        PARAMETER { name("itcm0_base"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF), description("Base address of ITCM at startup") } itcm0_base;
+        PARAMETER { name("dtcm0_base"), type(uint32_t), default(0x800000), min(0x0), max(0xFFFFFFFF), description("Base address of DTCM at startup") } dtcm0_base;
+        PARAMETER { name("itcm0_size"), type(uint32_t), default(0x8), min(0x0), max(0x8), description("Size of ITCM in KB") } itcm0_size;
+        PARAMETER { name("dtcm0_size"), type(uint32_t), default(0x8), min(0x0), max(0x8), description("Size of DTCM in KB") } dtcm0_size;
+        PARAMETER { name("NUM_MPU_REGION"), type(uint32_t), default(0x8), min(0x0), max(0xC), description("Number of MPU regions") } NUM_MPU_REGION;
+        PARAMETER { name("dcache-state_modelled"), type(bool), default(false), description("Set whether D-cache has stateful implementation") } dcache_state_modelled;
+        PARAMETER { name("icache-state_modelled"), type(bool), default(false), description("Set whether I-cache has stateful implementation") } icache_state_modelled;
+        PARAMETER { name("icache-size"), type(uint32_t), default(0x10000), min(0x1000), max(0x10000), description("Set I-cache size in bytes") } icache_size;
+        PARAMETER { name("dcache-size"), type(uint32_t), default(0x10000), min(0x1000), max(0x10000), description("Set D-cache size in bytes") } dcache_size;
+        PARAMETER { name("master_id"), description("Master ID presented in bus transactions"), type(uint32_t), default(0x0), min(0x0), max(0xFFFFFFFF) } master_id;
+    }
+    
+    // The clock signal connected to the clk_in port is used to determine
+    // the rate at which the core executes instructions.
+    slave port<ClockSignal> clk_in;
+
+    // The core will generate bus requests on this port.
+    master port<PVBus> pvbus_m;
+
+    // Raising this signal will put the core into reset mode.
+    slave port<Signal> reset;
+
+    // This signal drives the CPU's interrupt handling.
+    slave port<Signal> irq;
+
+    // This signal drives the CPU's fast-interrupt handling.
+    slave port<Signal> fiq;
+
+    // Signal from the core that it is waiting in standby for an interrupt
+    master port<Signal> standbywfi;
+
+    // Interrupt signal from performance monitoring unit.
+    master port<Signal> pmuirq;
+    
+    // Port allowing the number of instructions since startup to be read from the CPU.
+    master port<InstructionCount> ticks;
+    
+    // Vic address port from primary VIC
+    slave port<ValueState> vic_addr;
+    
+    // Vic acknowledge port to primary VIC
+    master port<Signal> vic_ack;
+    
+    // Configure FIQs as non-maskable after a reset
+    slave port<Signal> cfgnmfi;
+    
+    // Configure exceptions to be taken in thumb mode after a reset
+    slave port<Signal> cfgte;
+    
+    // Configure BE8 mode after a reset
+    slave port<Signal> cfgend0;
+
+    // Configure high vectors after a reset
+    slave port<Signal> vinithi;
+    
+    // Configure big endian instruction format after a reset
+    slave port<Signal> cfgie;
+    
+    // configure ITCM enabled after a reset
+    slave port<Signal> initrami;
+    
+    // configure DTCM enabled after a reset
+    slave port<Signal> initramd;
+
+    // slave access to ITCM
+    slave port<PVBus> itcm;
+    
+    // slave access to DTCM
+    slave port<PVBus> dtcm;
+
+}
+

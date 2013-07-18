@@ -1,0 +1,2584 @@
+/*!
+ * \file    PL080_DMAC.lisa
+ * \brief   LISA Implementation of PL080 DMA controller
+ * \date    Copyright 2007-2008 ARM Limited. All rights reserved.
+ */
+ 
+/*
+ * See DDI0196G_PL080_DMAC_r1p3_trm.pdf for detailed documentation on the organisation and
+ * use of the PL080 DMA controller
+ *
+ * Implementation details:
+ *
+ *  The DMA controller is modelled using a single LISA component but with a C++ model for
+ *  each of the channels (included in this file)
+ *
+ *  enabled channels are kept on an enabled_channels stack in priority order. When a channel
+ *  state changes, rearbitration takes place to make the highest (topmost) channel active 
+ *
+ *  The fifo storage (not the same as the fifo depth) is made large enough that
+ *  it doesn't need to wrap during a burst.
+ *
+ * Functional differences:
+ * 
+ *  Bus width is assumed to be 32bits
+ *
+ *  DMA protection/access bits are currently ignored (priv/bufferable/cacheable)
+ *
+ *  Locked accesses are not supported
+ *
+ *  Requests will only be routed to the most recently activated channel configured for a port
+ *  rathen than to all channels configured for that port
+ *
+ *  Responses will be sent only from the currently active channel.
+ *
+ *  Handshaking is handled slightly differently to hardware
+ *      dmac responses are transient and only asserted during the call, not set and cleared
+ *      peripherals do not need to lower their request signals during a response
+ *      dmac clr may be globally disabled to reduce handshaking traffic
+ *
+ *  The model is timing inaccurate but makes some attempt to regulate DMA flow to avoid 
+ *  starving other components in the model. Transfers are performed in batches of transactions
+ *  up to a configurable number of transactions per batch. The model then sleeps for an
+ *  equivalent number of cycles of the clock to limit the average transaction rate. This 
+ *  behaviour may cause problems in some systems that require a more regulated flow control. 
+ *  Reducing the maximum transactions per batch will help but will increase simulation cost.
+ *
+ *  Channels 6 and 7 are currently treated no differently to other channels
+ *
+ *  Changes to master endianness do not immediately affect enabled channels.
+ *
+ */
+ 
+component PL080_DMAC
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM PrimeCell DMA Controller(PL080/081)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #include <pv/PVBusMaster.h>
+        
+        // Everything in here is in a shared namespace so needs to have a unique prefix
+        
+        // debugging message controls
+        
+        #define PL080_TRACE      if (!0) ; else printf  
+        #define PL080_TRACE_REG  if (!0) ; else printf
+        #define PL080_TRACE_REGU if (!0) ; else printf
+        #define PL080_TRACE_CH   if (!0) ; else printf
+        
+        // Don't change anything below here
+        
+        #define PL080_NUM_CHANNELS    8
+        #define PL080_NUM_DMAPORTS    16
+        #define PL080_CHANNEL_MASK    ((PL080_NUM_CHANNELS)-1)
+        #define PL080_DMAPORT_MASK    ((PL080_NUM_DMAPORTS)-1)
+        
+        #define PL080_NO_DMAPORT      0xffffffff
+        #define PL080_NO_CHANNEL      0xffffffff
+        
+        // maximum number of bytes that can be transferred in a burst
+        
+        #define PL080_MAX_DMA_BURST   1024        
+        
+
+    }
+    
+    composition
+    {
+        // slave for publising our registers
+        
+        busslave : PVBusSlave(size = 0x1000);
+        
+        // masters for accessing devices and memory
+        
+        busmaster0 : PVBusMaster;
+        busmaster1 : PVBusMaster;
+        
+        // timer for controlling activity rate
+        
+        timer : ClockTimer;
+    }
+    
+    resources
+    {
+        // This sets the fifo depth for channels. It MUST be a multiple of the maxiumum transfer width
+        // The hardware has a 16 byte fifo, larger sizes allow for more efficient transfers
+        
+        PARAMETER { description("Channel FIFO size in bytes"), type(uint32_t), default(16) }  fifo_size;
+        
+        // This sets the largest number of transfers that can occur without waiting for other system
+        // components to run. Larger values make for faster transfers but more granular behaviour
+        // This should be at least 2*fifo_size for optimal transfers
+        
+        PARAMETER { description("Largest atomic transfer"), type(uint32_t), default(256) } max_transfer;
+        
+        // This determines whether a clear response should be sent to attached peripherals after a transfer
+        // Most peripherals do not require this and it causes excess handshaking overhead. This should
+        // possibly be a per-port parameter.
+        
+        PARAMETER { description("Generate clear response"), type(bool), default(false) } generate_clear;
+        
+        // This sets the approximate delay (in clock cycles) after a request before the DMAC responds
+        // to the request, if the channel is waiting. If configured to zero, transfers may occur
+        // during the request and may complete immediately, which may confuse some peripherals.
+        
+        PARAMETER { description("request delay"), type(uint32_t), default(0) } activate_delay;
+
+        // structure storing information related to one DMAC channel
+        struct PL080_Channel
+        {
+            // bit numbers and masks
+            enum RegBits
+            {
+                // config register
+                
+                CONFIG_H        = 18,       // halt
+                CONFIG_A        = 17,       // active
+                CONFIG_L        = 16,       // lock
+                CONFIG_ITC      = 15,       // tc interrupt mask
+                CONFIG_IE       = 14,       // error interrupt mask
+                CONFIG_FLOW     = 11,       // flow control
+                CONFIG_FLOW_MASK= 0x7,
+                CONFIG_DEST     = 6,        // dest port
+                CONFIG_DEST_MASK= PL080_NUM_DMAPORTS-1,
+                CONFIG_SRC      = 1,        // source port
+                CONFIG_SRC_MASK = PL080_NUM_DMAPORTS-1,
+                CONFIG_E        = 0,        // enable bit
+                
+                // control register
+                
+                CONTROL_I       = 31,       // current lli interrupt mask
+                CONTROL_PROT    = 28,       // access protection
+                CONTROL_PROT_MASK = 0x7,
+                CONTROL_DI      = 27,       // dest address increment
+                CONTROL_SI      = 26,       // source address increment
+                CONTROL_D       = 25,       // dest master select
+                CONTROL_S       = 24,       // source master select
+                CONTROL_DWIDTH  = 21,       // dest transfer width
+                CONTROL_DWIDTH_MASK = 0x7,
+                CONTROL_SWIDTH  = 18,       // source transfer width
+                CONTROL_SWIDTH_MASK = 0x7,
+                CONTROL_DBSIZE  = 15,       // dest burst size
+                CONTROL_DBSIZE_MASK = 0x7,
+                CONTROL_SBSIZE  = 12,       // source burst size
+                CONTROL_SBSIZE_MASK = 0x7,
+                CONTROL_TRANSFER_MASK = 0xfff // transfer count
+            };
+            
+            // channel states used by main controller to determine next action
+            enum State
+            {
+                Idle, Waiting, Runnable, TerminalCount, Error
+            };
+            
+            State  state;         // current activity state of the channel
+            
+            uint32_t channel_num; // channel number as seen by the DMAC
+            
+            uint32_t src_addr;    // source address of next transaction
+            uint32_t dst_addr;    // dest address of next transaction
+            uint32_t config;      // config status
+            uint32_t control;     // control reg
+            uint32_t lli_addr;    // link reg address and port to use for loads
+                                    
+            uint32_t src_port;    // active source port
+            uint32_t dst_port;    // active dest port
+            
+            uint32_t src_transfer;    // if dmac is controller, remaining transfers
+            uint32_t dst_transfer;    // if dmac is controller, remaining transfers
+            
+            uint32_t src_residual;    // number of transfers remaining in this burst 
+            uint32_t dst_residual;    // number of transfers remaining in this burst
+            
+            uint32_t src_burst;   // source burst transfer size when dma is master
+            uint32_t dst_burst;   // destination burst transfer size when dma is master
+            
+            uint32_t src_inc;     // byte increment for each source transfer
+            uint32_t dst_inc;     // byte increment for each destination transfer
+            
+            uint32_t src_width;   // (log2) transfer width for source transfer
+            uint32_t dst_width;   // (log2) transfer width for destination transfer
+            
+            uint32_t src_master;  // master bus port for source
+            uint32_t dst_master;  // master bus port for destination
+            
+            bool src_bigend;      // source master is big endian
+            bool dst_bigend;      // destination master is big endian
+            
+            pv::TransactionGenerator* reader;  // (shared) transaction generator for source
+            pv::TransactionGenerator* writer;  // (shared) transaction generator for destination
+            
+            uint32_t src_request;   // current request from source port
+            uint32_t dst_request;   // current request from dest port
+            
+            uint32_t flow_control;  // flow control type
+            
+            uint8_t fifo[PL080_MAX_DMA_BURST]; // channel fifo
+            uint8_t* fifo_in;       // pointer to next entry for src reads
+            uint8_t* fifo_out;      // pointer to next entry for dest writes
+            uint32_t  fifo_size;      // actual fifo depth as visible to the user
+            
+            bool stopped;           // channel is stopped pending more activity
+            uint32_t src_response;  // source response to a peripheral after a transfer
+            uint32_t dst_response;  // destination response to a peripheral after a transfer
+            bool src_tc_done;       // latched version of src_tc used in source flow mode
+            
+            bool halt;              // state of the config halt bit - masks src requests
+            
+            // configuration
+            
+            bool generate_clear;    // (don't) send clear responses to peripherals on burst
+            
+            // debug aids
+            
+            const char* requestName(uint32_t request)
+            {
+                static char name[32];
+                
+                if (request)
+                {
+                    sprintf(name, "%s%s%s%s", 
+                            request & PL080_REQ_SINGLE  ? "SINGLE "  : "",
+                            request & PL080_REQ_BURST   ? "BURST "   : "",
+                            request & PL080_REQ_LSINGLE ? "LSINGLE " : "",
+                            request & PL080_REQ_LBURST  ? "LBURST "  : "");
+                }
+                else
+                {
+                    sprintf(name, "NONE ");
+                }
+                        
+                return name;
+            }
+            
+            const char* responseName(uint32_t response)
+            {
+                static char name[32];
+                
+                if (response)
+                {
+                    sprintf(name, "%s%s",
+                            response & PL080_RES_CLR ? "CLR " : "",
+                            response & PL080_RES_TC  ? "TC "  : "");
+                }
+                else
+                {
+                    sprintf(name, "NONE ");
+                }
+                
+                return name;
+            }
+            
+            // implementation
+           
+            PL080_Channel()
+            {
+                channel_num    = 0;
+                fifo_size      = 16;
+                generate_clear = false;
+                
+                reset();
+            }
+            
+            void reset()
+            {
+                state = Idle;
+                
+                src_addr = 0;
+                dst_addr = 0;
+                config   = 0;
+                control  = 0;
+                lli_addr = 0;
+                
+                src_port = PL080_NO_DMAPORT;
+                dst_port = PL080_NO_DMAPORT;
+                
+                src_transfer = 0;
+                dst_transfer = 0;
+                
+                src_residual = 0;
+                dst_residual = 0;
+                
+                src_burst = 0;
+                dst_burst = 0;
+                src_inc = 0;
+                dst_inc = 0;
+                
+                src_width = 0;
+                dst_width = 0;
+                
+                src_master = 0;
+                dst_master = 0;
+                
+                src_bigend = false;
+                dst_bigend = false;
+                
+                reader = NULL;
+                writer = NULL;
+                
+                src_request = 0;
+                dst_request = 0;
+                
+                fifo_in = fifo;
+                fifo_out = fifo;
+                
+                halt = false;
+        
+                src_response = 0;
+                dst_response = 0;
+            }
+            
+            // Set the channel control state when the channel control register is written, or when
+            // an LLI load occurs. Channel data is immediately updated to reflect the new state.
+          
+            void setControl(uint32_t data)
+            {
+                static const uint32_t burst_size[] = { 1, 4, 8, 16, 32, 64, 128, 256 };
+                static const uint32_t trans_width[] = { 0, 1, 2, 0, 0, 0, 0, 0 };
+                                
+                src_burst = burst_size[(data >> CONTROL_SBSIZE) & CONTROL_SBSIZE_MASK];
+                dst_burst = burst_size[(data >> CONTROL_DBSIZE) & CONTROL_DBSIZE_MASK];
+                
+                src_width = trans_width[(data >> CONTROL_SWIDTH) & CONTROL_SWIDTH_MASK];
+                dst_width = trans_width[(data >> CONTROL_DWIDTH) & CONTROL_DWIDTH_MASK];
+                
+                // These will be ignored if the DMAC is not flow controller
+                
+                src_transfer = (data & CONTROL_TRANSFER_MASK);          
+                dst_transfer = (src_transfer << src_width) >> dst_width;
+                
+                src_master = (data >> CONTROL_S) & 1;
+                dst_master = (data >> CONTROL_D) & 1;
+                
+                src_inc = ((data >> CONTROL_SI) & 1) ? (1<<src_width) : 0;
+                dst_inc = ((data >> CONTROL_DI) & 1) ? (1<<dst_width) : 0;
+                
+                src_residual = 0;
+                dst_residual = 0;
+                
+                src_response = 0;
+                dst_response = 0;
+                
+                PL080_TRACE_CH("   src_burst=%d\n", src_burst);
+                PL080_TRACE_CH("   dst_burst=%d\n", dst_burst);
+                PL080_TRACE_CH("   src_width=%d%s\n", (8<<src_width), src_inc?"+":"");
+                PL080_TRACE_CH("   dst_width=%d%s\n", (8<<dst_width), dst_inc?"+":"");
+                PL080_TRACE_CH("   transfer=%d\n", src_transfer);
+                PL080_TRACE_CH("   src_master=%d\n", src_master);       
+                PL080_TRACE_CH("   dst_master=%d\n", dst_master);       
+                
+                // all other bits are used as required from the control register
+                control = data;    
+            }
+            
+            // Get the current channel control status as read by the channel control register
+            
+            uint32_t getControl()
+            {                
+                control &= ~CONTROL_TRANSFER_MASK;
+                
+                return control;
+            }
+            
+            // Set the config state when the channel config register is written
+            
+            void setConfig(uint32_t data)
+            {
+                bool is_enabled = (config & (1<<CONFIG_E)) != 0;
+                bool set_enable = (data & (1<<CONFIG_E)) != 0;
+                
+                halt = (data & (1<<CONFIG_H)) != 0;
+                
+                if (!is_enabled && set_enable)
+                {
+                    src_port     = (data >> CONFIG_SRC)  & CONFIG_SRC_MASK;
+                    dst_port     = (data >> CONFIG_DEST) & CONFIG_DEST_MASK;
+                
+                    flow_control = (data >> CONFIG_FLOW) & CONFIG_FLOW_MASK;
+                
+                    static const char* flow_name[] = { "M2M", "M2P", "P2M", "P2P", "P2P_DP", "M2P_DP", "P2M_SP", "P2P_SP" };
+                 
+                    PL080_TRACE_CH("   enabled\n");
+                    PL080_TRACE_CH("   src port=%d\n", src_port);
+                    PL080_TRACE_CH("   dst port=%d\n", dst_port);
+                    PL080_TRACE_CH("   flow=%s\n", flow_name[flow_control]); 
+                    
+                    switch (flow_control)
+                    {
+                        case 0: // mem to mem, DMA control
+                            src_port = PL080_NO_DMAPORT;
+                            dst_port = PL080_NO_DMAPORT;
+                        break;
+                        
+                        case 1: // mem to perip, DMA control
+                            src_port = PL080_NO_DMAPORT;
+                        break;
+                        
+                        case 2: // perip to mem, DMA control
+                            dst_port = PL080_NO_DMAPORT;
+                        break;
+                        
+                        case 3: // perip to perip, DMA control
+                        break;
+                        
+                        // for non DMAC flow control, transfer used as a 'last' flag
+                        // up to the last burst
+                        
+                        case 4: // perip to perip, dest control
+                            src_transfer = 1;
+                            dst_transfer = 1;
+                        break;
+                            
+                        case 5: // mem to perip, dest control
+                            src_port = PL080_NO_DMAPORT;
+                            src_transfer = 1;
+                            dst_transfer = 1;
+                        break;
+
+                        case 6: // perip to mem, src control
+                            dst_port = PL080_NO_DMAPORT;
+                            src_transfer = 1;
+                            dst_transfer = 1;
+                            src_tc_done = false;
+                        break;
+                        
+                        case 7: // perip to perip, src control
+                            src_transfer = 1;
+                            dst_transfer = 1;
+                            src_tc_done = false;
+                        break;
+                    }                    
+                }
+                
+                if (is_enabled)
+                    state = Runnable;
+                else
+                    state = Idle;
+                
+                // all other bits are used directly from the register
+                config = data;
+            }
+                        
+            // return the current config as returned by the channel config register
+            
+            uint32_t getConfig()
+            {
+                // active bit needs to be generated
+                
+                config &= ~(1<<CONFIG_A);
+                     
+                if (fifo_in != fifo_out)
+                    config |= (1<<CONFIG_A);
+                
+                return config;
+            }
+            
+            // Latch an incoming request from a port. The request will be sampled at the start of the
+            // next burst transfer. If the channel is stalled waiting for a request, it is made runnable.
+            
+            State setRequest(uint32_t port, uint32_t new_request)
+            {
+                // requests are sampled when the current (burst/single) transfer
+                // finishes and more data is required
+                
+                if (port == src_port)
+                {
+                    PL080_TRACE_CH("DMAC_CH%d source request %s\n", channel_num, requestName(new_request)); 
+                    
+                    src_request = new_request;
+                }   
+                if (port == dst_port)
+                {
+                    PL080_TRACE_CH("DMAC_CH%d dest request %s\n", channel_num, requestName(new_request)); 
+                    
+                    dst_request = new_request;
+                }
+                if ((src_request | dst_request) && (state == Waiting))
+                {
+                    PL080_TRACE_CH("DMAC_CH%d: made runnable\n", channel_num); 
+                    
+                    state = Runnable;
+                }
+                return state;
+            }
+            
+            // Set the enabled state of a channel. The channel is enabled by programming the control register
+            // and disabled when the last transfer finishes or an error occurs.
+            
+            void setEnabled(bool enable)
+            {
+                if (enable)
+                {
+                    config |= (1<<CONFIG_E);
+                    state = Runnable;
+                }
+                else
+                {
+                    config &= ~(1<<CONFIG_E);
+                    state = Idle;
+                    
+                    fifo_in = fifo;
+                    fifo_out = fifo;
+                }
+            }
+            
+            // Return the enabled state of a channel
+            
+            bool isEnabled()
+            {
+                return (config & (1<<CONFIG_E)) != 0;
+            }
+
+            // Utility functions to change data endianness. It would be useful to have a utility
+            // library of such calls.
+            
+            inline uint16_t bswap16(uint16_t a)
+            { 
+                return (a<<8) | (a>>8); 
+            }
+            
+            inline uint32_t bswap32(uint32_t a)
+            { 
+                return ((a&0x000000ffU)<<24) 
+                     | ((a&0x0000ff00U)<< 8)
+                     | ((a&0x00ff0000U)>> 8)
+                     | ((a&0xff000000U)>>24); 
+            }
+                           
+            // Read one transaction via a master port into the channel fifo. The action is
+            // dependent on the endianness of the source channel and the configured transfer
+            // width. If an error occurs the channel is put into the error state and
+            // the transfer returns false.
+            
+            bool readIntoFifo()
+            {
+                bool ok = false;
+                if (src_bigend)
+                {
+                    switch (src_width)
+                    {
+                        case 0:
+                        {
+                            ok = reader->read8(src_addr^3, fifo_in);
+                            if (ok)
+                            {
+                                src_addr += src_inc;
+                                fifo_in += 1;
+                            }
+                        }
+                        break;
+                        
+                        case 1:
+                        {
+                            uint16_t data;
+                            ok = reader->read16(src_addr^2, &data);
+                            if (ok)
+                            {
+                                data = bswap16(data);
+                                *(uint16_t*)fifo_in = data;
+                                src_addr += src_inc;
+                                fifo_in += 2;
+                            }
+                        }
+                        break;
+                        
+                        case 2:
+                        {
+                            uint32_t data;
+                            ok = reader->read32(src_addr, &data);
+                            if (ok)
+                            {
+                                src_addr += src_inc;
+                                data = bswap32(data);
+                                *(uint32_t*)fifo_in = data;
+                                fifo_in += 4;
+                            }
+                        } 
+                        break;
+                    } 
+                }
+                else
+                {
+                    switch (src_width)
+                    {
+                        case 0:
+                        {
+                            ok = reader->read8(src_addr, fifo_in);
+                            if (ok)
+                            {
+                                src_addr += src_inc;
+                                fifo_in += 1;
+                            }
+                        }
+                        break;
+                        
+                        case 1:
+                        {
+                            uint16_t data;
+                            ok = reader->read16(src_addr, &data);
+                            if (ok)
+                            {
+                                *(uint16_t*)fifo_in = data;
+                                src_addr += src_inc;
+                                fifo_in += 2;
+                            }
+                        }
+                        break;
+                        
+                        case 2:
+                        {
+                            uint32_t data;
+                            ok = reader->read32(src_addr, &data);
+                            if (ok)
+                            {
+                                *(uint32_t*)fifo_in = data;
+                                src_addr += src_inc;
+                                fifo_in += 4;
+                            }
+                        } 
+                        break;
+                    } 
+                }
+                if (!ok)
+                {
+                    PL080_TRACE_CH("DMAC_CH%d: read at 0x%x returned error status\n", channel_num, src_addr);
+                    
+                    state = Error;
+                    return false;
+                }
+                return true;                
+            }
+            
+            // Write one transaction from the fifo via a master port. The action is
+            // dependent on the endianness of the destination channel and the configured transfer
+            // width. If an error occurs the channel is put into the error state and
+            // the transfer returns false.
+            
+            bool writeFromFifo()
+            {
+                bool ok = false;
+                if (dst_bigend)
+                {
+                    switch (dst_width)
+                    {
+                        case 0:
+                        {
+                            ok = writer->write8(dst_addr^3, fifo_out);
+                            if (ok)
+                            {
+                                dst_addr += dst_inc;
+                                fifo_out += 1;
+                            }
+                        }
+                        break;
+                        
+                        case 1:
+                        {
+                            uint16_t data = *(uint16_t*)fifo_out;
+                            data = bswap16(data);
+                            ok = writer->write16(dst_addr^2, &data);
+                            if (ok)
+                            {
+                                dst_addr += dst_inc;
+                                fifo_out += 2;
+                            }
+                        }
+                        break;
+                        
+                        case 2:
+                        {
+                            uint32_t data = *(uint32_t*)fifo_out;
+                            data = bswap32(data);
+                            ok = writer->write32(dst_addr, &data);
+                            if (ok)
+                            {
+                                dst_addr += dst_inc;
+                                fifo_out += 4;
+                            }
+                        } 
+                        break;
+                    } 
+                }
+                else
+                {
+                    switch (dst_width)
+                    {
+                        case 0:
+                        {
+                            ok = writer->write8(dst_addr, fifo_out);
+                            if (ok)
+                            {
+                                dst_addr += dst_inc;
+                                fifo_out += 1;
+                            }
+                        }
+                        break;
+                        
+                        case 1:
+                        {
+                            uint16_t data = *(uint16_t*)fifo_out;
+                            ok = writer->write16(dst_addr, &data);
+                            if (ok)
+                            {
+                                dst_addr += dst_inc;
+                                fifo_out += 2;
+                            }
+                        }
+                        break;
+                        
+                        case 2:
+                        {
+                            uint32_t data = *(uint32_t*)fifo_out;
+                            ok = writer->write32(dst_addr, &data);
+                            if (ok)
+                            {
+                                dst_addr += dst_inc;
+                                fifo_out += 4;
+                            }
+                        } 
+                        break;
+                    } 
+                }
+                if (!ok)
+                {
+                    PL080_TRACE_CH("DMAC_CH%d: write at 0x%x returned error status\n", channel_num, dst_addr);
+
+                    state = Error;
+                    return false;
+                }
+                return true;
+            }
+            
+            // Read n transactions via a master port into the channel fifo
+            
+            bool srcAccess(uint32_t count)
+            {
+                for (uint32_t i=0; i<count; ++i)
+                {
+                    if (!readIntoFifo())
+                        return false;
+                }
+                return true;
+            }
+            
+            // Write n transactions via a master port from the channel fifo
+            
+            bool dstAccess(uint32_t count)
+            {
+                for (uint32_t i=0; i<count; ++i)
+                {
+                    if (!writeFromFifo())
+                        return false;
+                }
+                return true;
+            }
+
+            // set up for the next src burst/single transfer.
+            // Returns whether more data is available from the source peripheral/memory
+            
+            bool startSrcBurst()
+            {
+                // if the channel is halted ignore source requests and wait
+                if (halt)
+                {
+                    PL080_TRACE_CH("DMAC_CH%d: waiting due to halt\n", channel_num);
+
+                    state = Waiting;
+                    return false;
+                }
+                
+                switch (flow_control)
+                {
+                    case 0: // mem to mem, DMA control
+                    case 1: // mem to perip, DMA control
+                    case 5: // mem to perip, dest control
+                    {
+                        // ignore requests, use src_transfer
+                        if (src_transfer >= src_burst)
+                        {
+                            src_residual = src_burst;
+                            src_transfer -= src_burst;
+                        }
+                        else if (src_transfer > 0)
+                        {
+                            src_residual = src_transfer;
+                            src_transfer = 0; 
+                        }
+                        else
+                        { 
+                            PL080_TRACE_CH("DMAC_CH%d: M2* startSrcBurst with transfer == 0\n", channel_num);
+                            return false;
+                        }   
+                    } break;
+                    
+                    case 2: // perip to mem, DMA control
+                    case 3: // perip to perip, DMA control
+                    case 4: // perip to perip, dest control
+                    {
+                        // use DMAC_BURST, DMAC_SINGLE and src_transfer
+                        if (src_transfer >= src_burst)
+                        {
+                            if (src_request & PL080_REQ_BURST)
+                            {
+                                src_residual = src_burst;
+                                src_transfer -= src_burst;
+                            }
+                            else if (src_request & PL080_REQ_SINGLE)
+                            {
+                                src_residual = 1;
+                                src_transfer -= 1;
+                            }
+                            else 
+                            {
+                                PL080_TRACE_CH("DMAC_CH%d: waiting for src\n", channel_num);
+                                
+                                state = Waiting;
+                                return false;
+                            }
+                        }
+                        else if (src_transfer > 0)
+                        {
+                            if (src_request & PL080_REQ_BURST)
+                            {
+                                src_residual = src_transfer;
+                                src_transfer = 0;
+                            }
+                            else if (src_request & PL080_REQ_SINGLE)
+                            {
+                                src_residual = 1;
+                                src_transfer -= 1;
+                            }
+                            else
+                            {
+                                PL080_TRACE_CH("DMAC_CH%d: waiting for src\n", channel_num);
+                                
+                                state = Waiting;
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            PL080_TRACE_CH("DMAC_CH%d: P2* startSrcBurst with transfer == 0\n", channel_num);
+                            return false;
+                        }
+                    } break;
+                    
+                    case 6: // perip to mem, src control
+                    case 7: // perip to perip, src control
+                    {
+                        // use all requests in src control mode
+                        if (src_transfer != 0)
+                        {
+                            if (src_request)
+                            {
+                                if (src_request & (PL080_REQ_BURST|PL080_REQ_LBURST))
+                                {
+                                    src_residual = src_burst;
+                                }
+                                else
+                                {
+                                    src_residual = 1;
+                                }
+                                
+                                if (src_request & (PL080_REQ_LBURST|PL080_REQ_LSINGLE))
+                                {
+                                    src_transfer = 0;
+                                }
+                            }
+                            else
+                            {
+                                PL080_TRACE_CH("DMAC_CH%d: waiting for src\n", channel_num);
+                                
+                                state = Waiting;
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            PL080_TRACE_CH("DMAC_CH%d: P2* startSrcBurst src_transfer=0\n", channel_num);
+                            return false;
+                        }
+                    } break;
+                } // switch
+                
+                return true;
+            }
+            
+            // set up for the next dest burst/single transfer.
+            // returns whether the destination port/memory is ready to accept data
+            
+            bool startDstBurst()
+            {
+                switch (flow_control)
+                {
+                    case 0: // mem to mem, DMA control
+                    case 2: // perip to mem, DMA control
+                    {
+                        // ignore requests, use dst_transfer
+                        if (dst_transfer >= dst_burst)
+                        {
+                            dst_residual = dst_burst;
+                            dst_transfer -= dst_burst;
+                        }
+                        else if (dst_transfer > 0)
+                        {
+                            dst_residual= dst_transfer;
+                            dst_transfer = 0; 
+                        }
+                        else
+                        { 
+                            PL080_TRACE_CH("DMAC_CH%d: *2M startDstBurst transfer=0\n", channel_num);
+                            return false;
+                        }   
+                    } break;
+                                        
+                    case 1: // mem to perip, DMA control
+                    case 3: // perip to perip, DMA control
+                    {
+                        // use DMAC_BURST only and src_transfer
+                        if (dst_transfer >= dst_burst)
+                        {
+                            if (dst_request & PL080_REQ_BURST)
+                            {
+                                dst_residual = dst_burst;
+                                dst_transfer -= dst_burst;
+                            }
+                            else
+                            {
+                                PL080_TRACE_CH("DMAC_CH%d: waiting for dst\n", channel_num);
+                                
+                                state = Waiting;
+                                return false;
+                            }
+                        }
+                        else if (dst_transfer > 0)
+                        {
+                            // only the BURST signal is used, DMAC clips to remaining transfer size
+                            if (dst_request & PL080_REQ_BURST)
+                            {
+                                dst_residual = dst_transfer;
+                                dst_transfer = 0;
+                            }
+                            else
+                            {
+                                PL080_TRACE_CH("DMAC_CH%d: waiting for dst\n", channel_num);
+                                
+                                state = Waiting;
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            PL080_TRACE_CH("DMAC_CH%d: *2P startDstBurst transfer=0\n", channel_num);
+                            return false;
+                        }
+                        
+                    } break;
+
+                    case 4: // perip to perip, dest control
+                    case 5: // mem to perip, dest control
+                    {
+                        // use all requests, use dst_transfer to indicate last transfer
+                        // all request signals are mutually exclusive, the order is arbitrary
+                        if (dst_transfer != 0)
+                        {
+                            if (dst_request)
+                            {
+                                if (dst_request & (PL080_REQ_BURST|PL080_REQ_LBURST))
+                                {
+                                    dst_residual = dst_burst;
+                                }
+                                else
+                                {
+                                    dst_residual = 1;
+                                }
+                                
+                                if (dst_request & (PL080_REQ_LBURST|PL080_REQ_LSINGLE))
+                                {
+                                    dst_transfer = 0;
+                                }
+                            
+                                // src_transfer = dst_residual*dwidth/swidth, rounded up
+                                
+                                src_transfer = ((dst_residual<<dst_width)+(1<<src_width)-1)>>src_width;
+                            }
+                            else
+                            {
+                                PL080_TRACE_CH("DMAC_CH%d: waiting for dst\n", channel_num);
+                                
+                                state = Waiting;
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            PL080_TRACE_CH("DMAC_CH%d: *2P_DP startDstBurst transfer=0\n", channel_num);
+                            return false;
+                        }
+                    } break;                    
+                    
+                    case 6: // perip to mem, src control
+                    {
+                        dst_residual = dst_burst;
+                    } break;
+
+                    case 7: // perip to perip, src control
+                    {
+                        // use DMAC_BURST only, ignore dst_transfer
+                        if (dst_request & PL080_REQ_BURST)
+                        {
+                            dst_residual = dst_burst;
+                        }
+                        else
+                        {
+                            PL080_TRACE_CH("DMAC_CH%d: waiting for dst\n", channel_num);
+                            
+                            state = Waiting;
+                            return false;
+                        }
+                    } break;
+                } // switch
+                
+                return true;
+            }
+            
+            // actions to perform at the end of a src burst
+            
+            bool endSrcBurst()
+            {
+                switch(flow_control)
+                {
+                    case 0: // M2M
+                    case 1: // M2P
+                    case 5: // M2P_DP
+                    break;
+                    
+                    case 2: // P2M
+                    case 3: // P2P
+                        if (generate_clear)
+                            src_response = PL080_RES_CLR;
+                            
+                        if (src_transfer == 0)
+                            src_response |= PL080_RES_TC;
+                    break;
+                    
+                    case 4: // P2P_DP
+                        if (generate_clear)
+                            src_response = PL080_RES_CLR;
+                            
+                        if (src_transfer == 0 && dst_transfer == 0)
+                            src_response |= PL080_RES_TC;
+                    break;
+                    
+                    case 6: // P2M_SP
+                    case 7: // P2P_SP
+                        if (generate_clear)
+                            src_response = PL080_RES_CLR;
+                            
+                        if (src_transfer == 0)
+                        {
+                            src_tc_done = true;
+                            src_response |= PL080_RES_TC;
+                            
+                            // Adjust the dest counters so that the remaining data
+                            // gets sent. Note that rounding errors may lose data, as documented
+                            // in the TRM
+                            
+                            dst_transfer = (fifo_in-fifo_out) >> dst_width;
+                            
+                            if (dst_transfer > dst_residual)
+                            {
+                                dst_transfer -= dst_residual;
+                            }
+                            else
+                            {
+                                dst_residual = dst_transfer;
+                                dst_transfer = 0;
+                            }
+                        }
+                    break;
+                }
+                return (src_response == 0);
+            }
+            
+            // actions to perform at the end of a dst burst
+            
+            bool endDstBurst()
+            {
+                switch(flow_control)
+                {
+                    case 0: // M2M
+                    case 2: // P2M
+                        if (dst_transfer == 0)
+                        {
+                            state = TerminalCount;
+                            return false;
+                        }
+                    break;
+                    
+                    case 1: // M2P
+                    case 3: // P2P
+                    case 4: // P2P_DP
+                    case 5: // M2P_DP
+                        if (generate_clear)
+                            dst_response = PL080_RES_CLR;
+                        
+                        if (dst_transfer == 0)
+                        {
+                            dst_response |= PL080_RES_TC;
+                            state = TerminalCount;
+                        }
+                    break;
+                    
+                    case 6: // P2M_SP
+                        if (src_tc_done && (fifo_out-fifo_in == 0))
+                        {
+                            src_tc_done = false;
+                            state = TerminalCount;
+                            return false;
+                        }
+                    break;
+                    
+                    case 7: // P2P_SP
+                        if (generate_clear)
+                            dst_response = PL080_RES_CLR;
+                            
+                        if (src_tc_done && (fifo_out-fifo_in == 0))
+                        {
+                            src_tc_done = false;
+                            dst_response |= PL080_RES_TC;
+                            state = TerminalCount;
+                        }
+                    break;
+                }
+                return (dst_response == 0);
+            }
+            
+            // Adjust the fifo pointers after a burst transfer. This avoids having to
+            // deal with wrapping during the transfer. This will cause significant
+            // slowdown when src_width < dst_width and single transfers are used.
+            
+            void adjustFifo()
+            {
+                uint32_t fifo_depth = fifo_in-fifo_out;
+                if (fifo_depth > 0)
+                {
+                    memmove(fifo, fifo_out, fifo_depth);
+                    fifo_in = fifo+fifo_depth;
+                    fifo_out = fifo;
+                }
+                else
+                {   
+                    fifo_in = fifo;
+                    fifo_out = fifo;
+                }
+            }
+            
+            // Perform data transfers on the channel for approximately the given number of 'cycles'
+            // Returns approximately the number of cycles that didn't get used
+            
+            uint32_t startDma(uint32_t cycles)
+            {
+                stopped = false;
+                do
+                {
+                    PL080_TRACE_CH("DMAC_CH%d: dt=%d, dr=%d, st=%d, sr=%d, fi=%ld fo=%ld\n", 
+                                   channel_num, dst_transfer, dst_residual, src_transfer, src_residual, (long int)(fifo_in-fifo), (long int)(fifo_out-fifo));
+                   
+                    if (dst_residual > 0)
+                    {
+                        // number of accesses that can be made with the current fifo data
+                        uint32_t dst_access = (fifo_in-fifo_out)>>dst_width;
+                        
+                        // if there is at least one transfer available, do it
+                        if (dst_access > 0)
+                        {
+                            if (dst_access > cycles)
+                                dst_access = cycles;
+                                
+                            if (dst_residual > dst_access)
+                            {
+                                dst_residual -= dst_access;
+                            }
+                            else
+                            {
+                                dst_access = dst_residual;
+                                dst_residual = 0;
+                            }
+                            
+                            cycles -= dst_access;
+                                
+                            if (!dstAccess(dst_access))
+                                break;
+                            
+                            if (dst_residual == 0)
+                            {
+                                PL080_TRACE_CH("DMAC_CH%d: dst burst done t=%d\n", channel_num, dst_transfer);  
+                                if (!endDstBurst())
+                                    break;
+                            }
+                        }
+                        else if (src_residual > 0)
+                        {
+                            // src device has requested up to src_residual transfers 
+                            
+                            // number of accesses that can actually be made given the fifo space
+                            
+                            uint32_t src_access = (fifo_size-(fifo_in-fifo_out))>>src_width;
+                            
+                            if (src_access > cycles)
+                                src_access = cycles;
+                                
+                            if (src_residual > src_access)
+                            {
+                                src_residual -= src_access;
+                            }
+                            else
+                            {
+                                src_access = src_residual;
+                                src_residual = 0;
+                            }
+                            
+                            cycles -= src_access;
+                            
+                            if (!srcAccess(src_access))
+                                break;
+                            
+                            if (src_residual == 0)
+                            {
+                                PL080_TRACE_CH("DMAC_CH%d: src burst done\n", channel_num);  
+                                if (!endSrcBurst())
+                                    break;
+                            }
+                        }
+                        else // (src_residual == 0)
+                        {                         
+                            --cycles;   
+                            adjustFifo();
+                            
+                            // start of transfer, or waiting for src request
+                            if (!startSrcBurst())
+                                break;
+                                
+                            PL080_TRACE_CH("DMAC_CH%d: src burst of %d started\n", channel_num, src_residual);  
+                        }
+                    }
+                    else
+                    {
+                        --cycles;
+                        adjustFifo();
+                        
+                        // start of transfer, or waiting for dest request
+                        if (!startDstBurst())
+                            break;
+                            
+                        PL080_TRACE_CH("DMAC_CH%d: dest burst of %d started\n", channel_num, dst_residual);  
+                    }
+                } while (!stopped && (cycles > 0));
+                
+                stopped = false;
+                
+                return cycles;
+            }
+            
+            // make this channel stop executing and return to the DMAC, e.g. so another
+            // channel can be made active.
+            
+            void stopDma()
+            {
+                stopped = true;
+            }
+            
+            // load channel registers from a linked list record in memory
+            
+            bool loadLLI(pv::TransactionGenerator* source, uint32_t addr)
+            {
+                bool ok = false;
+                uint32_t data;
+            
+                ok = source->read32(addr, &data);
+                if (ok)
+                {
+                    src_addr = data;
+                    addr += 4;
+                    
+                    ok = source->read32(addr, &data);
+                }
+                if (ok)
+                {
+                    dst_addr = data;
+                    addr += 4;
+                    
+                    ok = source->read32(addr, &data);
+                }
+                if (ok)
+                {
+                    lli_addr = data;
+                    addr += 4;
+                
+                    ok = source->read32(addr, &data);
+                }
+                if (ok)
+                {
+                    setControl(data);
+                    
+                    // if not DMA flow control, the transfer counts need to be reset
+                    if (flow_control > 3)
+                    {
+                        src_transfer = 1;
+                        dst_transfer = 1;
+                    }
+        
+                    state = Runnable;
+                    return true;
+                }
+                else
+                {
+                    state = Error;
+                    return false;
+                }
+            }
+        };
+        
+        // structure storing information related to one DMAC DmaPort
+        
+        struct PL080_DmaPort
+        {
+            uint32_t port_num;    // only used for debugging
+            
+            uint32_t channel;     // the last channel to use this port, used for routing requests
+            uint32_t hwRequest;   // latched hardware request status bits
+            uint32_t swRequest;   // latched software request status bits
+            
+            PL080_DmaPort()
+            {
+                reset();
+                
+                hwRequest = 0;
+            }
+            
+            void reset()
+            {
+                channel = PL080_NO_CHANNEL;
+                swRequest = 0;
+            }
+        };
+
+        uint32_t irqtc_status;                    // raw TC interrupt status
+        uint32_t irqerr_status;                   // raw ERR interrupt status
+        
+        uint32_t irqtc_mask;                      // TC interrupt mask
+        uint32_t irqerr_mask;                     // ERR interrupt mask
+        
+        uint32_t config;                          // global config state
+        uint32_t sync;                            // global sync state
+        
+        bool     irq_tc;                          // currently asserted tc interrupt status
+        bool     irq_err;                         // currently asserted err interrupt status
+        bool     irq;                             // currently asssert irq interrupt status
+        
+        PL080_Channel channel[PL080_NUM_CHANNELS];// dma channels
+        PL080_DmaPort dmaport[PL080_NUM_DMAPORTS];// dma handshake ports
+        
+        // Transaction generators for bus transactions. It might be better to allocate and store
+        // these per channel as required. Alternating channels will likely thrash the generator.
+        
+        pv::TransactionGenerator* reader0;        // transaction generator for read transactions
+        pv::TransactionGenerator* writer0;        // transaction generator for write transactions
+        
+        pv::TransactionGenerator* reader1;        // transaction generator for read transactions
+        pv::TransactionGenerator* writer1;        // transaction generator for write transactions
+        
+        bool master0_bigend;                      // endianness of master0
+        bool master1_bigend;                      // endianness of master1
+        
+        // execution state management
+        
+        bool dma_busy;                            // stores whether the DMAC is running or scheduled to run
+        
+        uint32_t enabled_channels[PL080_NUM_CHANNELS];  // stack of enabled channels in priority order
+        int32_t  num_enabled_channels;            // number of enabled channels
+        
+        uint32_t active_channel;                  // index of currently active channel
+        
+        // Registers as visible in the debugger
+        REGISTER { description("Interrupt Status (R0)"),        read_function(debug_read), write_function(debug_write), reg_number(0x000) } IntStatus;
+        REGISTER { description("Terminal Condition Status (R0)"),read_function(debug_read), write_function(debug_write), reg_number(0x004) } IntTCStatus;
+        REGISTER { description("Terminal Condition Clear (W0)"),read_function(debug_read), write_function(debug_write), reg_number(0x008) } IntTCClear;
+        REGISTER { description("Error Status (R0)"),            read_function(debug_read), write_function(debug_write), reg_number(0x00c) } IntErrorStatus;
+        REGISTER { description("Error Status Clear (WO)"),      read_function(debug_read), write_function(debug_write), reg_number(0x010) } IntErrClear;
+        REGISTER { description("Raw TC Status"),                read_function(debug_read), write_function(debug_write), reg_number(0x014) } RawIntTCStatus;
+        REGISTER { description("Raw Error Status"),             read_function(debug_read), write_function(debug_write), reg_number(0x018) } RawIntErrorStatus;
+        REGISTER { description("Enabled Channels"),             read_function(debug_read), write_function(debug_write), reg_number(0x01c) } EnabledChannels;
+        REGISTER { description("Software Burst Request"),       read_function(debug_read), write_function(debug_write), reg_number(0x020) } SoftBReq;
+        REGISTER { description("Software Single Request"),      read_function(debug_read), write_function(debug_write), reg_number(0x024) } SoftSReq;
+        REGISTER { description("Software Last Burst Request"),  read_function(debug_read), write_function(debug_write), reg_number(0x028) } SoftLBReq;
+        REGISTER { description("Software Last Single Request"), read_function(debug_read), write_function(debug_write), reg_number(0x02c) } SoftLSReq;
+        REGISTER { description("Configuration"),                read_function(debug_read), write_function(debug_write), reg_number(0x030) } Configuration;
+        REGISTER { description("Synchronisation"),              read_function(debug_read), write_function(debug_write), reg_number(0x034) } Sync;
+        
+        REGISTER { description("Channel Source Address"),   read_function(debug_read), write_function(debug_write), reg_number(0x100) } C0SrcAddr;
+        REGISTER { description("Channel Dest Address"),     read_function(debug_read), write_function(debug_write), reg_number(0x104) } C0DstAddr;
+        REGISTER { description("Channel Linked List"),      read_function(debug_read), write_function(debug_write), reg_number(0x108) } C0LLI;
+        REGISTER { description("Channel Control"),          read_function(debug_read), write_function(debug_write), reg_number(0x10c) } C0Control;
+        REGISTER { description("Channel Config"),           read_function(debug_read), write_function(debug_write), reg_number(0x110) } C0Config;
+
+        REGISTER { description("Channel Source Address"),   read_function(debug_read), write_function(debug_write), reg_number(0x120) } C1SrcAddr;
+        REGISTER { description("Channel Dest Address"),     read_function(debug_read), write_function(debug_write), reg_number(0x124) } C1DstAddr;
+        REGISTER { description("Channel Linked List"),      read_function(debug_read), write_function(debug_write), reg_number(0x128) } C1LLI;
+        REGISTER { description("Channel Control"),          read_function(debug_read), write_function(debug_write), reg_number(0x12c) } C1Control;
+        REGISTER { description("Channel Config"),           read_function(debug_read), write_function(debug_write), reg_number(0x130) } C1Config;
+
+        REGISTER { description("Channel Source Address"),   read_function(debug_read), write_function(debug_write), reg_number(0x140) } C2SrcAddr;
+        REGISTER { description("Channel Dest Address"),     read_function(debug_read), write_function(debug_write), reg_number(0x144) } C2DstAddr;
+        REGISTER { description("Channel Linked List"),      read_function(debug_read), write_function(debug_write), reg_number(0x148) } C2LLI;
+        REGISTER { description("Channel Control"),          read_function(debug_read), write_function(debug_write), reg_number(0x14c) } C2Control;
+        REGISTER { description("Channel Config"),           read_function(debug_read), write_function(debug_write), reg_number(0x150) } C2Config;
+
+        REGISTER { description("Channel Source Address"),   read_function(debug_read), write_function(debug_write), reg_number(0x160) } C3SrcAddr;
+        REGISTER { description("Channel Dest Address"),     read_function(debug_read), write_function(debug_write), reg_number(0x164) } C3DstAddr;
+        REGISTER { description("Channel Linked List"),      read_function(debug_read), write_function(debug_write), reg_number(0x168) } C3LLI;
+        REGISTER { description("Channel Control"),          read_function(debug_read), write_function(debug_write), reg_number(0x16c) } C3Control;
+        REGISTER { description("Channel Config"),           read_function(debug_read), write_function(debug_write), reg_number(0x170) } C3Config;
+
+        REGISTER { description("Channel Source Address"),   read_function(debug_read), write_function(debug_write), reg_number(0x180) } C4SrcAddr;
+        REGISTER { description("Channel Dest Address"),     read_function(debug_read), write_function(debug_write), reg_number(0x184) } C4DstAddr;
+        REGISTER { description("Channel Linked List"),      read_function(debug_read), write_function(debug_write), reg_number(0x188) } C4LLI;
+        REGISTER { description("Channel Control"),          read_function(debug_read), write_function(debug_write), reg_number(0x18c) } C4Control;
+        REGISTER { description("Channel Config"),           read_function(debug_read), write_function(debug_write), reg_number(0x190) } C4Config;
+
+        REGISTER { description("Channel Source Address"),   read_function(debug_read), write_function(debug_write), reg_number(0x1a0) } C5SrcAddr;
+        REGISTER { description("Channel Dest Address"),     read_function(debug_read), write_function(debug_write), reg_number(0x1a4) } C5DstAddr;
+        REGISTER { description("Channel Linked List"),      read_function(debug_read), write_function(debug_write), reg_number(0x1a8) } C5LLI;
+        REGISTER { description("Channel Control"),          read_function(debug_read), write_function(debug_write), reg_number(0x1ac) } C5Control;
+        REGISTER { description("Channel Config"),           read_function(debug_read), write_function(debug_write), reg_number(0x1b0) } C5Config;
+        
+        REGISTER { description("Channel Source Address"),   read_function(debug_read), write_function(debug_write), reg_number(0x1c0) } C6SrcAddr;
+        REGISTER { description("Channel Dest Address"),     read_function(debug_read), write_function(debug_write), reg_number(0x1c4) } C6DstAddr;
+        REGISTER { description("Channel Linked List"),      read_function(debug_read), write_function(debug_write), reg_number(0x1c8) } C6LLI;
+        REGISTER { description("Channel Control"),          read_function(debug_read), write_function(debug_write), reg_number(0x1cc) } C6Control;
+        REGISTER { description("Channel Config"),           read_function(debug_read), write_function(debug_write), reg_number(0x1d0) } C6Config;
+
+        REGISTER { description("Channel Source Address"),   read_function(debug_read), write_function(debug_write), reg_number(0x1e0) } C7SrcAddr;
+        REGISTER { description("Channel Dest Address"),     read_function(debug_read), write_function(debug_write), reg_number(0x1e4) } C7DstAddr;
+        REGISTER { description("Channel Linked List"),      read_function(debug_read), write_function(debug_write), reg_number(0x1e8) } C7LLI;
+        REGISTER { description("Channel Control"),          read_function(debug_read), write_function(debug_write), reg_number(0x1ec) } C7Control;
+        REGISTER { description("Channel Config"),           read_function(debug_read), write_function(debug_write), reg_number(0x1f0) } C7Config;
+    }
+    
+    connection
+    {
+        self.pvbus_s => busslave.pvbus_s;
+        busslave.device => self.device;
+        
+        busmaster0.pvbus_m => self.pvbus0_m;
+        busmaster1.pvbus_m => self.pvbus1_m;
+        
+        self.clk_in => timer.clk_in;
+        timer.timer_callback => self.dma_callback;
+    }
+    
+    
+////////////////////////////////////////////////////////////////////////////////
+// External ports
+////////////////////////////////////////////////////////////////////////////////
+    
+    // slave port for register accesses
+    slave port<PVBus> pvbus_s;
+    
+    // clock for driving timed behaviour
+    slave port<ClockSignal> clk_in;
+    
+    // system reset
+    slave port<Signal> reset_in
+    {
+        behaviour setValue(sg::Signal::State state)
+        {
+            if (state == sg::Signal::Set)
+                reset(0);
+        }
+    }
+    
+    // master ports for connection to devices
+    master port<PVBus> pvbus0_m;
+    master port<PVBus> pvbus1_m;
+    
+    // Interrupt signals
+    master port<Signal> interr;
+    master port<Signal> intr;
+    master port<Signal> inttc;
+    
+    // request/response ports for communicating with devices
+    slave port<PL080_DMAC_DmaPortProtocol> dma_port[16] // PL080_NUM_DMAPORTS
+    {
+        behaviour request(uint32_t index, uint32_t request) : void
+        {
+            dmaRequest(index, request);
+        }
+    }
+    
+////////////////////////////////////////////////////////////////////////////////
+// Internal ports
+////////////////////////////////////////////////////////////////////////////////
+    
+    // bus slave behaviour
+    
+    internal slave port<PVDevice> device
+    {
+        // Per DDI0196G sec 3.1.1, reads and writes must be word sized
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            return tx.setReturnData32(registerRead(tx.getAddress()));
+        }
+        
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(), tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }   
+    
+    // callback from dma rate timer
+    
+    internal slave port<TimerCallback> dma_callback
+    {
+        behaviour signal() : uint32_t
+        {
+            return runCallback();
+        }
+    }
+
+////////////////////////////////////////////////////////////////////////////////
+// General component configuration
+////////////////////////////////////////////////////////////////////////////////
+
+    behaviour init()
+    {
+        composition.init();
+        // instantiate transaction generators for each master channel.
+        // having multiple generators avoids contention during dma.
+
+        reader0 = busmaster0.control.createTransactionGenerator();
+        writer0 = busmaster0.control.createTransactionGenerator();
+        
+        reader1 = busmaster1.control.createTransactionGenerator();
+        writer1 = busmaster1.control.createTransactionGenerator();
+        
+        num_enabled_channels = 0;
+        
+        // settign dma_busy true blocks any further arbitration and therefore disables dma
+        dma_busy = true;
+        
+        for (uint32_t i=0; i<PL080_NUM_CHANNELS; ++i)
+        {
+            channel[i].channel_num = i;
+            channel[i].generate_clear = generate_clear;
+            channel[i].fifo_size = fifo_size;
+        }
+           
+        for (uint32_t i=0; i<PL080_NUM_DMAPORTS; ++i)
+            dmaport[i].port_num = i;
+            
+        irq_tc  = false;
+        irq_err = false;
+        irq     = false;
+        
+        common_reset();
+    }
+    
+    behaviour terminate()
+    {
+        delete reader0;
+        delete writer0;
+        delete reader1;
+        delete writer1;
+        composition.terminate();
+    }
+
+    behaviour reset(int level)
+    {
+        composition.reset(level);
+        disableDma();
+        
+        common_reset();
+        
+        update_interrupts();
+    } 
+    
+    behaviour common_reset()
+    {
+        irqtc_status    = 0;
+        irqerr_status   = 0;
+        irqtc_mask      = 0;
+        irqerr_mask     = 0;
+        config          = 0;
+        sync            = 0;
+        active_channel  = PL080_NO_CHANNEL;
+       
+        for (int i=0; i<PL080_NUM_CHANNELS; ++i)
+            channel[i].reset();
+        
+        for (int i=0; i<PL080_NUM_DMAPORTS; ++i)
+            dmaport[i].reset();
+        
+        master0_bigend = false;
+        master1_bigend = false;
+    }
+       
+////////////////////////////////////////////////////////////////////////////////
+// Hardware/Software Request/Response handling
+////////////////////////////////////////////////////////////////////////////////
+    
+    // Handle an incoming request from one of the dma ports. The request will be
+    // recorded, combined with any software request and routed to the last
+    // channel to bind to the port (if any)
+    
+    behaviour dmaRequest(uint32_t port_num, uint32_t request)
+    {
+        PL080_DmaPort* port = &dmaport[port_num];
+        
+        // note the request status
+        port->hwRequest = request;
+        
+        PL080_TRACE("DMAC: incoming request on dma port %d\n", port_num);
+        
+        // route the combined sw/hw request state to the active channel
+        if (port->channel != PL080_NO_CHANNEL)
+        {
+            PL080_TRACE("DMAC: routed to channel %d\n", port->channel);
+            channel[port->channel].setRequest(port_num, request | port->swRequest);
+            rearbitrateChannel(port->channel);
+        }
+    }  
+    
+    // send a response to a port, if there is a device connected
+    
+    behaviour setResponse(uint32_t port_num, uint32_t response)
+    {
+        if (dma_port[port_num].response.implemented())
+            dma_port[port_num].response(response);
+    }
+
+    // Handle a bit being set in the software request register. This state is
+    // combined with the current hardware request and forwarded to the latest channel
+    // to bind to that port (if any)
+    
+    behaviour setSwRequest(uint32_t port_num, uint32_t request)
+    {
+        PL080_DmaPort* port = &dmaport[port_num];
+        
+        port->swRequest |= request;
+        if (port->channel != PL080_NO_CHANNEL)
+            channel[port->channel].setRequest(port_num, port->swRequest | port->hwRequest);
+    }
+    
+    // Handle a software request being cleared. This can't happen from the request register,
+    // only when a transfer completes or a channel is disabled.
+    behaviour clearSwRequest(uint32_t port_num, uint32_t request)
+    {
+        PL080_DmaPort* port = &dmaport[port_num];
+        
+        port->swRequest &= ~request;
+        if (port->channel != PL080_NO_CHANNEL)
+            channel[port->channel].setRequest(port_num, port->swRequest | port->hwRequest);
+    }
+        
+////////////////////////////////////////////////////////////////////////////////
+// Channel management requiring DMA controller interaction
+////////////////////////////////////////////////////////////////////////////////
+
+    // setup a channel ready to run after the channel configuration has been reloaded
+    // either by register writes or LLI
+    
+    behaviour setupChannel(uint32_t ch_num)
+    {
+        PL080_Channel* ch = &channel[ch_num];
+        
+        if (ch->src_master)
+        {
+            ch->reader = reader1;
+            ch->src_bigend = master1_bigend;
+        }
+        else
+        {
+            ch->reader = reader0;
+            ch->src_bigend = master0_bigend;
+        }
+        
+        if (ch->dst_master)
+        {
+            ch->writer = writer1;
+            ch->dst_bigend = master1_bigend;
+        }
+        else
+        {
+            ch->writer = writer0;
+            ch->dst_bigend = master0_bigend;
+        }
+        
+        // set up primary channels in src/destination ports
+        if (ch->src_port != PL080_NO_DMAPORT)
+        {
+            PL080_DmaPort* port = &dmaport[ch->src_port];
+            
+            port->channel = ch_num;
+            
+            ch->setRequest(ch->src_port, port->swRequest | port->hwRequest);
+        }
+        
+        if (ch->dst_port != PL080_NO_DMAPORT)
+        {
+            PL080_DmaPort* port = &dmaport[ch->dst_port];
+            
+            port->channel = ch_num;
+            
+            ch->setRequest(ch->dst_port, port->swRequest | port->hwRequest);
+        }
+    }
+    
+    // Cause the next LLI entry to be loaded into a channel and update all
+    // associated state.
+    // returns false if there is no next LLI or there was an abort
+    
+    behaviour nextLLI(uint32_t ch_num) : bool
+    {
+        PL080_Channel* ch = &channel[ch_num];
+        
+        uint32_t lli_addr = ch->lli_addr & 0xfffffffc;
+        uint32_t lli_port = ch->lli_addr & 0x1;
+        
+        if (lli_addr == 0)
+            return false;
+            
+        // LLI should load via the configured master port
+        
+        pv::TransactionGenerator* lli_source = lli_port ? reader1 : reader0;
+        
+        if (ch->loadLLI(lli_source, lli_addr))
+        {
+            setupChannel(ch_num);
+            return true;
+        }
+        else
+        {
+            if (ch->config & (1<<PL080_Channel::CONFIG_IE))
+            {
+                irqerr_status |= (1<<ch_num);
+                update_interrupts();
+            }
+            return false;
+        }
+    }
+    
+    // add the channel to the enabled channels list.
+    // channel 0 has the highest priority, channel 7 the lowest
+    
+    behaviour enableChannel(uint32_t ch_num)
+    {
+        int32_t i;
+        for (i=num_enabled_channels-1; i>=0; --i)
+        {
+            uint32_t ch = enabled_channels[i];
+            if (ch > ch_num)
+                break;
+                
+             enabled_channels[i+1] = enabled_channels[i];
+        }
+        enabled_channels[i+1] = ch_num;
+        ++num_enabled_channels;
+        
+        channel[ch_num].setEnabled(true);
+    }
+   
+    // remove a channel from the enabled channels list.
+    
+    behaviour disableChannel(uint32_t ch_num)
+    {
+        for (int32_t i=num_enabled_channels-1; i>=0; --i)
+        {
+            if (ch_num == enabled_channels[i])
+            {
+                while (i<num_enabled_channels-1)
+                {
+                    enabled_channels[i] = enabled_channels[i+1];
+                    ++i;
+                }
+                break;
+            }
+        }
+        --num_enabled_channels;
+        
+        channel[ch_num].setEnabled(false);
+    }
+    
+////////////////////////////////////////////////////////////////////////////////
+// Channel arbitration and running
+////////////////////////////////////////////////////////////////////////////////
+
+    // Rearbitrate channels when something may have changed the activity state of
+    // one or more channels. Make the highest priority channel runnable and run it.
+    
+    behaviour rearbitrate()
+    {
+        int32_t i;
+        for (i=num_enabled_channels-1; i>=0; --i)
+        {
+            uint32_t ch_num = enabled_channels[i];
+            
+            if (channel[ch_num].state != PL080_Channel::Waiting && channel[ch_num].state != PL080_Channel::Idle)
+            {
+                if (ch_num != active_channel)
+                {
+                    if (active_channel != PL080_NO_CHANNEL)
+                        channel[active_channel].stopDma();
+                        
+                    PL080_TRACE("DMAC Channel%d made active\n", ch_num);
+
+                    active_channel = ch_num;
+                }
+                break;
+            }
+        }
+        
+        // If something can run, run it
+        
+        if (i >= 0)
+            runDma();
+        else
+            active_channel = PL080_NO_CHANNEL;
+    }
+    
+    // Rearbitrate when a known channel has changed state
+    
+    behaviour rearbitrateChannel(uint32_t ch_num)
+    {   
+        // ignore if lower priority than active channel, or if this channel
+        // is already active
+        if ((active_channel == PL080_NO_CHANNEL) || (ch_num < active_channel))
+        {
+            PL080_Channel* ch = &channel[ch_num];
+            
+            if (ch->state != PL080_Channel::Waiting && ch->state != PL080_Channel::Idle)
+            {
+                if (active_channel != PL080_NO_CHANNEL)
+                    channel[active_channel].stopDma();
+                    
+                PL080_TRACE("DMAC Channel%d made active\n", ch_num);
+                    
+                active_channel = ch_num;
+            }
+        }
+        
+        // see if dma wants to run
+        runDma();
+    }
+        
+    // disable arbitration and cancel any pending activity
+    
+    behaviour disableDma()
+    {
+        dma_busy = true;
+        timer.timer_control.cancel();
+    }
+    
+    // enable arbitration and rearbitrate to start dma activity
+    
+    behaviour enableDma()
+    {
+        if (!timer.timer_control.isSet())
+        {
+            dma_busy = false;
+            rearbitrate();
+        }
+    }
+    
+    // Schedule dma activity to run if it isn't already.
+    
+    behaviour runDma()
+    {
+        // this prevents reentrancy in scheduling
+        if (dma_busy)
+            return;
+            
+        dma_busy = true;
+        
+        // The DMAC behaviour can be configured to perform activity during
+        // a transaction if none is already scheduled, or schedule activity
+        // for later processing.
+        
+        // Activity is essentially atomic, happening instantaneously in simulated
+        // time, so the DMAC scheduled future activity to give the illusion of
+        // taking a finite amount of time
+         
+        if (activate_delay == 0)
+        {
+            uint32_t sleep_for = runFor(max_transfer);
+            if (sleep_for > 0)
+                timer.timer_control.set(sleep_for);
+            else
+                dma_busy = false;
+        }
+        else
+        {
+            timer.timer_control.set(activate_delay);
+        }
+    }
+    
+    // Timed callback to start another active period after a sleep. If there is
+    // more activity to perform after the current active period, the timer is
+    // rescheduled.
+    
+    behaviour runCallback() : uint32_t
+    {
+        uint32_t sleep_for = runFor(max_transfer);
+        if (sleep_for > 0)
+        {
+            return sleep_for;
+        }
+        else
+        {
+            dma_busy = false;
+            return 0;
+        }     
+    }
+    
+    // Central run loop for dma activity. Don't call this directly, call runDma()
+    // Activity will run for a certain number of transfers (if there are any to perform) and 
+    // then sleep for an equivalent number of 'cycles' to ensure the DMAC doesn't starve
+    // the rest of the system.
+    
+    behaviour runFor(uint32_t max_cycles) : uint32_t
+    {   
+        uint32_t cycles = max_cycles;
+        while ((active_channel != PL080_NO_CHANNEL) && (cycles > 0))
+        {
+            PL080_Channel* ch = &channel[active_channel];
+            
+            switch (ch->state)
+            {
+                case PL080_Channel::TerminalCount:
+                
+                    // terminating the transfer clears the soft interrupt bits
+                    
+                    if ((ch->src_port != PL080_NO_DMAPORT) && dmaport[ch->src_port].swRequest)
+                        clearSwRequest(ch->src_port, PL080_REQ_MASK);
+                        
+                    if ((ch->dst_port != PL080_NO_DMAPORT) && dmaport[ch->dst_port].swRequest)
+                        clearSwRequest(ch->dst_port, PL080_REQ_MASK);
+                    
+                    // Attempt to load the next scatter gather entry
+                    if (!nextLLI(active_channel))
+                    {
+                        disableChannel(active_channel);
+                        rearbitrate();
+                    }
+                break;
+                
+                case PL080_Channel::Error:
+
+                    // errors in the transfer clear the soft interrupt bits
+                    
+                    if ((ch->src_port != PL080_NO_DMAPORT) && dmaport[ch->src_port].swRequest)
+                        clearSwRequest(ch->src_port, PL080_REQ_MASK);
+                        
+                    if ((ch->dst_port != PL080_NO_DMAPORT) && dmaport[ch->dst_port].swRequest)
+                        clearSwRequest(ch->dst_port, PL080_REQ_MASK);
+               
+                    irqerr_status |= (1<<active_channel);
+                    update_interrupts();
+                    
+                    disableChannel(active_channel);
+                    rearbitrate();
+                break;
+                
+                case PL080_Channel::Waiting:
+                    rearbitrate();
+                break;
+                
+                case PL080_Channel::Runnable:
+                
+                    cycles = ch->startDma(cycles);
+            
+                    if (ch->src_response != 0)
+                    {
+                        if (ch->src_port != PL080_NO_DMAPORT)
+                            setResponse(ch->src_port, ch->src_response);
+                            
+                        ch->src_response = 0;
+                    }
+                    
+                    if (ch->dst_response != 0)
+                    {
+                        if (ch->dst_port != PL080_NO_DMAPORT)
+                            setResponse(ch->dst_port, ch->dst_response);
+                            
+                        ch->dst_response = 0;
+                    }
+                    
+                    if (ch->state == PL080_Channel::TerminalCount)
+                    {          
+                        if ((ch->control & (1<<PL080_Channel::CONTROL_I)))
+                        {
+                            irqtc_status |= (1<<active_channel);
+                            update_interrupts();
+                        }
+                    }
+
+                    // Don't allow a halted channel to go idle
+                    if (ch->halt)
+                    {
+                        PL080_TRACE_CH("DMAC_CH%d waiting due to halt\n", ch->channel_num);
+                        ch->state = PL080_Channel::Waiting;
+                    }
+                    
+                break;
+                
+                case PL080_Channel::Idle:
+                    // This should disable the channel 
+                    rearbitrate();
+                break;
+            }
+        }
+        return max_cycles-cycles;
+    }
+
+////////////////////////////////////////////////////////////////////////////////
+// Interrupt marshalling
+////////////////////////////////////////////////////////////////////////////////
+        
+    // Records the status of the interrupt output pin and sends a message
+    // to any listeners if it changes
+    
+    behaviour setInt(bool state)
+    {
+        if ((irq != state) && intr.setValue.implemented())
+        {
+            irq = state;
+            if (state)
+                intr.setValue(sg::Signal::Set);
+            else
+                intr.setValue(sg::Signal::Clear);
+        }
+    }
+    
+    // Records the status of the terminal count output pin and sends a message
+    // to any listeners if it changes
+    
+    behaviour setInttc(bool state)
+    {
+        if ((irq_tc != state) &&  inttc.setValue.implemented())
+        {
+            irq_tc = state;
+            if (state)
+                inttc.setValue(sg::Signal::Set);
+            else
+                inttc.setValue(sg::Signal::Clear);
+        }
+    }
+
+    // Records the status of the error output pin and sends a message
+    // to any listeners if it changes
+    
+    behaviour setInterr(bool state)
+    {
+        if ((irq_err != state) && interr.setValue.implemented())
+        {
+            irq_err = state;
+            if (state)
+                interr.setValue(sg::Signal::Set);
+            else
+                interr.setValue(sg::Signal::Clear);
+        }
+    }
+
+    // Update masked interrupt status output
+    
+    behaviour update_interrupts()
+    {
+        setInttc((irqtc_status & irqtc_mask) != 0);
+        setInterr((irqerr_status & irqerr_mask) != 0);
+        setInt((irqtc_status & irqtc_mask) != 0 || (irqerr_status & irqerr_mask) != 0);
+    }
+    
+////////////////////////////////////////////////////////////////////////////////
+// Bus slave implementation
+////////////////////////////////////////////////////////////////////////////////
+
+    // Handle reads to the slave pvbus port
+
+    behavior registerRead(pv::bus_addr_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+        
+        if (device_addr >= 0x100 && device_addr < 0x200)
+        {
+            // channel access
+            uint32_t ch_num = (device_addr >> 5) & (PL080_NUM_CHANNELS-1);
+            PL080_Channel& ch = channel[ch_num];
+            
+            switch(device_addr & 0x1f)
+            {
+                case 0x00: // src addr
+                    data = ch.src_addr;
+                    
+                    PL080_TRACE_REG("DMAC: C%dSrcAddr -> 0x%x\n", ch_num, data);
+                break;
+                    
+                case 0x04: // dst addr
+                    data = ch.dst_addr;
+                    
+                    PL080_TRACE_REG("DMAC: C%dDstAddr -> 0x%x\n", ch_num, data);
+                break;
+                    
+                case 0x08: // linked list
+                    data = ch.lli_addr;
+                    
+                    PL080_TRACE_REG("DMAC: C%dLLI -> 0x%x\n", ch_num, data);
+                break;
+                    
+                case 0x0c: // control
+                    data = ch.getControl();
+                    
+                    PL080_TRACE_REG("DMAC: C%dControl -> 0x%x\n", ch_num, data);
+                break;
+                    
+                case 0x10: // config
+                    data = ch.getConfig();
+                    
+                    PL080_TRACE_REG("DMAC: C%dConfig -> 0x%x\n", ch_num, data);
+                break;
+                
+                default:
+                    PL080_TRACE_REGU("DMAC: Unexpected read at 0x%x\n", (uint32_t)device_addr);
+                break;
+            }
+        }
+        else
+        {
+            switch (device_addr)
+            {
+                case 0x00: // irq status
+                    data = (irqtc_status & irqtc_mask) | (irqerr_status & irqerr_mask);
+                    
+                    PL080_TRACE_REG("DMAC: IrqStatus -> 0x%x\n", data);
+                break;
+                    
+                case 0x04: // irqtc status
+                    data = (irqtc_status & irqtc_mask);
+                    
+                    PL080_TRACE_REG("DMAC: IrqTCStatus -> 0x%x\n", data);
+                break;
+                    
+                case 0x08: // WRITE ONLY
+                    
+                    PL080_TRACE_REG("DMAC: IrqTCClear -> (WRITE_ONLY)\n");
+                break;
+                    
+                case 0x0c: // irqerr status
+                    data = (irqerr_status & irqerr_mask);
+                    
+                    PL080_TRACE_REG("DMAC: IrqErrStatus -> 0x%x\n", data);
+                break;
+                    
+                case 0x10: // WRITE ONLY
+                    
+                    PL080_TRACE_REG("DMAC: IrqErrClear -> (WRITE_ONLY)\n");
+                break;
+                    
+                case 0x14: // raw irqtc status
+                    data = irqtc_status;
+                    
+                    PL080_TRACE_REG("DMAC: RawIrqTCStatus -> 0x%x\n", data);
+                break;
+                    
+                case 0x18: // raw irqerr status
+                    data = irqerr_status;
+                    
+                    PL080_TRACE_REG("DMAC: RawIrqErrStatus -> 0x%x\n", data);
+                break;
+                
+                case 0x1c: // enabled channels
+                    for (int i=0; i<num_enabled_channels; ++i)
+                        data |= 1<<enabled_channels[i];
+                    
+                    PL080_TRACE_REG("DMAC: EnabledChannels -> 0x%x\n", data);
+                break;
+                
+                case 0x20: // burst request status
+                {
+                    for (uint32_t port_num=0; port_num<PL080_NUM_DMAPORTS; ++port_num)
+                    {
+                        PL080_DmaPort* port = &dmaport[port_num];
+                        if ((port->hwRequest|port->swRequest) & PL080_REQ_BURST)
+                            data |= (1<<port_num);
+                    }
+                    PL080_TRACE_REG("DMAC: SoftBReq -> 0x%x\n", data);
+                }
+                break;
+                                
+                case 0x24: // single request status
+                {
+                    for (uint32_t port_num=0; port_num<PL080_NUM_DMAPORTS; ++port_num)
+                    {
+                        PL080_DmaPort* port = &dmaport[port_num];
+                        if ((port->hwRequest|port->swRequest) & PL080_REQ_SINGLE)
+                            data |= (1<<port_num);
+                    }
+                    PL080_TRACE_REG("DMAC: SoftSReq -> 0x%x\n", data);
+                }
+                break;
+                
+                case 0x28: // last burst request status
+                {
+                    for (uint32_t port_num=0; port_num<PL080_NUM_DMAPORTS; ++port_num)
+                    {
+                        PL080_DmaPort* port = &dmaport[port_num];
+                        if ((port->hwRequest|port->swRequest) & PL080_REQ_LBURST)
+                            data |= (1<<port_num);
+                    }
+                    PL080_TRACE_REG("DMAC: SoftLBReq -> 0x%x\n", data);
+                }
+                break;
+                
+                case 0x2c: // last single request status
+                {
+                    for (uint32_t port_num=0; port_num<PL080_NUM_DMAPORTS; ++port_num)
+                    {
+                        PL080_DmaPort* port = &dmaport[port_num];
+                        if ((port->hwRequest|port->swRequest) & PL080_REQ_LSINGLE)
+                            data |= (1<<port_num);
+                    }
+                    PL080_TRACE_REG("DMAC: SoftLSReq -> 0x%x\n", data);
+                }
+                break;
+                
+                case 0x30: // config
+                    data = config;
+                    
+                    PL080_TRACE_REG("DMAC: Configuration -> 0x%x\n", data);
+                break;
+                
+                case 0x34: // synchronisation
+                    data = sync;
+                    
+                    PL080_TRACE_REG("DMAC: Sync -> 0x%x\n", data);
+                break;
+                
+                // perip id
+                
+                case 0xfe0: 
+                    data = 0x80;
+                    
+                    PL080_TRACE_REG("DMAC: PerphID0 -> 0x%x\n", data);
+                break;
+
+                case 0xfe4: 
+                    data = 0x10;
+                    
+                    PL080_TRACE_REG("DMAC: PerphID1 -> 0x%x\n", data);
+                break;
+                
+                case 0xfe8: 
+                    data = 0x14;
+                    
+                    PL080_TRACE_REG("DMAC: PerphID2 -> 0x%x\n", data);
+                break;
+                
+                case 0xfec: 
+                    data = 0x0a;
+                    
+                    PL080_TRACE_REG("DMAC: PerphID3 -> 0x%x\n", data);
+                break;
+                
+                // pcell id
+                
+                case 0xff0: 
+                    data = 0x0d;
+                    
+                    PL080_TRACE_REG("DMAC: PCellID0 -> 0x%x\n", data);
+                break;
+                
+                case 0xff4: 
+                    data = 0xf0;
+                    
+                    PL080_TRACE_REG("DMAC: PCellID1 -> 0x%x\n", data);
+                break;
+                
+                case 0xff8: 
+                    data = 0x05;
+                    
+                    PL080_TRACE_REG("DMAC: PCellID2 -> 0x%x\n", data);
+                break;
+                
+                case 0xffc: 
+                    data = 0xb1;
+                    
+                    PL080_TRACE_REG("DMAC: PCellID3 -> 0x%x\n", data);
+                break;
+                default:
+                    PL080_TRACE_REGU("DMAC: Unexpected read at 0x%x\n", (uint32_t)device_addr);
+                break;
+            }
+        }
+        
+        return data;
+    }
+    
+    // Handle writes to the slave pvbus port
+    behavior registerWrite(pv::bus_addr_t device_addr, uint32_t data)
+    {
+        if (device_addr >= 0x100 && device_addr < 0x200)
+        {
+            // channel access
+            uint32_t ch_num = (device_addr >> 5) & (PL080_NUM_CHANNELS-1);
+            PL080_Channel& c = channel[ch_num];
+            
+            switch(device_addr & 0x1f)
+            {
+                case 0x00: // src addr
+                    PL080_TRACE_REG("DMAC: C%dSrcAddr <- 0x%x\n", ch_num, data);
+                
+                    c.src_addr = data;
+                    
+                    return;
+                    
+                case 0x04: // dst addr
+                    PL080_TRACE_REG("DMAC: C%dDstAddr <- 0x%x\n", ch_num, data);
+                
+                    c.dst_addr = data;
+                    
+                    return;
+                    
+                case 0x08: // linked list
+                    PL080_TRACE_REG("DMAC: C%dLLI <- 0x%x\n", ch_num, data);
+                
+                    c.lli_addr = data & ~2;
+                    
+                    return;
+                    
+                case 0x0c: // control
+                    PL080_TRACE_REG("DMAC: C%dControl <- 0x%x\n", ch_num, data);
+                    
+                    c.setControl(data);             
+                    
+                    return;
+                    
+                case 0x10: // config
+                {
+                    PL080_TRACE_REG("DMAC: C%dConfig <- 0x%x\n", ch_num, data);
+                    
+                    bool was_enabled = c.isEnabled();
+                     
+                    c.setConfig(data);
+                    
+                    bool is_enabled = c.isEnabled();
+                    
+                    if (data & (1<<PL080_Channel::CONFIG_ITC))
+                        irqtc_mask |= (1<<ch_num);
+                    else
+                        irqtc_mask &= ~(1<<ch_num);
+                        
+                    if (data & (1<<PL080_Channel::CONFIG_IE))
+                        irqerr_mask |= (1<<ch_num);
+                    else
+                        irqerr_mask &= ~(1<<ch_num);
+                       
+                    update_interrupts();
+                    
+                    if (!was_enabled && is_enabled)
+                    {
+                        setupChannel(ch_num);
+                        enableChannel(ch_num);
+                    }
+                    else if (was_enabled && !is_enabled)
+                    {
+                        disableChannel(ch_num);
+                    }
+                    
+                    rearbitrate(); 
+                    
+                    return;
+                }
+                
+                default:
+                    PL080_TRACE_REGU("DMAC: Unexpected write at 0x%x\n", (uint32_t)device_addr);
+                    
+                    return;
+            } // switch
+        }
+        else
+        {
+            switch (device_addr)
+            {
+                case 0x00: // READ ONLY
+                    PL080_TRACE_REG("DMAC: IntStatus <- 0x%x (READ_ONLY)\n", data);
+                    return;
+                    
+                case 0x04: // READ ONLY
+                    PL080_TRACE_REG("DMAC: IntTCStatus <- 0x%x (READ_ONLY)\n", data);
+                    return;
+                    
+                case 0x08: // inttc clear
+                    PL080_TRACE_REG("DMAC: IntTCClear <- 0x%x\n", data);
+                    
+                    irqtc_status &= ~data;
+                    update_interrupts();
+                    return;
+                    
+                case 0x0c: // READ ONLY
+                    PL080_TRACE_REG("DMAC: IntErrorStatus <- 0x%x (READ_ONLY)\n", data);
+                    return;
+                    
+                case 0x10: // interr clear
+                    PL080_TRACE_REG("DMAC: IntErrClear <- 0x%x\n", data);
+                    
+                    irqerr_status &= ~data;
+                    update_interrupts();
+                    return;
+                    
+                case 0x14: // READ ONLY
+                    PL080_TRACE_REG("DMAC: RawIntTCStatus <- 0x%x (READ_ONLY)\n", data);
+                    return;
+                    
+                case 0x18: // READ ONLY
+                    PL080_TRACE_REG("DMAC: RawIntErrorStatus <- 0x%x (READ_ONLY)\n", data);
+                    return;
+                    
+                case 0x1c: // READ ONLY
+                    PL080_TRACE_REG("DMAC: EnabledChannels <- 0x%x (READ_ONLY)\n", data);
+                    return;
+                    
+                case 0x20: // software burst request
+                {          
+                    PL080_TRACE_REG("DMAC: SoftBReq <- 0x%x\n", data);
+                    
+                    for (uint32_t port=0; port<PL080_NUM_DMAPORTS; ++port)
+                        if (data & (1<<port))
+                            setSwRequest(port, PL080_REQ_BURST);
+                            
+                    rearbitrate();
+                    
+                    return;
+                }
+                          
+                case 0x24: // software single request
+                {
+                    PL080_TRACE_REG("DMAC: SoftSReq <- 0x%x\n", data);
+
+                    for (uint32_t port=0; port<PL080_NUM_DMAPORTS; ++port)
+                        if (data & (1<<port))
+                            setSwRequest(port, PL080_REQ_SINGLE);
+                            
+                    rearbitrate();
+                    
+                    return;
+                }
+
+                case 0x28: // software last burst request
+                {
+                    PL080_TRACE_REG("DMAC: SoftLBReq <- 0x%x\n", data);
+                    
+                    for (uint32_t port=0; port<PL080_NUM_DMAPORTS; ++port)
+                        if (data & (1<<port))
+                            setSwRequest(port, PL080_REQ_LBURST);
+                            
+                    rearbitrate();
+                    
+                    return;
+                }
+
+                case 0x2c: // software last single request
+                {
+                    PL080_TRACE_REG("DMAC: SoftLSReq <- 0x%x\n", data);
+                    
+                    for (uint32_t port=0; port<PL080_NUM_DMAPORTS; ++port)
+                        if (data & (1<<port))
+                            setSwRequest(port, PL080_REQ_LSINGLE);
+                            
+                    rearbitrate();
+                    
+                    return;
+                }
+                
+                case 0x30: // config
+                    PL080_TRACE_REG("DMAC: Configuration <- 0x%x\n", data);
+                    
+                    // bit 0 : enable
+                    // bit 1 : master 0 endianness
+                    // bit 2 : master 1 endianness
+                    
+                    data &= 0x7;
+                    
+                    if (config != data)
+                    {
+                        master0_bigend = ((data >> 1) & 1) != 0;
+                        master1_bigend = ((data >> 2) & 1) != 0;
+                        
+                        bool enable = (data & 1) != 0;
+                    
+                        config = data;
+                    
+                        if (enable)
+                        {
+                            enableDma();
+                        }
+                        else
+                        {
+                            disableDma();
+                            
+                            // disabling the controller also clears the sw_request bits
+                            for (uint32_t port=0; port<PL080_NUM_DMAPORTS; ++port)
+                                clearSwRequest(port, PL080_REQ_MASK);
+                        }
+                    }
+                    
+                    return;
+                
+                case 0x34: // synchronisation
+                    PL080_TRACE_REG("DMAC: Sync <- 0x%x\n", data);
+                    
+                    sync = data & 0xffff;
+                    
+                    return;
+                    
+                default:
+                    PL080_TRACE_REGU("DMAC: Unexpected write at 0x%x\n", (uint32_t)device_addr);
+                    
+                    return;
+            } // switch
+        }
+    }
+
+    // debugger register support
+    behaviour debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+        
+        return ACCESS_FUNC_OK;
+    }
+    
+    behaviour debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+        
+        return ACCESS_FUNC_OK;
+    }
+}

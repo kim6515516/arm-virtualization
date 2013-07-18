@@ -1,0 +1,118 @@
+========================================================================
+Model Debugger for ARM Fast Models  8.1 Release Notes
+========================================================================
+
+Detailed documentation can be found in the 'doc' subfolder for Fast
+Models Tools and the 'Docs' subfolder for the Fast Models Portfolio.
+
+
+-------------------------------------------
+Platform requirements for Microsoft Windows
+-------------------------------------------
+
+When running Microsoft Windows XP or Microsoft Windows 7 it is
+recommended to use machines with at least 2GB RAM, and preferably at
+least 4GB for best performance. To use audio a 2GHz, or faster, Intel
+Core2Duo, or similar performing, processor is recommended.
+
+Operating system:
+Microsoft Windows XP 32 Bit SP2 or SP3.
+Microsoft Windows 7 32 bit RTM or SP1, Professional or Enterprise editions.
+Microsoft Windows 7 64 bit RTM or SP1, Professional or Enterprise editions.
+
+Compiler:
+Microsoft Visual Studio 2008 with Service Pack 1 and the Microsoft
+Visual Studio 2008 Service Pack 1 ATL Security Update.
+
+or
+
+Microsoft Visual Studio 2010 with Service Pack 1.
+
+Runtime Libraries:
+Fast Models Portfolio does not contain the Microsoft Visual Studio 2008 SP1 
+or Microsoft Visual Studio 2010 SP1 runtime libraries.
+
+Models built with Microsoft Visual Studio 2008 SP1 or Microsoft Visual
+Studio 2010 SP1 require both the Microsoft Visual Studio 2005 SP1 and
+the Microsoft Visual Studio 2008/2010 SP1 Redistributable Package to
+be installed in order to run.
+
+Please email support-esl@arm.com with any comments.
+
+To view the documentation, Adobe Acrobat reader (Version 8 or higher)
+needs to be installed on the system.
+
+
+-------------------------------
+Platform requirements for Linux
+-------------------------------
+
+When running on Linux it is recommended to use machines with at least 2GB RAM,
+and preferably at least 4GB for best performance. To use audio a 2GHz, or
+faster, Intel Core2Duo, or similar performing, processor is recommended.
+
+Operating system:
+Red Hat Enterprise Linux 4 (on either 32 or 64 bit architecture)
+Red Hat Enterprise Linux 5 (on either 32 or 64 bit architecture)
+Red Hat Enterprise Linux 6 (on either 32 or 64 bit architecture)
+
+Compiler:
+
+When building models for 32bit hosts, Fast Models 8.1 for Linux
+supports the following compilers:
+ - gcc 4.1.2 (built against at least binutils 2.17)
+ - gcc 4.4.4
+
+When building models for 64bit hosts, Fast Models 8.1 for Linux
+supports the following compiler:
+ - gcc 4.1.2 (built against at least binutils 2.17)
+ - gcc 4.4.4
+
+To view the documentation, Adobe Acrobat reader (Version 8 or higher) needs to
+be installed on the system.
+
+
+----------------------------
+Licence management utilities
+----------------------------
+
+If you are using floating licenses, you must use FLEXnet license
+management utilities version 9.2 or higher. FLEXnet 10.8 license
+management utilities are available as an optional installable
+component in the product installer.
+
+Use the highest version of the license management utilities provided with
+any ARM tools you are using. It is recommended to setup the user
+environment running applications of the Fast Models product only for one
+armlmd license server, because spreading Fast Models license features
+over different servers could result in license denials for certain features.
+
+For more instructions on installing licenses please consult the ARM
+online documentation:
+* How do I install my floating license?
+    http://infocenter.arm.com/help/topic/com.arm.doc.faqs/ka3861.html
+* How do I install my node locked license?
+    http://infocenter.arm.com/help/topic/com.arm.doc.faqs/ka3510.html
+* FLEXnet for ARM® Tools License Management Guide v4.3
+    http://infocenter.arm.com/help/topic/com.arm.doc.dui0209-/index.html
+
+
+------------------
+Outstanding Issues
+------------------
+
+* Model Debugger can start an isim system or SystemC simulation and
+  connect to it automatically. Feature can be used from GUI, command
+  line and script. (DE 718484 and DE 717307).
+
+* Model Debugger has improved behavior when MP stepping when support
+  in model is provided (DE 688518).
+
+* ModelDebugger cannot load 64-bit CADI libraries (SDDKW-10292).
+
+* Model Debugger fails to show the model configuration dialog box when
+  loading 64 bit models (SDDKW-11267).
+
+* The ModelDebugger MxScript Sleep function was waiting for n
+  milliseconds instead of n seconds on Windows. This has been
+  corrected to match the manual (SDDKW-12746).

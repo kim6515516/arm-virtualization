@@ -1,0 +1,652 @@
+/*
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// The model of VE system registers
+
+component VE_SysRegs
+{
+    properties {
+        version = "8.1.37";
+    }
+
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000);
+        timer_24mhz : ClockTimer;
+        timer_100Hz : ClockTimer;
+    }
+
+    includes
+    {
+        #define VESYSREG_TRACE if (!0) ; else printf
+    }
+
+    resources
+    {
+        enum
+        {
+            BOARD_REV_A,
+            BOARD_REV_B,
+            BOARD_REV_C
+        };
+        
+        // Default the core tile type to 0x0C for Cortex-A9
+        PARAMETER { description("Procesor ID register at CoreTile Express Site 1"), type(uint32_t), default(0x0c000000) } sys_proc_id0;
+        // Default the logic tile type to 0xFF for not supported.
+        PARAMETER { description("Processor ID at CoreTile Express Site 2"), type(uint32_t), default(0xff000000) } sys_proc_id1;
+
+        PARAMETER { description("User switches"), type(uint32_t), default(0x0) } user_switches_value;
+        PARAMETER { description("SYS_CFG_SHUTDOWN exits simulation"), type(bool), default("false") } exit_on_shutdown;
+        PARAMETER { description("Tile fitted"), type(bool), default("true") } tilePresent;
+
+        REGISTER { description("SYS_ID"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0) } SYS_ID;
+        REGISTER { description("SYS_SW"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x04) } SYS_SW;
+        REGISTER { description("SYS_LED"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x08) } SYS_LED;
+        REGISTER { description("SYS_100HZ"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x24), attribute(read_only) } SYS_100HZ;
+        REGISTER { description("SYS_FLAGS and SYS_FLAGSSET"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x30)  } SYS_FLAGS;
+        REGISTER { description("SYS_FLAGSCLR"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x34), attribute (write_only)  } SYS_FLAGSCLR;
+        REGISTER { description("SYS_NVFLAGS and SYS_NVFLAGSSET"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x38)  } SYS_NVFLAGS;
+        REGISTER { description("SYS_NVFLAGSCLR"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x3C), attribute (write_only)  } SYS_NVFLAGSCLR;
+        REGISTER { description("SYS_MCI"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x48), attribute(read_only)  } SYS_MCI;
+        REGISTER { description("SYS_FLASH"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x4C)  } SYS_FLASH;
+        REGISTER { description("SYS_CFGSW"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x58) } SYS_CFGSW;
+        REGISTER { description("SYS_24MHZ"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x5C), attribute(read_only) } SYS_24MHZ;
+        REGISTER { description("SYS_MISC"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x60) } SYS_MISC;
+        REGISTER { description("SYS_DMA"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x64) } SYS_DMA;
+        REGISTER { description("SYS_PROCID0"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x84) } SYS_PROCID0;
+        REGISTER { description("SYS_PROCID1"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x88) } SYS_PROCID1;
+        REGISTER { description("SYS_CFGDATA"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xA0) } SYS_CFGDATA;
+        REGISTER { description("SYS_CFGCTRL"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xA4) } SYS_CFGCTRL;
+        REGISTER { description("SYS_CFGSTAT"), bitwidth(32), read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xA8) } SYS_CFGSTAT;
+
+        uint32_t RESET_TIME_24MHZ;
+        uint32_t RESET_TIME_100HZ;
+        uint32_t clockCLCD;
+        uint8_t mmbSite;
+
+        // site location
+        enum
+        {
+            SYS_CTRL_SITE_MB,
+            SYS_CTRL_SITE_DB1,
+            SYS_CTRL_SITE_DB2
+        };
+
+        // function
+        enum
+        {
+            SYS_CFG_OSC      = 1, // Oscillator frequency in Hz
+            SYS_CFG_VOLT     = 2, // Voltage in uV
+            SYS_CFG_AMP      = 3, // Current in uA
+            SYS_CFG_TEMP     = 4, // Temperature in uC
+            SYS_CFG_RESET    = 5, // DB reset register
+            SYS_CFG_SYSCON   = 6, // SCC configuration register
+            SYS_CFG_MUXFPGA  = 7, // FPGA select: 0: Motherboard; 1/2: Daughterboard 1/2; 3: Unused
+            SYS_CFG_SHUTDOWN = 8, // Shutdown system
+            SYS_CFG_REBOOT   = 9, // Reboot system
+            SYS_CFG_DVIMODE = 11, // 3-bit DVI mode -- 0: VGA, 1: SVGA, 2: XGA, 3: SXGA, 4: UXGA
+            SYS_CFG_POWER   = 12, // Power in uW
+        };
+
+        struct SysCtrl
+        {
+            bool busy;        // Is a transfer is in progress
+            bool write;       // Is transfer a write?
+            uint8_t function; // Destination device
+            uint8_t site;
+            uint8_t position;
+            uint16_t device;
+        } sysCfgCtrl;
+
+        enum
+        {
+            SYS_CFGSTAT_COMPLETE = 0x1, // Configuration complete. Cleared when SYS_CFGCTRL.S set
+            SYS_CFGSTAT_ERROR    = 0x2, // Configuration error. Cleared when SYS_CFGCTRL.S seta
+        };
+
+        enum
+        {
+            SYS_CFGCTRL_START_MASK    = 0x80000000, // [31]
+            SYS_CFGCTRL_START_BIT     = 31,
+            SYS_CFGCTRL_WRITE_MASK    = 0x40000000, // [30]
+            SYS_CFGCTRL_WRITE_BIT     = 30,
+            SYS_CFGCTRL_DCC_MASK      = 0x3c000000, // [29:26]
+            SYS_CFGCTRL_DCC_BIT       = 26,
+            SYS_CFGCTRL_FUNCTION_MASK = 0x03f00000, // [25:20]
+            SYS_CFGCTRL_FUNCTION_BIT  = 20,
+            SYS_CFGCTRL_SITE_MASK     = 0x00030000, // [17:16]
+            SYS_CFGCTRL_SITE_BIT      = 16,
+            SYS_CFGCTRL_POSITION_MASK = 0x0000f000, // [15:12]
+            SYS_CFGCTRL_POSITION_BIT  = 12,
+            SYS_CFGCTRL_DEVICE_MASK   = 0x00000fff, // [11:0]
+            SYS_CFGCTRL_DEVICE_BIT    = 0,
+        };
+    }
+
+    slave port<PVBus> pvbus;
+
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        // DUI 0447E sec 4.3 says all registers are 32 bit and dont support byte writes
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            // V2M_P1_HBI0190's ApbSubSys.v wires up the ApbRegs to ignore the size & bottom two address bits,
+            // We don't model AhbSlave.v's behaviour of non-word aligned 8 & 16 bit reads, so make those abort.
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS && (tx.getAddress() & 3) != 0) return tx.generateAbort();
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32(registerRead(tx.getAddress() & ~3));
+        }
+
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            // V2M_P1_HBI0190's ApbSubSys.v wires up the ApbRegs to ignore the size & bottom two address bits
+            // We don't model AhbSlave.v's behaviour of non word-aligned 8 & 16 bit writes, so make those abort.
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS && (tx.getAddress() & 3) != 0) return tx.generateAbort();
+            registerWrite(tx.getAddress() & ~3, tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+
+    slave port<ClockSignal> clock_24Mhz;
+    slave port<ClockSignal> clock_100Hz;
+    master port<ValueState> user_switches
+    {
+        behavior getValue() : uint32_t
+        {
+            return SYS_SW;
+        }
+        behavior setValue(uint32_t data)
+        {
+            SYS_SW = data;
+        }
+    }
+
+    master port<ValueState> leds
+    {
+        behavior getValue() : uint32_t
+        {
+             return SYS_LED;
+        }
+    }
+
+
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        self.clock_24Mhz => timer_24mhz.clk_in;
+        self.clock_100Hz => timer_100Hz.clk_in;
+        timer_24mhz.timer_callback => self.timer_callback_handler_24mhz;
+        timer_100Hz.timer_callback => self.timer_callback_handler_100Hz;
+    }
+
+    slave port<StateSignal> mmc_card_present
+    {
+        behavior setValue(sg::Signal::State state)
+        {
+            if (state == sg::Signal::Set)
+                SYS_MCI |= 0x1;
+            else
+                SYS_MCI &= ~0x1;
+        }
+    }
+
+    internal slave port<TimerCallback> timer_callback_handler_24mhz
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            return timer_callback_24mhz();
+        }
+    }
+    behavior timer_callback_24mhz() : uint32_t
+    {
+        SYS_24MHZ += RESET_TIME_24MHZ;
+        return RESET_TIME_24MHZ;
+    }
+
+    internal slave port<TimerCallback> timer_callback_handler_100Hz
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            return timer_callback_100hz();
+        }
+    }
+    behavior timer_callback_100hz() : uint32_t
+    {
+        SYS_100HZ += RESET_TIME_100HZ;
+        return RESET_TIME_100HZ;
+    }
+
+
+    behavior init()
+    {
+        composition.init();
+        RESET_TIME_24MHZ = 24000000;
+        RESET_TIME_100HZ = 100;
+        timer_24mhz.timer_control.set(RESET_TIME_24MHZ);
+        timer_100Hz.timer_control.set(RESET_TIME_100HZ);
+        mmbSite = 1;
+    }
+
+    behavior getSysID(int revision):uint32_t
+    {
+        uint32_t sysId = 0;
+
+        // Use the HBI of the A5 board for now, as that's the only existing board with
+        // an RS1 memory map.
+
+        // HBI = R HHH B A FF
+        // where R = board rev, HHH = HBI in BCD, B = Bus (4=AHB, 5=AXI), F = FPGA build
+        switch (revision)
+        {
+        case BOARD_REV_A: sysId = 0x0225f500; break;
+        case BOARD_REV_B: sysId = 0x12257500; break;
+        case BOARD_REV_C: sysId = 0x22252500; break;
+        }
+        return sysId;
+    }
+
+    behavior getSysSW(): uint32_t
+    {
+        // etermine user switch register content. This comes from the board's config.txt file.
+        return user_switches_value; // 0 for now...
+    }
+
+    behavior getSysCfgCtrl(): uint32_t
+    {
+        // determine system control register
+        uint32_t command = 0;
+
+        if (sysCfgCtrl.busy)
+            command |= SYS_CFGCTRL_START_MASK; // Control operation is in progress...
+        if (sysCfgCtrl.write)
+            command |= SYS_CFGCTRL_WRITE_MASK;
+        command |= (sysCfgCtrl.function << SYS_CFGCTRL_FUNCTION_BIT) & SYS_CFGCTRL_FUNCTION_MASK;
+        command |= (sysCfgCtrl.site     << SYS_CFGCTRL_SITE_BIT    ) & SYS_CFGCTRL_SITE_MASK;
+        command |= (sysCfgCtrl.position << SYS_CFGCTRL_POSITION_BIT) & SYS_CFGCTRL_POSITION_MASK;
+        command |= (sysCfgCtrl.device   << SYS_CFGCTRL_DEVICE_BIT  ) & SYS_CFGCTRL_DEVICE_MASK;
+
+        return command;
+    }
+
+    behavior setSysCfgCtrl(uint32_t data)
+    {
+        sysCfgCtrl.busy     = ((data & SYS_CFGCTRL_START_MASK   ) >> SYS_CFGCTRL_START_BIT) != 0;
+        sysCfgCtrl.write    = ((data & SYS_CFGCTRL_WRITE_MASK   ) >> SYS_CFGCTRL_WRITE_BIT) != 0;
+        sysCfgCtrl.function =  (data & SYS_CFGCTRL_FUNCTION_MASK) >> SYS_CFGCTRL_FUNCTION_BIT;
+        sysCfgCtrl.site     =  (data & SYS_CFGCTRL_SITE_MASK    ) >> SYS_CFGCTRL_SITE_BIT;
+        sysCfgCtrl.position =  (data & SYS_CFGCTRL_POSITION_MASK) >> SYS_CFGCTRL_POSITION_BIT;
+        sysCfgCtrl.device   =  (data & SYS_CFGCTRL_DEVICE_MASK  ) >> SYS_CFGCTRL_DEVICE_BIT;
+
+        VESYSREG_TRACE("sysCfgCtrl.busy = %d, sysCfgCtrl.write = %d, sysCfgCtrl.function = %d, sysCfgCtrl.site = %d, sysCfgCtrl.position = %d, sysCfgCtrl.device = %d\n", sysCfgCtrl.busy, sysCfgCtrl.write, sysCfgCtrl.function, sysCfgCtrl.site, sysCfgCtrl.position, sysCfgCtrl.device);
+
+        if (sysCfgCtrl.busy)
+            SYS_CFGSTAT = SYS_CFGSTAT & ~(SYS_CFGSTAT_COMPLETE|SYS_CFGSTAT_ERROR);
+        else
+            return;
+
+        switch (sysCfgCtrl.site)
+        {
+        case SYS_CTRL_SITE_MB: // Motherboard site access
+            switch (sysCfgCtrl.function)
+            {
+            case SYS_CFG_OSC: // Device oscillator frequency in Hz
+                if (sysCfgCtrl.device == 1) { // Device #1: CLCD clock
+                    if (sysCfgCtrl.write)
+                    {
+                        if (clock_CLCD.set.implemented())
+                        {
+                            clockCLCD = SYS_CFGDATA;
+                            clock_CLCD.set(clockCLCD, 1);
+                        }
+                    } else {
+                        SYS_CFGDATA = clockCLCD;
+                    }
+                } else {
+                    // Unsupported device
+                    SYS_CFGSTAT |= SYS_CFGSTAT_ERROR;
+                }
+                break;
+            case SYS_CFG_SHUTDOWN:
+                if (sysCfgCtrl.device == 0 && sysCfgCtrl.write) {
+                    if (exit_on_shutdown) simShutdown();
+                }
+                break;
+            case SYS_CFG_MUXFPGA:
+                // DVI mux
+                mmbSite = SYS_CFGDATA;
+                break;
+            default:
+                // Model doesn't support this function on the motherboard site
+                SYS_CFGSTAT |= SYS_CFGSTAT_ERROR;
+                break;
+            }
+            break;
+
+        case SYS_CTRL_SITE_DB1: // daughterboard configuration over CB (Configuration Bus)
+        case SYS_CTRL_SITE_DB2:
+            if (sysCfgCtrl.function == SYS_CFG_MUXFPGA)
+            {
+                // DVI mux
+                mmbSite = SYS_CFGDATA;
+            }
+            else if (sysCfgCtrl.write && cb[sysCfgCtrl.site - 1].write.implemented())
+            {
+                // Write from SYS_CFGDATA over the configuration bus.
+                // NB we assume that the configuration bus writes complete immediately
+                bool ok = cb[sysCfgCtrl.site - 1].write(
+                        sysCfgCtrl.function, sysCfgCtrl.device, SYS_CFGDATA);
+                if (!ok) SYS_CFGSTAT |= SYS_CFGSTAT_ERROR;
+            }
+            else if (!sysCfgCtrl.write && cb[sysCfgCtrl.site - 1].read.implemented())
+            {
+                // Read into SYS_CFGDATA over the configuration bus.
+                // NB we assume that the configuration bus reads complete immediately
+                bool ok = cb[sysCfgCtrl.site - 1].read(
+                        sysCfgCtrl.function, sysCfgCtrl.device, &SYS_CFGDATA);
+                if (!ok) SYS_CFGSTAT |= SYS_CFGSTAT_ERROR;
+            }
+            else
+            {
+                // Model doesn't support this function on the daughterboard sites
+                SYS_CFGSTAT |= SYS_CFGSTAT_ERROR;
+            }
+            break;
+        default: // Unsupported site
+            // Model doesn't support any functions on this site
+            SYS_CFGSTAT |= SYS_CFGSTAT_ERROR;
+            break;
+        }
+
+        // All transfers, even if the function/site isn't supported, complete immediately.
+        sysCfgCtrl.busy = false;
+        SYS_CFGSTAT |= SYS_CFGSTAT_COMPLETE;
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        SYS_ID = getSysID(BOARD_REV_A);
+        SYS_SW = getSysSW();
+        SYS_LED = 0x00000000;
+        SYS_100HZ = 0x00000000;
+        SYS_FLAGS = 0x00000000;
+        SYS_FLAGSCLR = 0x00000000;
+        SYS_NVFLAGS = 0x00000000;
+        SYS_NVFLAGSCLR = 0x00000000;
+        if (mmc_card_present.getValue() == sg::Signal::Set)
+            SYS_MCI = 0x00000001;
+        else
+            SYS_MCI = 0x00000000;
+
+        SYS_FLASH = 0x00000000;
+        SYS_CFGSW = 0x00000000;
+        SYS_24MHZ = 0x00000000;
+
+        SYS_MISC = 0x00302000;
+        if (!tilePresent)
+        {
+          // The tile present bits are 0 for
+          // present, 1 for not present.
+          SYS_MISC |= 0x1000;
+        }
+        SYS_DMA = 0x00000000;
+
+
+        SYS_PROCID0 = sys_proc_id0;
+        SYS_PROCID1 = sys_proc_id1;
+
+        SYS_CFGCTRL = 0x00000000;
+
+
+        SYS_CFGSTAT = 0x00000000;
+
+        RESET_TIME_24MHZ = 24000000;
+        RESET_TIME_100HZ = 100;
+        timer_24mhz.timer_control.set(RESET_TIME_24MHZ);
+        timer_100Hz.timer_control.set(RESET_TIME_100HZ);
+        setSysCfgCtrl(0);
+        clockCLCD = 23750000; // default for CLCD clock (OSC1)
+        clock_CLCD.set(clockCLCD,1);
+        mmbSite = 1; // defaults to DB1 (daugherboard 1 CLCD)
+    }
+
+
+    behavior registerRead(uint32_t device_addr) : uint32_t
+    {
+        uint32_t data = 0;
+
+        switch(device_addr)
+        {
+        case 0x0:
+            data = SYS_ID;
+            VESYSREG_TRACE("SYS_ID -> %x\n", data);
+            break;
+        case 0x04:
+            data = SYS_SW;
+            VESYSREG_TRACE("SYS_SW -> %x\n", data);
+            break;
+        case 0x08:
+            data = SYS_LED;
+            VESYSREG_TRACE("SYS_LED -> %x\n", data);
+            break;
+        case 0x24:
+            data = SYS_100HZ + (RESET_TIME_100HZ - timer_100Hz.timer_control.remaining());
+            VESYSREG_TRACE("SYS_100HZ -> %x\n", data);
+            break;
+        case 0x30:
+            data = SYS_FLAGS;
+            VESYSREG_TRACE("SYS_FLAGS -> %x\n", data);
+            break;
+        case 0x34:
+            VESYSREG_TRACE("SYS_FLAGSCLR is write only!\n");
+            break;
+        case 0x38:
+            data = SYS_NVFLAGS;
+            VESYSREG_TRACE("SYS_NVFLAGS -> %x\n", data);
+            break;
+        case 0x3C:
+            VESYSREG_TRACE("SYS_NVFLAGSCLR is write only!\n");
+            break;
+        case 0x48:
+            data = SYS_MCI;
+            VESYSREG_TRACE("SYS_MCI -> %x\n", data);
+            break;
+        case 0x4C:
+            data = SYS_FLASH;
+            VESYSREG_TRACE("SYS_FLASH -> %x\n", data);
+            break;
+        case 0x58:
+            data = SYS_CFGSW;
+            VESYSREG_TRACE("SYS_CFGSW -> %x\n", data);
+            break;
+        case 0x5C:
+            data = SYS_24MHZ + (RESET_TIME_24MHZ - timer_24mhz.timer_control.remaining());
+            VESYSREG_TRACE("SYS_24MHZ -> %x\n", data);
+            break;
+        case 0x60:
+            data = SYS_MISC;
+            VESYSREG_TRACE("SYS_MISC -> %x\n", data);
+            break;
+        case 0x64:
+            data = SYS_DMA;
+            VESYSREG_TRACE("SYS_DMA -> %x\n", data);
+            break;
+        case 0x84:
+            data = SYS_PROCID0;
+            VESYSREG_TRACE("SYS_PROCID0 -> %x\n", data);
+            break;
+        case 0x88:
+            data = SYS_PROCID1;
+            VESYSREG_TRACE("SYS_PROCID1 -> %x\n", data);
+            break;
+        case 0xA0:
+            data = SYS_CFGDATA;
+            VESYSREG_TRACE("SYS_CFGDATA -> %x\n", data);
+            break;
+        case 0xA4:
+            data = getSysCfgCtrl();
+            VESYSREG_TRACE("SYS_CFGCTRL -> %x\n", data);
+            break;
+        case 0xA8:
+            data = SYS_CFGSTAT;
+            VESYSREG_TRACE("SYS_CFGSTAT -> %x\n", data);
+            break;
+        default:
+            data = 0xdeaddead;
+            VESYSREG_TRACE("UNKNOWN[0x%02x] -> %x\n", device_addr, data);
+            break;
+        }
+
+
+        return data;
+    }
+
+    behavior registerWrite(uint32_t device_addr, uint32_t data)
+    {
+        switch(device_addr)
+        {
+        case 0x0:
+            VESYSREG_TRACE("SYS_ID <- %x\n", data);
+            SYS_ID = (SYS_ID & 0x0FFFFFFF) | (data & 0xF0000000);  // 27:0 are read-only
+            break;
+        case 0x04:
+            VESYSREG_TRACE("SYS_SW <- %x\n", data);
+            SYS_SW = (SYS_SW & 0xFFFFFF00) | (data & 0xFF); // 31:8 are read-only
+            break;
+        case 0x08:
+            VESYSREG_TRACE("SYS_LED <- %x\n", data);
+            SYS_LED = (SYS_LED & 0xFFFFFF00) | (data & 0xFF); // 31:8 are read-only
+            break;
+        case 0x24:
+            VESYSREG_TRACE("SYS_100HZ is read only!\n");
+            break;
+        case 0x30:
+            VESYSREG_TRACE("SYS_FLAGS <- %x\n", data);
+            SYS_FLAGS |= data;
+            break;
+        case 0x34:
+            VESYSREG_TRACE("SYS_FLAGSCLR <- %x\n", data);
+            SYS_FLAGS = ~((~SYS_FLAGS) | data);
+            break;
+        case 0x38:
+            VESYSREG_TRACE("SYS_NVFLAGS <- %x\n", data);
+            SYS_NVFLAGS |= data;
+            break;
+        case 0x3C:
+            VESYSREG_TRACE("SYS_NVFLAGSCLR <- %x\n", data);
+            SYS_NVFLAGSCLR = ~((~SYS_NVFLAGSCLR) | data);
+            break;
+        case 0x48:
+            VESYSREG_TRACE("SYS_MCI is read only!");
+            break;
+        case 0x4C:
+            VESYSREG_TRACE("SYS_FLASH <- %x\n", data);
+            SYS_FLASH = data & 0x1; // just set bit 0
+            break;
+        case 0x58:
+            VESYSREG_TRACE("SYS_CFGSW <- %x\n", data);
+            SYS_CFGSW = (SYS_CFGSW & 0xFFFFFF00) | (data & 0xFF); // 31:8 are read-only
+            break;
+        case 0x5C:
+            VESYSREG_TRACE("SYS_24MHZ is read only!\n");
+            break;
+        case 0x60:
+            VESYSREG_TRACE("SYS_MISC <- %x\n", data);
+            SYS_MISC = (SYS_MISC & 0xf007ffff) | (data & 0x0ff80000);
+            // Event I/O to daughterboard unimplemented
+            break;
+        case 0x64:
+            VESYSREG_TRACE("SYS_DMA <- %x\n", data);
+            // All SYS_DMA fields ignore writes
+            break;
+        case 0x84:
+            VESYSREG_TRACE("SYS_PROCID0 <- %x\n", data);
+            SYS_PROCID0 = data;
+            break;
+        case 0x88:
+            VESYSREG_TRACE("SYS_PROCID1 <- %x\n", data);
+            SYS_PROCID1 = data;
+            break;
+        case 0xA0:
+            VESYSREG_TRACE("SYS_CFGDATA <- %x\n", data);
+            SYS_CFGDATA = data;
+            break;
+        case 0xA4:
+            VESYSREG_TRACE("SYS_CFGCTRL <- %x\n", data);
+            setSysCfgCtrl(data);
+            break;
+        case 0xA8:
+            VESYSREG_TRACE("SYS_CFGSTAT <- %x\n", data);
+            SYS_CFGSTAT = data & (SYS_CFGSTAT_COMPLETE | SYS_CFGSTAT_ERROR);
+            break;
+        default:
+            VESYSREG_TRACE("UNKNOWN[0x%02x] <- %x\n", device_addr, data);
+            break;
+        }
+    }
+
+    // debugger register access support
+    behavior debug_read(CASIU32 reg_id, CASIU64* datap, bool side_effects) : CADIReturn_t
+    {
+        *datap = registerRead(reg_id);
+
+        return eslapi::CADI_STATUS_OK;
+    }
+
+    behavior debug_write(CASIU32 reg_id, const CASIU64* datap, bool side_effects) : CADIReturn_t
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+
+        return eslapi::CADI_STATUS_OK;
+    }
+    master port<ClockRateControl> clock_CLCD;
+    master port<LCD> lcd;
+    master port<VECBProtocol> cb[2];
+    slave port<LCD> mmb[3]
+    {
+        behavior lock(uint32_t index):const VisRasterLayout*
+        {
+            if ((mmbSite == index) && lcd.lock.implemented())
+                return lcd.lock();
+            else
+                return 0;
+       }
+
+        behavior unlock(uint32_t index):void
+        {
+            if ((mmbSite == index) && lcd.unlock.implemented())
+                lcd.unlock();
+        }
+
+        behavior update(uint32_t index, int x, int y, unsigned int w, unsigned int h):void
+        {
+            if ((mmbSite == index) && lcd.update.implemented())
+                lcd.update(x, y, w, h);
+        }
+
+        behavior setPreferredLayout(uint32_t index, unsigned int width, unsigned int height,
+                                unsigned int depth):void
+        {
+            if ((mmbSite == index) && lcd.setPreferredLayout.implemented())
+                lcd.setPreferredLayout(width, height, depth);
+        }
+
+    }
+}

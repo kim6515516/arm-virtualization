@@ -1,0 +1,115 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ */
+
+// Allow a component to configure its PVBusSlave subcomponent.
+//
+// This gives control over mapping regions of device memory to be
+// RAM/ROM/Device memory.   The PVBusSlave automatically routes incoming
+// bus accesses according to this configuration.  Accesses to device
+// memory (or writes to ROM memory) are routed to the device port,
+// which the component should use to provide implementations of the
+// read() and write() behaviours.
+
+protocol PVBusSlaveControl
+{
+    includes
+    {
+#include "pv/PVBusSlave.h"
+    }
+
+    properties {
+        version = "8.1.37";
+        description = "PVBusSlaveControl Protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    // Set the default fill pattern for RAM/ROM regions.  This should be
+    // called before any memory accesses occur, and allows memory to be
+    // prefilled with an alternating two-word pattern.
+    slave  behavior setFillPattern (uint32_t fill1, uint32_t fill2);
+
+    // Define how accesses are routed for a given range of device addresses.
+    //    'base': start address of range to be configured (4k-aligned)
+    //    'top' : end address (4k-aligned)
+    //    'type': types of access to configure:
+    //                    ACCESSTYPE_READ,
+    //                    ACCESSTYPE_WRITE,
+    //                    ACCESSTYPE_RW
+    //    'mode': select the new mode for accesses.
+    //
+    // The following access modes control how to treat accesses of the
+    // selected type, within the chosen range:
+    //    ACCESSMODE_MEMORY : access data storage (managed by the PVBusSlave).
+    //    ACCESSMODE_DEVICE : route request to the device port on the slave.
+    //    ACCESSMODE_ABORT  : generate an abort on the transaction.
+    //    ACCESSMODE_IGNORE : ignore the transaction (reads return 0).
+
+    slave behavior setAccess(pv::bus_addr_t base,
+                             pv::bus_addr_t top,
+                             pv::accessType type,
+                             pv::accessMode mode);
+
+
+    // Get read or write access to the underlying memory storage provided by
+    // the PVBusSlave.
+    //    'address' : byte address to request access to.
+    //    'limit'   : returns the address limit for the contiguous region.
+    // The returned pointer can be used to directly access all memory locations
+    // from 'address' up to 'limit-1'.  The returned pointer is only
+    // guaranteed to remain valid until the next bus access or simulation
+    // cycle. Modifying memory by means of getWriteStorage will not inform
+    // any of the global exclusive monitors of the update.
+
+    slave behavior getReadStorage(pv::bus_addr_t address,
+                                  pv::bus_addr_t *limit)
+                      : const uint8_t *;
+
+    slave behavior getWriteStorage(pv::bus_addr_t address,
+                                   pv::bus_addr_t *limit)
+                      : uint8_t *;
+
+
+    // Allows a device to provide its own memory region to implement memory
+    // storage.  For example, a device may want to ensure that the underlying
+    // memory is implemented in one contiguous region, or is allocated from
+    // a special region (eg. video memory, mmap'd memory).
+    //
+    // The caller must allow the PVBusSlave to take ownership of all accesses
+    // to this memory.  ie. the caller must always call getWriteStorage()
+    // before modifying the contents of this memory region.
+    //
+    // device_base and device_limit must be 4k aligned.
+
+    slave behaviour provideReadStorage(pv::bus_addr_t device_base,
+                                       pv::bus_addr_t device_limit,
+                                       const uint8_t *storage);
+
+    slave behaviour provideWriteStorage(pv::bus_addr_t device_base,
+                                       pv::bus_addr_t device_limit,
+                                       uint8_t *storage);
+
+    slave behaviour provideReadWriteStorage(
+                                       pv::bus_addr_t device_base,
+                                       pv::bus_addr_t device_limit,
+                                       uint8_t *storage);
+
+    // Behaviours below are not currently documented and therefore unsupported
+
+    // Allow configuration of the transactions that are accepted
+    // by a PVBusSlave. By default the slave will accept read and write
+    // transactions. The slave_config_t class provides the following
+    // methods to extend the set of accepted transactions...
+    //
+    //     acceptACE_CleanShared_CleanInvalid_MakeInvalid()
+    //     acceptACE_CleanUnique_MakeUnique()
+    //     acceptEvict()
+    //     acceptMemoryBarriers()
+    //     acceptPrefetchOnly()
+    //     acceptExclusiveTransactions()
+    //     ignoreNonExclusiveStoresToGlobalMonitor()
+    //     setLog2ExclusiveMonitorGranuleSize()
+
+    slave behaviour configure(pv::slave_config_t*);
+}

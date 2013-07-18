@@ -1,0 +1,635 @@
+/*
+ * Copyright 2006-2009 ARM Limited. All rights reserved.
+ */
+
+component IntelStrataFlashJ3 {
+
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Intel Strata Flash J3 LISA+ model.";
+    }
+    includes
+    {
+        #define NOR_FLASH_PROGRAM_COMMAND    0x00100010
+        #define NOR_FLASH_READ_ARRAY         0x00FF00FF
+        #define NOR_FLASH_READ_STATUS        0x70707070
+        #define NOR_FLASH_PROGRAM_VERIFY     0x00D000D0
+        #define NOR_FLASH_BYTE_WORD_PROGRAM  0x00400040
+        #define NOR_FLASH_ID_MODE            0x00900090
+        #define NOR_FLASH_BLOCK_WRITE_MODE   0x00E800E8
+        #define NOR_FLASH_STATUS_READY_MASK  0x00800080
+        #define NOR_FLASH_CFI_QUERY_COMMAND  0x00980098
+        #define NOR_FLASH_MAX_WRITE_BUFF     0x80
+        #define NOR_FLASH_BLOCK_ERASE        0x00200020
+        #define NOR_FLASH_BLOCK_LOCK_CONFIRM 0x00010001
+        #define NOR_FLASH_BLOCK_LOCK_BITS    0x00600060
+
+        enum IntelStrataFlashJ3_BlockWriteState
+        {
+            IntelStrataFlashJ3_BLOCK_WRITE_COUNT,                      // first write is word count-1
+            IntelStrataFlashJ3_BLOCK_WRITE_START,                      // then buffer address + first data
+            IntelStrataFlashJ3_BLOCK_WRITE_CONTINUE                    // then other data until a confirm command
+        };
+    }
+
+    //Ports visible to the world
+    slave port<PVBus> pvbus;                        // This is where the address and the data comes from the bus
+    master port<PVBusSlaveControl> mbs_control;     // This is an internal control that is used to control the encapsulated PVBusSlave
+
+    composition
+    {
+        mbs : PVBusSlave(size = size)               // memory bus slave
+    }
+
+    connection
+    {
+        self.pvbus       => mbs.pvbus_s;            // connect the external port to the PVBusSlave.
+        self.mbs_control => mbs.control;            // connect the internal control to the PVBusSlave.
+        mbs.device       => self.mem_port;
+    }
+
+    resources
+    {
+        PARAMETER { description("Memory Size"), max( 0xffffffff ), min( 0x4 ), default(0x1000), type(uint32_t) }  size;
+        MEMORY { virtual(true), read_function(debug_read), write_function(debug_write) } ram_contents[0x100000000];
+        uint8_t       cfi_data[64];
+
+        uint32_t block_size_bits;                     // number of address bits in one block region.
+        uint32_t blocks;                              // number of blocks.
+        uint32_t edit_block;                          // which block is currently being programmed.
+        uint32_t edit_state;                          // the flash state variable.
+        uint32_t erase_region_size;                   // size of the erase region
+
+        uint32_t block_write_state;
+        uint32_t block_write_address;
+        uint32_t block_write_count;
+
+        bool in_read_special_mode;
+
+        pv::bus_addr_t bytes;                      // size of the flash device in bytes.
+        uint32_t fill1, fill2;                       // pattern that needs to be programmed into the flash if needed.
+
+    }
+
+    slave port<PVDevice> mem_port                   // PVDevice port that is connect PVBusSlave port.
+    {
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result   // implementation of the mandatory  port read.
+        {
+            // NOTE that PVBusSlave will use this for debug reads -- so we will
+            // see the memory as specified by the state machine. c.f. this to
+            // debugWrite that will alter the underlying storage without going
+            // through the state machine.
+
+            // The underlying code will do the wrong thing with unaligned reads, so abort if we get one
+            if (!tx.isAligned()) return tx.generateAbort();
+
+            // As the underlying code doesn't support >32 bit accesses we must
+            // split larger accesses up
+            switch (tx.getAccessWidth())
+            {
+                case pv::ACCESS_8_BITS: case pv::ACCESS_16_BITS: case pv::ACCESS_32_BITS:
+                {
+                    uint32_t data;
+                    do_read(tx.getAddress(), tx.getAccessByteWidth(), &data);
+                    return tx.setReturnData32(data);
+                }
+                case pv::ACCESS_64_BITS:
+                {
+                    uint32_t datalo;
+                    uint32_t datahi;
+                    do_read(tx.getAddress(), 4, &datalo);
+                    do_read(tx.getAddress()+4, 4, &datahi);
+                    const uint64_t data = uint64_t(datalo) | (uint64_t(datahi) << 32);
+                    return tx.setReturnData64(data);
+                }
+                default:
+                    // Ignore larger reads.
+                    return tx.readComplete();
+            }
+        }
+
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result // implementation of the mandatory port write
+        {
+            // The underlying code will do the wrong thing with unaligned writes, so abort if we get one
+            if (!tx.isAligned()) return tx.generateAbort();
+
+            uint32_t data;
+            switch (tx.getAccessWidth())
+            {
+            case pv::ACCESS_8_BITS: data = tx.getData8(); break;
+            case pv::ACCESS_16_BITS: data = tx.getData16(); break;
+            case pv::ACCESS_32_BITS: data = tx.getData32(); break;
+            case pv::ACCESS_64_BITS:
+            {
+                //  We must split this into two 32 bit writes until the
+                //  underlying code supports 64 bit writes.
+                uint32_t datalo = uint32_t(tx.getData64() & 0x00000000FFFFFFFFull);
+                uint32_t datahi = uint32_t((tx.getData64() & 0xFFFFFFFF00000000ull) >> 32);
+                do_write(tx.getAddress(), 4, &datalo);
+                do_write(tx.getAddress()+4, 4, &datahi);
+                return tx.writeComplete();
+            }
+            default:
+                // Ignore larger writes.
+                return tx.writeComplete();
+            }
+            do_write(tx.getAddress(), tx.getAccessByteWidth(), &data);
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return mem_port.read(tx);
+        }
+        
+        behaviour debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            // Debug writes work in the same way as loadFlashFile (ish!)
+            pv::bus_addr_t limit;
+            uint8_t* storage = mbs_control.getWriteStorage(tx.getAddress(), &limit);
+
+            unsigned const access_width_in_bytes = tx.getAccessByteWidth();
+            if (tx.getAddress() + access_width_in_bytes - 1 <= limit)
+            {
+                switch (access_width_in_bytes)
+                {
+                case 1:
+                    *storage =  tx.getData8();
+                    break;
+                case 2:
+                    *(uint16_t *)storage = tx.getData16();
+                    break;
+                case 4:
+                    *(uint32_t *)storage = tx.getData32();
+                    break;
+                case 8:
+                    *(uint64_t *)storage = tx.getData64();
+                    break;
+                default:
+                    return tx.generateAbort();
+                }
+                return tx.writeComplete();
+            }
+            return tx.generateAbort();
+        }
+    }
+
+    slave port<FlashLoaderPort> flashloader                     // Can be used to load code/data into the flash
+    {
+        behavior loadFlashFile(FlashLoader* loader):uint32_t    // Implementation of the protocols routine : loadFlashFile
+        {
+            uint8_t *buffer;
+            size_t block_size;
+            pv::bus_addr_t device_addr = 0;
+            pv::bus_addr_t page_limit = 0;
+
+            while (device_addr < bytes) {                       // while we have not exceeded the flash size
+                buffer = mbs_control.getWriteStorage(device_addr, &page_limit);
+                block_size = (size_t)(page_limit - device_addr);
+
+                size_t count = loader->readData(buffer, block_size); //copy the data.
+                device_addr += count;
+                if (count < block_size) {
+                    break; // EOF?
+                }
+
+            }
+            return (uint32_t)device_addr;
+        }
+        behavior saveFlashFile(FlashLoader* loader):uint32_t
+        {
+            const uint8_t *buffer;
+            size_t block_size;
+            pv::bus_addr_t device_addr = 0;
+            pv::bus_addr_t page_limit = 0;
+
+            while (device_addr < bytes) {
+                buffer = mbs_control.getReadStorage(device_addr, &page_limit);
+                block_size = (size_t)((bytes<page_limit?bytes:page_limit) - device_addr);
+
+                size_t count = loader->writeData(buffer, block_size);
+                device_addr += count;
+            }
+            return (uint32_t)device_addr;
+        }
+    }
+
+    /* The helper routine that does the reads/ right transitions of the state machine */
+    behavior do_read(pv::bus_addr_t address, int width, uint32_t *data)
+    {
+        uint32_t block = address_to_block(address);                 // what block are we concerned about?
+        uint32_t word;
+        int access_type;
+
+        if (block == edit_block) {                              // is this the block we were editing?
+            access_type = edit_state;                           // yes? then type of access is what we set in the write()
+        } else {
+            access_type = NOR_FLASH_READ_ARRAY;                 // no? then it is a read.
+        }
+
+        switch (access_type & 0xff) {
+            case NOR_FLASH_READ_ARRAY & 0xff:                   // read the data
+                flash_read(address, width, data);
+                if ((edit_state & 0xff) == (NOR_FLASH_READ_ARRAY & 0xff)) {
+                    clear_read_special();
+                }
+                return;
+
+            case NOR_FLASH_ID_MODE & 0xff:                      // ID mode
+                cfi_read(address % 8, &word);
+                break;
+
+            case NOR_FLASH_PROGRAM_VERIFY & 0xff:
+            case NOR_FLASH_READ_STATUS & 0xff:
+            case NOR_FLASH_BLOCK_WRITE_MODE & 0xff:
+            case NOR_FLASH_BLOCK_LOCK_CONFIRM & 0xff:
+                word = NOR_FLASH_STATUS_READY_MASK;             // return the ready mask for these.
+                break;
+
+            case NOR_FLASH_CFI_QUERY_COMMAND & 0xff:
+                cfi_read(address, &word);                       // do the read of the CFI data
+                break;
+            default:
+                word = 0xdeaddead;
+                break;
+        }
+
+        switch (width) {                                        // fill in the data with contents we read.
+            case 1: *data = word & 0xff; break;
+            case 2: *data = word & 0xffff; break;
+            case 4: *data = word; break;
+        }
+    }
+
+
+    // erase MUST set bits to 1
+    behavior erase(pv::bus_addr_t base, pv::bus_addr_t end)
+    {
+        pv::bus_addr_t next_block;
+
+        assert((base & 0x7) == 0);
+        assert((end & 0x7) == 0);
+
+        while (base < end) {
+            uint32_t* storage = (uint32_t *)mbs_control.getWriteStorage(base, &next_block);
+            assert((next_block & 0x7) == 0);
+
+            for (; base < next_block; base += 8, storage += 2) {
+                storage[0] = 0xffffffff;
+                storage[1] = 0xffffffff;
+            }
+        }
+    }
+
+    // flash writes can only clear bits, not set them
+    behavior flash_write(pv::bus_addr_t address, int width, const uint32_t *data)
+    {
+        uint8_t* storage = mbs_control.getWriteStorage(address, NULL);
+        switch (width) {
+            case 1: *storage = (*storage & 0x00) | (uint8_t) *data; break;
+            case 2: *(uint16_t *)storage = (*(uint16_t *)storage & 0x0000) | (uint16_t) *data; break;
+            case 4: *(uint32_t *)storage = (*(uint32_t *)storage & 0x00000000) | (uint32_t) *data; break;
+        }
+    }
+
+    behavior do_write(pv::bus_addr_t address, int width, uint32_t *data)
+    {
+        uint32_t block = address_to_block(address);
+
+        if (block == edit_block &&
+                ((edit_state & 0xff) == (NOR_FLASH_PROGRAM_COMMAND & 0xff) ||
+                 (edit_state & 0xff) == (NOR_FLASH_BYTE_WORD_PROGRAM & 0xff)))
+        {
+            flash_write(address, width, data);
+            edit_state = NOR_FLASH_PROGRAM_VERIFY;
+            return;
+        }
+        else if ((edit_state & 0xff) == (NOR_FLASH_BLOCK_WRITE_MODE & 0xff))
+        {
+            switch (block_write_state)
+            {
+                case IntelStrataFlashJ3_BLOCK_WRITE_COUNT:
+                    if (block == edit_block)
+                    {
+                        block_write_count = ((*data & 0xff) + 1)*4; // bytes
+                        block_write_state = IntelStrataFlashJ3_BLOCK_WRITE_START;
+                        return;
+                    }
+                    break;
+                case IntelStrataFlashJ3_BLOCK_WRITE_START:
+                    // address specifies the base address of the block
+                    block_write_address = address;
+                    block_write_state = IntelStrataFlashJ3_BLOCK_WRITE_CONTINUE;
+                    // FALLTHROUGH
+                case IntelStrataFlashJ3_BLOCK_WRITE_CONTINUE:
+                    if (address >= block_write_address &&
+                            address <= block_write_address+NOR_FLASH_MAX_WRITE_BUFF-width)
+                    {
+                        // this should be buffered
+                        flash_write(address,width,data);
+
+                        block_write_count -= width;
+
+                        if (block_write_count == 0)
+                            edit_state = NOR_FLASH_PROGRAM_VERIFY;
+
+                        return;
+                    }
+                    else
+                    {
+                        // this is supposed to be an error
+                        edit_state = NOR_FLASH_PROGRAM_VERIFY;
+                        return;
+                    }
+                    break;
+            }
+        }
+
+        switch(*data & 0xff) {
+            case NOR_FLASH_BLOCK_ERASE & 0xff:
+                {
+                    uint32_t offset = address_to_offset(address) / 4;
+                    if (offset == 0) {
+                        uint32_t block = address_to_block(address);
+                        erase(block_to_address(block),
+                                block_to_address(block + 1));
+                    }
+                }
+                break;
+            case NOR_FLASH_BLOCK_LOCK_CONFIRM & 0xff:
+                if (edit_state != NOR_FLASH_BLOCK_LOCK_BITS || block != edit_block)
+                {
+                }
+                break;
+            case NOR_FLASH_BLOCK_WRITE_MODE & 0xff:
+                block_write_state = IntelStrataFlashJ3_BLOCK_WRITE_COUNT;
+                break;
+            default:
+                break;
+        }
+
+        edit_state = *data;
+        set_edit_block(block);
+    }
+
+    behavior cfi_read(pv::bus_addr_t address, uint32_t *data)
+    {
+        uint32_t offset = (address_to_offset(address) / 4) & 0xffff;
+
+        if (offset > cfi_length()) {
+            *data = 0;
+        }
+        else {
+            uint32_t value = (uint32_t)(cfi_data[offset]);
+            *data = value | (value << 16);
+        }
+    }
+
+    behavior set_read_special(pv::bus_addr_t base, pv::bus_addr_t end)
+    {
+        mbs_control.setAccess(base, end, pv::ACCESSTYPE_READ, pv::ACCESSMODE_DEVICE);
+    }
+
+    behavior set_edit_block(uint32_t block)
+    {
+        if (block != edit_block && in_read_special_mode) {
+            set_read_array(block_to_address(edit_block),
+                    block_to_address(edit_block + 1));
+        }
+        if (block != edit_block || !in_read_special_mode) {
+            edit_block = block;
+            set_read_special(block_to_address(block),
+                    block_to_address(block + 1));
+            in_read_special_mode = true;
+        }
+    }
+
+    behavior address_to_offset(pv::bus_addr_t address) : uint32_t
+    {
+            return (uint32_t)(address & ((1 << block_size_bits) - 1));
+    }
+
+    behavior cfi_length() : uint32_t
+    {
+        return sizeof(cfi_data) / sizeof(cfi_data[0]);
+    }
+
+    behavior address_to_block(pv::bus_addr_t address) : uint32_t
+    {
+        return (uint32_t)(address >> (block_size_bits));
+    }
+
+
+    behaviour flash_read(pv::bus_addr_t address, int width, uint32_t *data) {
+        uint8_t const* storage = mbs_control.getReadStorage(address, NULL);
+        switch (width) {
+            case 1: *data = (uint32_t)(*storage);
+            case 2: *data = (uint32_t)(*(uint16_t*)storage);
+            case 4: *data = *(uint32_t*)storage;
+        }
+    }
+
+    behaviour clear_read_special()
+    {
+        if (in_read_special_mode) {
+            set_read_array(block_to_address(edit_block),
+                    block_to_address(edit_block+1));
+            in_read_special_mode = false;
+        }
+    }
+
+    behavior block_to_address(uint32_t block) : pv::bus_addr_t
+    {
+            return ((pv::bus_addr_t)block) << block_size_bits;
+    }
+
+    behavior set_read_array(pv::bus_addr_t base, pv::bus_addr_t end)
+    {
+        mbs_control.setAccess(base, end,
+                pv::ACCESSTYPE_READ,
+                pv::ACCESSMODE_MEMORY);
+    }
+
+    behavior get_size() : pv::bus_addr_t
+    {
+        return bytes;
+    }
+
+    behavior get_size_shift(uint32_t size) : uint32_t
+    {
+        uint32_t shift=0;
+        while(size != 2)
+        {
+          size=size>>1;
+          shift++;
+        }
+
+        return shift;
+    }
+
+    behavior init()
+    {
+        composition.init();
+        // this is for 2 devices
+        bytes      = size;
+        block_size_bits = 18;
+        blocks = address_to_block(get_size());
+        edit_block = (uint32_t)-1;
+        edit_state = NOR_FLASH_READ_ARRAY;
+        erase_region_size = (1 << block_size_bits)/2;
+        in_read_special_mode = false;
+
+        fill1 = 0xe7ff0010;
+        fill2 = 0xe800e800;
+        mbs_control.setFillPattern(fill1, fill2);
+        mbs_control.setAccess(0, bytes, pv::ACCESSTYPE_WRITE, pv::ACCESSMODE_DEVICE);
+        // By default, all reads go to the storage array.
+        set_read_array(0, bytes);
+
+
+        const uint8_t cfi_default_data[] = {
+            0x89, 0x18,   /* control interface ID code? these bytes copied from real IntegratorCP board */
+            /* THESE ARE OVERRIDDEN BELOW */
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+            0x51, /* 0010 : 'Q' */
+            0x52, /* 0011 : 'R' */
+            0x59, /* 0012 : 'Y' */
+
+            0x01, /* 0013 : LSB Primary vendor command set and control */
+            0x00, /* 0014 : MSB interface ID code: Intel extended */
+
+            0x31, /* 0015 : LSB Address for Primary Alogrithm extended */
+            0x00, /* 0016 : MSB Query table */
+
+            0x00, /* 0017 : LSB Alternate vendor command set and */
+            0x00, /* 0018 : MSB control interface ID code */
+
+            0x00, /* 0019 : LSB Address for Alternate Alogrithm */
+            0x00, /* 001a : MSB extended Query table */
+
+            0x27, /* 001b : Minimum Program voltage */
+            0x36, /* 001c : Maximum Program voltage */
+            0x00, /* 001d : Maximum Program voltage */
+            0x00, /* 001e : Maximum Program voltage */
+            0x07, /* 001f : byte write typical timeout */
+            0x07, /* 0020 : buffer write typical timeout */
+            0x0a, /* 0021 : block erase typical timeout */
+            0x00, /* 0022 : chip erase typical timeout */
+            0x04, /* 0023 : byte write maximum timeout */
+            0x04, /* 0024 : byte write maximum timeout */
+            0x04, /* 0025 : byte write maximum timeout */
+            0x00, /* 0026 : byte write maximum timeout */
+            0x18, /* 0027 : device size = 4 devices (in 2 pairs) * 2^24 bytes= 16MB each*/
+
+            0x02, /* 0028 : LSB Flash device interface description  */
+            0x00, /* 0029 : MSB                                      */
+
+            0x05, /* 002a : LSB   2^n = maximum number of bytes in a */
+            0x00, /* 002b : MSB   multi-byte write MSB               */
+
+            0x01, /* 002c : Number of erase block regions */
+
+            /* the next four values depend on configuration so will be calculated at run time, not read here */
+            0x7f, /* 002d : LSB  erase block region info: */
+            0,    /* 002e : MSB  number of blocks-1       */
+
+            0,    /* 002f : LSB  erase block region info: */
+            2,    /* 0030 : MSB  size of block /256B MSB  */
+            /*        1 region, e.g. 64 blocks of 128K each (per chip, pv erase region = 256k) */
+
+            /* -----  Intel Primary Algorithm Extended Query Table ----  */
+            0x50, /* 0031 : 'P' */
+            0x52, /* 0032 : 'R' */
+            0x49, /* 0033 : 'I' */
+            0x31, /* 0034 : major version "1" */
+            0x31, /* 0035 : minor version "1" */
+
+            0x00, /* 0036 :                          */
+            0x00, /* 0037 : optional feature support */
+            0x00, /* 0038 :                          */
+            0x00, /* 0039 :                          */
+
+            0x00, /* 003a : supportted functions after suspend */
+
+            0x00, /* 003b : block status register mask */
+            0x00, /* 003c :                             */
+
+            0x50, /* 003d : logic supply program/erase voltage */
+            0x50, /* 003e : programming supply supply program/erase voltage */
+            0x00, /* 003f : reserved */
+        };
+
+        memcpy((void *)cfi_data, (void *)cfi_default_data, sizeof(cfi_default_data)/sizeof(cfi_default_data[0]));
+
+        cfi_data[0x2d] = (uint8_t)((blocks - 1) & 0xff);              // The dafault values for this device.. see the manual for more..
+        cfi_data[0x2e] = (uint8_t)((blocks - 1) >> 8);
+        cfi_data[0x2f] = (uint8_t)((erase_region_size / 256) & 0xff);
+        cfi_data[0x30] = (uint8_t)((erase_region_size / 256) >> 8);
+        cfi_data[0x27] = (uint8_t)(get_size_shift(size));
+    }
+
+    // -- CADI Debug interface to memory --
+
+    behaviour debug_read(uint32_t /*space_id*/,
+                         uint32_t /*block_id*/,
+                         uint64_t offset,
+                         uint32_t size_in_maus,
+                         uint64_t *data,
+                         bool /*side_effects*/,
+                         sg::MemoryAccessContext *mac)
+        : AccessFuncResult
+    {
+        pv::bus_addr_t start_address = offset % size;
+        uint8_t *      ptr = (uint8_t *)data;
+        uint32_t       size_in_bytes = size_in_maus * mac->GetMauInBytes();
+
+        while (size_in_bytes > 0) {
+            pv::bus_addr_t block_limit;
+            uint8_t const *storage = mbs.control.getReadStorage(start_address,
+                                                                      &block_limit);
+            uint32_t       transfer_bytes = block_limit - start_address;
+            if (transfer_bytes > size_in_bytes) transfer_bytes = size_in_bytes;
+            if (transfer_bytes == 0) break;
+
+            memcpy(ptr, storage, transfer_bytes);
+
+            size_in_bytes -= transfer_bytes;
+            start_address  = (start_address + transfer_bytes) % size;
+            ptr += transfer_bytes;
+        }
+        return ACCESS_FUNC_OK;
+    }
+
+    behaviour debug_write(uint32_t /*space_id*/,
+                          uint32_t /*block_id*/,
+                          uint64_t offset,
+                          uint32_t size_in_maus,
+                          const uint64_t *data,
+                          bool /*side_effects*/,
+                          sg::MemoryAccessContext *mac)
+        : AccessFuncResult
+    {
+        pv::bus_addr_t start_address = offset % size;
+        uint8_t const *ptr = (uint8_t *)data;
+        uint32_t       size_in_bytes = size_in_maus * mac->GetMauInBytes();
+
+        while (size_in_bytes > 0) {
+            pv::bus_addr_t block_limit;
+            uint8_t *      storage = mbs.control.getWriteStorage(start_address,
+                                                                       &block_limit);
+            uint32_t       transfer_bytes = block_limit - start_address;
+            if (transfer_bytes > size_in_bytes) transfer_bytes = size_in_bytes;
+            if (transfer_bytes == 0) break;
+
+            memcpy(storage, ptr, transfer_bytes);
+
+            size_in_bytes -= transfer_bytes;
+            start_address  = (start_address + transfer_bytes) % size;
+            ptr += transfer_bytes;
+        }
+        return ACCESS_FUNC_OK;
+    }
+}

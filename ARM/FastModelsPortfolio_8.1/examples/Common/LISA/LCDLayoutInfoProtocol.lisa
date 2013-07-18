@@ -1,0 +1,15 @@
+/*
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// 
+
+protocol LCDLayoutInfo
+{
+    properties {
+        version = "8.1.37";
+        description = "LCDLayoutInfo protocol";
+    }
+
+    slave behavior setLayoutInfo(int x, int y, uint32_t w, uint32_t h);
+}

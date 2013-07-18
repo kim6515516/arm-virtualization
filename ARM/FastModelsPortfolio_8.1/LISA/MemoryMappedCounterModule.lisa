@@ -1,0 +1,833 @@
+/*!
+ *  \file   MemoryMappedCounterModule.lisa
+ *  \brief  Memory Mapped Counter Module for Generic Timers.
+ *  \date   Copyright ARM Limited 2011 All Rights Reserved.
+ *
+ *  Implements a memory mapped counter module. This is required to be used for
+ *  multicluster models. It also must be used to run a single core system with
+ *  a timer that runs at a rate other than the input clock to the core.
+ *
+ *  This file implements the interface for SoC Level Counters as specified by
+ *  the ARM Generic Timer Specification.
+ */
+
+component MemoryMappedCounterModule
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Memory Mapped Counter Module for Generic Timers";
+        documentation_file = "";
+    }
+
+    includes
+    {
+        #include <set>
+        #include <algorithm>
+    }
+
+    composition
+    {
+        busSlaveControl : PVBusSlave(size = 0x1000);
+        busSlaveRead : PVBusSlave(size = 0x1000);
+
+        timer : ClockTimer64();
+        signalTimer : ClockTimer64();
+        eventTimer  : ClockTimer64();
+
+        timer_realtime : RealtimeClockTimer( frequency = base_frequency );
+        signalTimer_realtime : RealtimeClockTimer( frequency = base_frequency);
+        eventTimer_realtime  : RealtimeClockTimer( frequency = base_frequency);
+    }
+
+    resources
+    {
+        typedef std::set<uint64_t> CallbackSet;
+        typedef std::set<uint64_t>::iterator CallbackIt;
+
+        enum RegOffsets
+        {
+            CNTCV_LO_R  = 0x0,  // CNTCV at offset 0x0 in CNTReadBase frame
+            CNTCV_HI_R  = 0x4,
+
+            CNTCR       = 0x0,   // registers in CNTControlBase frame
+            CNTSR       = 0x4,
+            CNTCV_LO    = 0x8,
+            CNTCV_HI    = 0xC,
+            CNTFID0     = 0x20, // Base frequency ID, other IDs are at FID0 + 4i
+            CNT_ID      = 0xFD0 // Base of ID registers
+        };
+
+        enum BitOffsets
+        {
+            CNTCR_FCREQ_BIT = 8,
+            CNTCR_FCREQ_MASK = 1 << CNTCR_FCREQ_BIT,
+            CNTSR_FCACK_BIT = 8,
+            CNTSR_FCACK_MASK = 1 << CNTCR_FCREQ_BIT,
+        };
+
+        uint32_t cntcr;
+        uint32_t cntsr;
+        uint32_t cntfid0;
+        uint64_t savedcountvalue;
+        bool     enabled;
+        CallbackSet signalcbpoints;
+        CallbackSet eventcbpoints;
+        uint64_t lowWaterMark;
+
+        bool in_signaltimer_callback;
+        bool in_eventtimer_callback;
+
+        // when anything else interacts with the timer, we need to present a consistent
+        // view of time for the entire duration of the call
+        // (handling one call may invoke other reentrant calls)
+        // even if the underlying timer changes (i.e. when it updates in real time)
+        class IN_API_CALL
+        {
+            uint64_t & upct_inside_call;
+            uint64_t time_at_start_of_api_call;
+        public:
+            // take a snapshot of time on entry to an API
+            // children of the same API call will get the same time from getPhysicalCount
+            IN_API_CALL(uint64_t unadjustedPhysicalCount, uint64_t & upct_inside_call_)
+            :   upct_inside_call(upct_inside_call_)
+            {
+//                printf("IN_API_CALL %llu<-%llu\n", (long long unsigned) upct_inside_call_, (long long unsigned)physicalCount);
+                time_at_start_of_api_call = upct_inside_call;
+                upct_inside_call = unadjustedPhysicalCount;
+            }
+            // on exit from the API call the stacked object goes out of scope
+            // restore the previous value for upct_inside_call
+            // if this was the outer API call it will be 0, and next call gets a new time
+            ~ IN_API_CALL()
+            {
+//                printf("IN_API_CALL %llu->%llu\n", (long long unsigned)time_at_start_of_api_call, (long long unsigned)upct_inside_call);
+                upct_inside_call = time_at_start_of_api_call;
+            }
+        };
+        uint64_t upct_inside_call;
+
+        PARAMETER {
+                name("non_arch_start_at_default"),
+                description("Firmware is expected to enable the timer at boot time.  However, turning this parameter on is a model-specific way of enabling the counter module out of reset."),
+                type(bool),
+                default(false)
+                } non_arch_start_at_default;
+
+        PARAMETER { name("base_frequency"), type(uint32_t), default(100000000), description("Reset value for CNTFID0, base frequency in Hz") } base_frequency;
+        PARAMETER { name("use_real_time"), type(bool), default(false), description("Update the Generic Timer counter at a real-time base frequency instead of simulator time") } use_real_time;
+        
+        PARAMETER { name("cntcidr0123_C"), type(uint32_t), default(0), description("Values to be returned for control-frame CIDR registers") } cntcidr32_c;
+        PARAMETER { name("cntpidr0123_C"), type(uint32_t), default(0), description("Values to be returned for control-frame PIDR registers 0-3") } cntpidr32a_c;
+        PARAMETER { name("cntpidr4567_C"), type(uint32_t), default(0), description("Values to be returned for control-frame PIDR registers 4-7") } cntpidr32b_c;
+
+        PARAMETER { name("cntcidr0123_R"), type(uint32_t), default(0), description("Values to be returned for read-frame CIDR registers") } cntcidr32_r;
+        PARAMETER { name("cntpidr0123_R"), type(uint32_t), default(0), description("Values to be returned for read-frame PIDR registers 0-3") } cntpidr32a_r;
+        PARAMETER { name("cntpidr4567_R"), type(uint32_t), default(0), description("Values to be returned for read-frame PIDR registers 4-7") } cntpidr32b_r;
+
+        PARAMETER { name("readonly_is_WI"), type(bool), default(false), description("Ignore (rather than failing) on writes to read-frame") } readframe_wi;
+
+        PARAMETER { description("Diagnostics"), type(uint32_t), default(0), min(0), max(4) } diagnostics;
+    }
+
+    slave port<PVBus>               pvbus_control_s;
+    slave port<PVBus>               pvbus_read_s;
+    slave port<ClockSignal>         clk_in;
+
+    master port<CounterInterface>   cntvalueb
+    {
+        behavior getCounterValue() : uint64_t
+        {
+            IN_API_CALL api(getUnadjustedPhysicalCount(), upct_inside_call);
+
+            return getPhysicalCount();
+        }
+        behavior requestSignalUpdate(uint64_t at)
+        {
+            IN_API_CALL api(getUnadjustedPhysicalCount(), upct_inside_call);
+
+            if (diagnostics > 0)
+                cout << getInstancePath().c_str() << ": CounterInterface::requestSignalUpdate(at=0x"
+                     << std::hex << at << "),";
+
+            const uint64_t pct = getPhysicalCount();
+
+            if (diagnostics > 0)
+                cout << "PhysicalCount 0x" << std::hex << pct << std::endl;
+
+            // If the request was for a time that is less or equal to the current
+            // count then special case and signal immediately even if the
+            // counter isn't running.
+            if(at <= pct)
+            {
+                cntvalueb.signalUpdate();
+            }
+            else
+            {
+                // If there is an outstanding request then it is at the head of the
+                // set and we just need to cancel it.
+                if(signalTimer_isSet())
+                    signalTimer_cancel();
+
+                signalcbpoints.insert(at);
+
+                // At this point we are guaranteed that we have at least one
+                // element in the set. The point can't be zero as we've caught this
+                // before we get into this else clause.
+                //
+                // However due to drift it's possible that we have a element at the
+                // head of the set which should have already caused a callback.
+                // Therefore iterate over the set removing anything which should
+                // have already been signaled and if we did remove anything produce
+                // a callback.
+                bool needCallBack = false;
+                while(signalcbpoints.begin() != signalcbpoints.end())
+                {
+                    if(*signalcbpoints.begin() <= pct) {
+                        signalcbpoints.erase(signalcbpoints.begin());
+                        needCallBack = true;
+                    } else {
+                        break;
+                    }
+                }
+
+                if(needCallBack)
+                    cntvalueb.signalUpdate();
+
+                updateSignalTimer();
+            }
+        }
+
+        behaviour requestEventUpdate(uint64_t at)
+        {
+            IN_API_CALL api(getUnadjustedPhysicalCount(), upct_inside_call);
+
+            const uint64_t pct = getPhysicalCount();
+
+            // If the request was for a time that is less or equal to the current
+            // count then special case and signal immediately even if the
+            // counter isn't running.
+            if(at <= pct)
+            {
+                cntvalueb.eventUpdate();
+            }
+            else
+            {
+                // If there is an outstanding request then it is at the head of the
+                // set and we just need to cancel it.
+                if(eventTimer_isSet())
+                    eventTimer_cancel();
+
+                eventcbpoints.insert(at);
+
+                // At this point we are guaranteed that we have at least one
+                // element in the set. The point can't be zero as we've caught this
+                // before we get into this else clause.
+                //
+                // However due to drift it's possible that we have a element at the
+                // head of the set which should have already caused a callback.
+                // Therefore iterate over the set removing anything which should
+                // have already been signaled and if we did remove anything produce
+                // a callback.
+                bool needCallBack = false;
+                while(eventcbpoints.begin() != eventcbpoints.end())
+                {
+                    if(*eventcbpoints.begin() <= pct) {
+                        eventcbpoints.erase(eventcbpoints.begin());
+                        needCallBack = true;
+                    } else {
+                        break;
+                    }
+                }
+
+                if(needCallBack)
+                    cntvalueb.eventUpdate();
+
+                updateEventTimer();
+            }
+        }
+    }
+
+
+    internal slave port<TimerCallback64> timerCB
+    {
+        behavior signal() : uint64_t
+        {
+            lowWaterMark = 0;
+            return 0xFFFFFFFFFFFFFFFFull;
+        }
+    }
+
+    internal slave port<TimerCallback64> signalTimerCB
+    {
+        behavior signal() : uint64_t
+        {
+            IN_API_CALL api(getUnadjustedPhysicalCount(), upct_inside_call);
+
+            // If the callbacks trigger any new requests for timers then we do
+            // not honour them then but honour them at the end of this function
+            // by returning the right sleep value.
+            in_signaltimer_callback = true;
+
+            // If we've been called back then the point which requested the callback
+            // must be a the head of the set.
+            assert(!signalcbpoints.empty());
+
+            // The callback infrastructure does not define an ordering between multiple
+            // ClockTimers. The effect is that we may have been called back slightly
+            // early or slightly late with respect to the time remaining on any other
+            // ClockTimer in the system. However this error is not systemic and over
+            // the long term the right number of ticks will be counted.
+
+            // To preserve the a self-consistency then we must make sure that if we are
+            // called back early then any client reading the physical time gets a value
+            // which is consistent with the timer function having triggered.
+            lowWaterMark = std::max(*signalcbpoints.begin(),lowWaterMark);
+
+            // The event related to the callbackpoint has now been triggered so we can
+            // remove it from the set.
+            signalcbpoints.erase(signalcbpoints.begin());
+
+            cntvalueb.signalUpdate();
+
+            // In the late case there may be things in the set which have already
+            // been signaled. So we iterate over the set to remove any such items
+            // from the head.
+            const uint64_t pct = getPhysicalCount();
+
+            while(signalcbpoints.begin() != signalcbpoints.end())
+            {
+                if(*signalcbpoints.begin() <= pct)
+                    signalcbpoints.erase(signalcbpoints.begin());
+                else
+                    break;
+            }
+
+            // We now examine the set of scheduled callbacks and ask to be
+            // woken in the appropriate time, or not at all by returning zero
+            // if we have run out of requests.
+
+            uint64_t time_to_next_callback;
+
+            if (signalcbpoints.empty())
+            {
+                time_to_next_callback = 0;
+            }
+            else
+            {
+                assert( getUnadjustedPhysicalCount() < *signalcbpoints.begin() );
+                time_to_next_callback = *signalcbpoints.begin() - getUnadjustedPhysicalCount();
+                assert(time_to_next_callback != 0);
+            }
+
+            in_signaltimer_callback = false;
+            return time_to_next_callback;
+        }
+    }
+
+    internal slave port<TimerCallback64> eventTimerCB
+    {
+        behavior signal() : uint64_t
+        {
+            IN_API_CALL api(getUnadjustedPhysicalCount(), upct_inside_call);
+
+            // If the callbacks trigger any new requests for timers then we do
+            // not honour them then but honour them at the end of this function
+            // by returning the right sleep value.
+            in_eventtimer_callback = true;
+
+            // If we've been called back then the point which requested the callback
+            // must be a the head of the set.
+            assert(!eventcbpoints.empty());
+
+            // The callback infrastructure does not define an ordering between multiple
+            // ClockTimers. The effect is that we may have been called back slightly
+            // early or slightly late with respect to the time remaining on any other
+            // ClockTimer in the system. However this error is not systemic and over
+            // the long term the right number of ticks will be counted.
+
+            // To preserve the a self-consistency then we must make sure that if we are
+            // called back early then any client reading the physical time gets a value
+            // which is consistent with the timer function having triggered.
+            lowWaterMark = std::max(*eventcbpoints.begin(),lowWaterMark);
+
+            // The event related to the callbackpoint has now been triggered so we can
+            // remove it from the set.
+            eventcbpoints.erase(eventcbpoints.begin());
+
+            cntvalueb.eventUpdate();
+
+            // In the late case there may be things in the set which have already
+            // been signaled. So we iterate over the set to remove any such items
+            // from the head.
+            const uint64_t pct = getPhysicalCount();
+
+            while(eventcbpoints.begin() != eventcbpoints.end())
+            {
+                if(*eventcbpoints.begin() <= pct)
+                    eventcbpoints.erase(eventcbpoints.begin());
+                else
+                    break;
+            }
+
+            // We now examine the set of scheduled callbacks and ask to be
+            // woken in the appropriate time, or not at all by returning zero
+            // if we have run out of requests.
+
+            uint64_t time_to_next_callback;
+
+            if (eventcbpoints.empty())
+            {
+                time_to_next_callback = 0;
+            }
+            else
+            {
+                assert( getUnadjustedPhysicalCount() < *eventcbpoints.begin() );
+                time_to_next_callback = *eventcbpoints.begin() - getUnadjustedPhysicalCount();
+                assert(time_to_next_callback != 0);
+            }
+
+            in_eventtimer_callback = false;
+            return time_to_next_callback;
+        }
+    }
+
+
+    internal slave port<PVDevice> control_device
+    {
+        behavior read(pv::ReadTransaction tx)
+                    : pv::Tx_Result
+        {
+            IN_API_CALL api(getUnadjustedPhysicalCount(), upct_inside_call);
+
+            const pv::bus_addr_t addr = tx.getAddress();
+            const pv::AccessWidth width = tx.getAccessWidth();
+            uint64_t data = 0;
+
+            // Unaligned reads might span multiple registers. Can't do this.
+            if (!tx.isAligned()) return tx.generateAbort();
+            switch(addr & ~3)
+            {
+                case CNTCR:
+                    data = cntcr;
+                    break;
+                case CNTSR:
+                    data = cntsr;
+                    break;
+                case CNTCV_LO:
+                    data = getPhysicalCount();
+                    break;
+                case CNTCV_HI:
+                    data = ((getPhysicalCount() >> 32) & 0xFFFFFFFF);
+                    break;
+                case CNTFID0:
+                    data = cntfid0;
+                    break;
+                case CNT_ID:
+                    data = (cntpidr32b_c>>24)&0xff;
+                    break;
+                case (CNT_ID+4):
+                    data = (cntpidr32b_c>>16)&0xff;
+                    break;
+                case (CNT_ID+8):
+                    data = (cntpidr32b_c>>8)&0xff;
+                    break;
+                case (CNT_ID+0x0c):
+                    data = (cntpidr32b_c>>0)&0xff;
+                    break;
+                case (CNT_ID+0x10):
+                    data = (cntpidr32a_c>>24)&0xff;
+                    break;
+                case (CNT_ID+0x14):
+                    data = (cntpidr32a_c>>16)&0xff;
+                    break;
+                case (CNT_ID+0x18):
+                    data = (cntpidr32a_c>>8)&0xff;
+                    break;
+                case (CNT_ID+0x1c):
+                    data = (cntpidr32a_c>>0)&0xff;
+                    break;
+                case (CNT_ID+0x20):
+                    data = (cntcidr32_c>>24)&0xff;
+                    break;
+                case (CNT_ID+0x24):
+                    data = (cntcidr32_c>>16)&0xff;
+                    break;
+                case (CNT_ID+0x28):
+                    data = (cntcidr32_c>>8)&0xff;
+                    break;
+                case (CNT_ID+0x2c):
+                    data = (cntcidr32_c>>0)&0xff;
+                    break;
+                default:
+                    data = 0;
+                    break;
+            }
+
+            switch(width)
+            {
+                case pv::ACCESS_8_BITS:
+                case pv::ACCESS_16_BITS:
+                case pv::ACCESS_32_BITS:
+                    tx.setReturnData32((uint32_t)data);
+                    break;
+                case pv::ACCESS_64_BITS:
+                    tx.setReturnData64(data);
+                    break;
+                default:
+                    message("MemoryMappedCounterModule control device received read of unknown width",MSG_WARNING);
+                    break;
+            }
+            return tx.readComplete();
+        }
+
+        behavior write(pv::WriteTransaction tx)
+                    : pv::Tx_Result
+        {
+            IN_API_CALL api(getUnadjustedPhysicalCount(), upct_inside_call);
+            const pv::bus_addr_t addr = tx.getAddress();
+
+            if ((tx.getAccessWidth() == pv::ACCESS_64_BITS) && (addr == CNTCV_LO) && tx.isAligned())
+            {
+                // 64bit atomic access to CNTCV
+                if(!enabled)
+                {
+                    savedcountvalue = tx.getData64();
+                }
+                return tx.writeComplete();
+            }
+
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            switch(addr)
+            {
+                case CNTCR:
+                    setCNTCR(tx.getData32());
+                    break;
+                case CNTCV_LO:
+                    if(!enabled)
+                    {
+                        savedcountvalue &= UINT64_C(0xFFFFFFFF00000000);
+                        savedcountvalue |= tx.getData32();
+                    }
+                    break;
+                case CNTCV_HI:
+                    if(!enabled)
+                    {
+                        savedcountvalue &= UINT64_C(0x00000000FFFFFFFF);
+                        savedcountvalue |= (uint64_t(tx.getData32()) << 32);
+                    }
+                    break;
+                case CNTFID0:
+                    cntfid0 = tx.getData32();
+                    break;
+
+            }
+
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return control_device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return control_device.write(tx);
+        }        
+    }
+
+    internal slave port<PVDevice> read_device
+    {
+        behavior read(pv::ReadTransaction tx)
+                    : pv::Tx_Result
+        {
+            IN_API_CALL api(getUnadjustedPhysicalCount(), upct_inside_call);
+
+            const pv::bus_addr_t addr = tx.getAddress();
+            const pv::AccessWidth width = tx.getAccessWidth();
+            uint64_t data = 0;
+            // the read-device contains a (read-only) copy of the
+            // counter value register (see table E-2 in ARMARM), but
+            // has its own device-ID
+
+           switch(addr & ~3)
+            {
+                case CNTCV_LO_R:
+                    data = getPhysicalCount();
+                    break;
+                case CNTCV_HI_R:
+                    data = ((getPhysicalCount() >> 32) & 0xFFFFFFFF);
+                    break;
+                case CNT_ID:
+                    data = (cntpidr32b_r>>24)&0xff;
+                    break;
+                case (CNT_ID+4):
+                    data = (cntpidr32b_r>>16)&0xff;
+                    break;
+                case (CNT_ID+8):
+                    data = (cntpidr32b_r>>8)&0xff;
+                    break;
+                case (CNT_ID+0x0c):
+                    data = (cntpidr32b_r>>0)&0xff;
+                    break;
+                case (CNT_ID+0x10):
+                    data = (cntpidr32a_r>>24)&0xff;
+                    break;
+                case (CNT_ID+0x14):
+                    data = (cntpidr32a_r>>16)&0xff;
+                    break;
+                case (CNT_ID+0x18):
+                    data = (cntpidr32a_r>>8)&0xff;
+                    break;
+                case (CNT_ID+0x1c):
+                    data = (cntpidr32a_r>>0)&0xff;
+                    break;
+                case (CNT_ID+0x20):
+                    data = (cntcidr32_r>>24)&0xff;
+                    break;
+                case (CNT_ID+0x24):
+                    data = (cntcidr32_r>>16)&0xff;
+                    break;
+                case (CNT_ID+0x28):
+                    data = (cntcidr32_r>>8)&0xff;
+                    break;
+                case (CNT_ID+0x2c):
+                    data = (cntcidr32_r>>0)&0xff;
+                    break;
+                default:
+                    data = 0;
+                    break;
+            }
+
+            switch(width)
+            {
+                case pv::ACCESS_8_BITS:
+                case pv::ACCESS_16_BITS:
+                case pv::ACCESS_32_BITS:
+                    tx.setReturnData32((uint32_t)data);
+                    break;
+                case pv::ACCESS_64_BITS:
+                    tx.setReturnData64(data);
+                    break;
+                default:
+                    message("MemoryMappedCounterModule read device received read of unknown width",MSG_WARNING);
+                    break;
+            }
+            return tx.readComplete();
+        }
+
+        behavior write(pv::WriteTransaction tx)
+                    : pv::Tx_Result
+        {
+            if (readframe_wi)
+                return tx.writeComplete();
+            else
+                return tx.generateAbort();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return read_device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return read_device.write(tx);
+        }        
+    }
+
+    slave port <Signal> counter_reset
+    {
+        behavior setValue(sg::Signal::State s)
+        {
+            if(s == sg::Signal::Set)
+                reset(0);
+        }
+    }
+
+    connection
+    {
+        self.pvbus_control_s => busSlaveControl.pvbus_s;
+        self.pvbus_read_s => busSlaveRead.pvbus_s;
+
+        busSlaveControl.device => self.control_device;
+        busSlaveRead.device => self.read_device;
+        timer.timer_callback => self.timerCB;
+        signalTimer.timer_callback => self.signalTimerCB;
+        eventTimer.timer_callback => self.eventTimerCB;
+        timer_realtime.timer_callback => self.timerCB;
+        signalTimer_realtime.timer_callback => self.signalTimerCB;
+        eventTimer_realtime.timer_callback => self.eventTimerCB;
+
+        self.clk_in => timer.clk_in;
+        self.clk_in => signalTimer.clk_in;
+        self.clk_in => eventTimer.clk_in;
+    }
+
+    behavior init()
+    {
+        in_signaltimer_callback = false;
+        in_eventtimer_callback  = false;
+
+        savedcountvalue = 0;
+
+        lowWaterMark = 0;
+
+        composition.init();
+    }
+
+    behavior reset(int level)
+    {
+        // The counter will start from zero out of reset and if the counter
+        // block itself is reset.
+        savedcountvalue = 0;
+
+        lowWaterMark = 0;
+
+        cntsr = 0;
+        cntfid0 = base_frequency;
+
+        if (non_arch_start_at_default)
+            setCNTCR(0x101);
+        else
+            setCNTCR(0x000);
+
+        upct_inside_call = 0;
+
+        composition.reset(level);
+    }
+
+    behavior setCNTCR(uint32_t data)
+    {
+        cntcr = data;
+
+        if (cntcr & CNTCR_FCREQ_MASK)
+        {
+            cntsr |= CNTSR_FCACK_MASK;
+        }
+
+        // Enable bit
+        if(cntcr & 0x1)
+            enableCounter();
+        else
+            disableCounter();
+    }
+
+    behavior  timer_isSet() : bool              { if (use_real_time) { return timer_realtime.timer_control.isSet(); }           else { return timer.timer_control.isSet(); } }
+    behavior  timer_set(uint64_t value)         { if (use_real_time) { timer_realtime.timer_control.set(value); }               else { timer.timer_control.set(value); } }
+    behavior  timer_cancel()                    { if (use_real_time) { timer_realtime.timer_control.cancel(); }                 else { timer.timer_control.cancel(); } }
+    behavior  timer_remaining() : uint64_t      { if (use_real_time) { return timer_realtime.timer_control.remaining(); }       else { return timer.timer_control.remaining(); } }
+
+    behavior  signalTimer_isSet() : bool        { if (use_real_time) { return signalTimer_realtime.timer_control.isSet(); }     else { return signalTimer.timer_control.isSet(); } }
+    behavior  signalTimer_set(uint64_t value)   { if (use_real_time) { signalTimer_realtime.timer_control.set(value); }         else { signalTimer.timer_control.set(value); } }
+    behavior  signalTimer_cancel()              { if (use_real_time) { signalTimer_realtime.timer_control.cancel(); }           else { signalTimer.timer_control.cancel(); } }
+    behavior  signalTimer_remaining() : uint64_t{ if (use_real_time) { return signalTimer_realtime.timer_control.remaining(); } else { return signalTimer.timer_control.remaining(); } }
+
+    behavior  eventTimer_isSet() : bool         { if (use_real_time) { return eventTimer_realtime.timer_control.isSet(); }      else { return eventTimer.timer_control.isSet(); } }
+    behavior  eventTimer_set(uint64_t value)    { if (use_real_time) { eventTimer_realtime.timer_control.set(value); }          else { eventTimer.timer_control.set(value); } }
+    behavior  eventTimer_cancel()               { if (use_real_time) { eventTimer_realtime.timer_control.cancel(); }            else { eventTimer.timer_control.cancel(); } }
+    behavior  eventTimer_remaining() : uint64_t { if (use_real_time) { return eventTimer_realtime.timer_control.remaining(); }  else { return eventTimer.timer_control.remaining(); } }
+
+    behavior enableCounter()
+    {
+        cntvalueb.setEnabled(true);
+
+        if ( ! timer_isSet() )
+        {
+            timer_set(0xFFFFFFFFFFFFFFFFull - savedcountvalue);
+            savedcountvalue = 0;
+
+            updateSignalTimer();
+            updateEventTimer();
+        }
+
+        enabled = true;
+    }
+
+    behavior disableCounter()
+    {
+        cntvalueb.setEnabled(false);
+
+        if (timer_isSet())
+        {
+            savedcountvalue = getPhysicalCount();
+            timer_cancel();
+        }
+
+        if(signalTimer_isSet())
+        {
+            signalTimer_cancel();
+        }
+
+        if(eventTimer_isSet())
+        {
+            eventTimer_cancel();
+        }
+        
+        enabled = false;
+    }
+
+    behavior getPhysicalCount() : uint64_t
+    {
+        if( timer_isSet())
+        {
+            uint64_t unadjustedPhysicalCount = getUnadjustedPhysicalCount();
+
+            return std::max(lowWaterMark,unadjustedPhysicalCount);
+        }
+        else
+        {
+            return savedcountvalue;
+        }
+    }
+
+    behavior getUnadjustedPhysicalCount() : uint64_t
+    {
+        if(timer_isSet())
+        {
+            // we only call the underlying timer once per event / callback / register access
+            // in normal simulations the result would be the same, but if a RealTime timer
+            // is being used we must ensure that our idea of current time does not change
+            // during the time it takes to walk the list of events.
+            if (upct_inside_call)
+                return upct_inside_call;
+            return 0xFFFFFFFFFFFFFFFFull - timer_remaining();
+        }
+        else
+            return savedcountvalue;
+    }
+
+    behavior updateSignalTimer()
+    {
+        if(timer_isSet() && ! in_signaltimer_callback)
+        {
+            CallbackIt it = signalcbpoints.begin();
+            if(it != signalcbpoints.end())
+            {
+                uint64_t point_to_set = *it - getUnadjustedPhysicalCount();
+                assert(point_to_set != 0);
+
+                signalTimer_set(point_to_set);
+            }
+        }
+    }
+
+    behavior updateEventTimer()
+    {
+        if(timer_isSet() && ! in_eventtimer_callback)
+        {
+            CallbackIt it = eventcbpoints.begin();
+            if(it != eventcbpoints.end())
+            {
+                uint64_t point_to_set = *it - getUnadjustedPhysicalCount();
+                assert(point_to_set != 0);
+
+                eventTimer_set(point_to_set);
+            }
+        }
+    }
+}
+
+
+/* eof MemoryMappedCounterModule.lisa */

@@ -1,0 +1,53 @@
+/*
+ * SGValueState2AMBAPVValueState.lisa - SystemGenerator ValueState to AMBA-PV
+ *                                      ValueState protocol converter.
+ *
+ * The confidential and proprietary information contained in this file may
+ * only be used by a person authorised under and to the extent permitted
+ * by a subsisting licensing agreement from ARM Limited.
+ *
+ * Copyright 2007-2009 ARM Limited.
+ * All rights reserved.
+ *
+ * This entire notice must be reproduced on all copies of this file
+ * and copies of this file may only be made by a person if such person is
+ * permitted to do so under the terms of a subsisting license agreement
+ * from ARM Limited.
+ */
+
+component SGValueState2AMBAPVValueState {
+
+    properties { 
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "SystemGenerator ValueState to AMBA-PV ValueState protocol converter.";
+        loadfile_extension = "";
+        has_cadi = 0;
+        executes_software = 0;
+        is_single_stepped = 0;
+        dso_safe = 0;
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    /* Connection out to AMBAPV ValueState master */
+    master port<AMBAPVValueState> amba_pv_value_m;
+
+    /* Slave ValueState port in from SystemGenerator world */
+    slave port<ValueState> sg_value_s {
+
+        /*
+         * Performs a value transfer.
+         */
+        behavior setValue(uint32_t value) {
+            amba_pv_value_m.set_state(0, value);
+        }
+
+        /*
+         * Performs a value transfer.
+         */
+        behavior getValue(): uint32_t {
+            return (amba_pv_value_m.get_state(0, NULL));
+        }
+    }
+}
+

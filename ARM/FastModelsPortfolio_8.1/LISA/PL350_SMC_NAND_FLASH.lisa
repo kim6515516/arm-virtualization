@@ -1,0 +1,642 @@
+/*!
+ * \file  PL350_SMC_NAND_FLASH.lisa
+ * \brief LISA Implementation of NAND Flash.
+ * \date Copyright 2005-2008 ARM Limited. All rights reserved.
+ *
+ */
+
+component PL350_SMC_NAND_FLASH
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "A NAND Flash implementation which works with PL350";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes
+    {
+        #include "hostconf/zinttypes.h"
+        #include <math.h>       //for ceil()
+        #define GNAND_TRACE(x) 
+        #define GNAND_DBG(x) 
+    
+        /*---------------------------------------*/
+        /*           command definitions         */
+        /*---------------------------------------*/       
+        //below are the commands implemented
+        #define NAND_CMD_PAGE_READ_CYCLE1        0x00
+        #define NAND_CMD_PAGE_READ_CYCLE2        0x30
+        #define NAND_CMD_RESET                   0xFF
+        #define NAND_CMD_PAGE_PROGRAM_CYCLE1     0x80
+        #define NAND_CMD_PAGE_PROGRAM_CYCLE2     0x10
+        #define NAND_CMD_BLOCK_ERASE_CYCLE1      0x60
+        #define NAND_CMD_BLOCK_ERASE_CYCLE2      0xD0
+        #define NAND_CMD_RANDOM_DATA_INPUT       0x85
+        #define NAND_CMD_RANDOM_DATA_READ_CYCLE1 0x05
+        #define NAND_CMD_RANDOM_DATA_READ_CYCLE2 0xE0
+        #define NAND_CMD_READ_STATUS             0x70
+    
+        //below are the commands NOT implemented
+        #define NAND_CMD_READ_DATA_MOVE          0x35
+        #define NAND_CMD_CACHE_PRGM_CONFIRM      0x15
+        #define NAND_CMD_PRGM_DATA_MOVE          0x85
+        #define NAND_CMD_READ_CACHE_START        0x31
+        #define NAND_CMD_READ_CACHE_LAST         0X3F
+        #define NAND_CMD_READ_UNIQUE_ID          0x65
+    
+        /*---------------------------------------*/
+        /*           state definitions           */
+        /*---------------------------------------*/       
+        /* After a command is input, the NAND goes to one of the following states */
+        #define STATE_CMD_READ_STATUS            0x01 /* read status */
+        #define STATE_CMD_READ_ID                0x02 /* read ID */
+        #define STATE_CMD_READSTART              0x03 /* read data start command (large page devices) */
+        #define STATE_CMD_PAGEPROG               0x04 /* start page programm */
+        #define STATE_CMD_RANDOM_READ            0x05 /* read data start command (large page devices) */
+        #define STATE_CMD_RANDOM_PAGE_PROG       0x06 /* start page programm */
+        #define STATE_CMD_ERASE                  0x07 /* sector erase first command */
+        #define STATE_CMD_RESET                  0x0C /* reset */
+    
+        /* Previous operation is done, ready to accept new requests */
+        #define STATE_READY                      0x00
+    
+            /* This state is used to mark that the next state isn't known yet */
+        #define STATE_UNKNOWN                    0x10        
+
+        #define GENERIC_NAND_CYCLES(x)          (( x & 0x00E00000 ) >> 21 )
+        #define GENERIC_NAND_ECVALID(x)         (( x & 0x00100000 ) >> 20 )  
+        #define GENERIC_NAND_END_CMD(x)         (( x & 0x0007F800 ) >> 11 )  
+        #define GENERIC_NAND_START_CMD(x)       (( x & 0x000007F8 ) >>  3 )  
+        #define GENERIC_NAND_CLEARCS(x)         (( x & 0x00200000 ) >> 21 )  
+         
+         
+
+    }   //end of includes
+
+    composition
+    {
+        busslave : PVBusSlave(size = 0x1000000);
+    }
+
+    resources
+    {             
+        PARAMETER { description("Device Name"), type(string) , default("Samsung K9F1G08U0M") } DEVICE_NAME;
+        PARAMETER { description("Device manufacturer code"), type(uint32_t), default(0xEC)      }DEVICE_1;                 // 4 cycles of Device ID
+        PARAMETER { description("Device code"), type(uint32_t),              default(0xDA)      }DEVICE_2;
+        PARAMETER { description("Device 3rd cycle code"), type(uint32_t),    default(0x80)      }DEVICE_3;
+        PARAMETER { description("Device 4th cycle code"), type(uint32_t),    default(0x15)      }DEVICE_4;
+
+        PARAMETER { description("flash size in byte"), type(uint32_t),       default(0x1080000) }NAND_FLASH_SIZE;          //note not bits!  
+        PARAMETER { description("page size"), type(uint32_t),                default(2112)      }NAND_PAGE_SIZE; 
+        PARAMETER { description("Spare size per page"), type(uint32_t),      default(64)        }NAND_SPARE_SIZE_PER_PAGE;
+        PARAMETER { description("valid page size"), type(uint32_t),          default(2048)      }NAND_VALID_SIZE_PER_PAGE; //the memory has 131072 rows(pages) in default
+        PARAMETER { description("number of pages in each block"), type(uint32_t), default(64) } NAND_PAGE_COUNT_PER_BLOCK; //No. of pages in each block        
+        PARAMETER { description("number of blocks in the flash device"), type(uint32_t), default(2048) } NAND_BLOCK_COUNT; //No. of blocks in the device 
+                                                                                                           //total size = NAND_BLOCK_COUNT * 
+                                                                                                           //              NAND_PAGE_COUNT_PER_BLOCK * 
+                                                                                                           //              NAND_PAGE_SIZE bytes;
+
+        uint8_t  start_cmd;             // the first command to initiate the required operation (page read, program, etc)  bits - [3-10]
+        uint8_t  end_cmd;               // the second command , not really needed                                          bits - [11 -18]                
+        int      cycles_remaining ;     // no of address cycles to decode.                                                bits - [21 - 23]
+        uint8_t  cycles;                // hold the orignial value of cycles_remaining
+        uint8_t  valid_data_byte_lanes; // the valid_data_byte_lanes.                                                      bits - [2-0]
+        uint8_t  End_CMD_valid;         //Indicates whether the end command must be issued to the NAND flash.
+
+        uint8_t  clear_cs;              //When set, the chip select for a NAND flash is de-asserted on completion
+                                        //of this command. When not set, the chip select remains asserted.
+
+        uint8_t  status_reg;            // the current status register (ready/busy)
+        uint8_t  cur_state;             // This is populated during the command phase so that we know what to do when we get the data phase
+
+        uint32_t RowAddr;               // the page number in a block
+        uint32_t ColumnAddr;            // the offset within page / column address
+
+        uint32_t blk_size ;             // how many bytes in one block 
+
+        uint8_t  *Flash_mem;            // dynamically allocated memory inside the NAND flash
+        uint8_t  *page_buffer;
+
+        uint32_t page_buffer_index_w;   //index of write
+        uint32_t page_buffer_index_r;   //index of read (can both be merged?)
+
+        uint64_t cmd_phase_data;        //The data that we get during the command phase. 8 bytes
+
+        // the mode the device is in
+        uint8_t is_in_pageprogram;      //flag to show whether in the PageProgram, 1 set
+        uint8_t is_in_pageread;           //flag to show whether in the PageRead,  1 set
+        uint8_t is_in_blockerase;         //flag to show whether in the Block Erase,  1 set
+
+        uint8_t FlashID[4];             // 4 ID registers Manufacturer ID; // Device ID; // ID3; // ID4;
+        uint8_t IDIndex;           
+        uint8_t int_set;                // var to indicate if we set the interrupt
+    }   //end of resources         
+                                   
+    slave port<PVBus> pvbus;       
+
+    master port<Signal> irq;
+
+    slave port<PVDevice> device
+    {
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            uint8_t  width = tx.getAccessByteWidth();
+            uint32_t  data = 0x0;             
+
+            GNAND_TRACE(printf("+read\n"));
+
+            if(int_set){                                // if we have the interrupt set, then axi read will clear it.
+
+                update_int(sg::Signal::Clear);
+                int_set = 0x0;
+            }
+
+            switch(cur_state)                           // do operation according to the current command status
+            {
+                case STATE_CMD_READSTART:               // page read
+                    data = FlashRead(width);
+                    break;
+
+                case STATE_CMD_RANDOM_READ:             //random page read
+                    data = FlashRead(width);
+                    break;
+
+                case STATE_CMD_READ_STATUS:             //After issuing a Read Status,all READ transcations will be from the status reg till a new cmd is issued.
+                    width = 1;
+                    data = status_reg;
+                    break;
+
+                case STATE_CMD_READ_ID:                 //Manufacturer ID,Device ID, 3rd ID, 4th ID
+                    if(IDIndex < 4) {
+                        data = FlashID[IDIndex++];
+                        if(IDIndex==3)
+                            IDIndex = 0;                //get back to the start of the register
+                    } else 
+                        GNAND_DBG(printf("Error: read id exceed the size\n"));
+                    width = 1;
+                    break;
+
+                default:
+                    break;
+
+            }//switch(cur_state)
+
+            GNAND_TRACE(printf("-read\n"));
+            switch(width)      
+            {                
+                case 1:  
+                    return tx.setReturnData8(data);
+                case 2: 
+                    return tx.setReturnData16(data); 
+                default:                                //32 bits or else
+                    return tx.setReturnData32(data);
+            }
+        }   //read()
+
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            pv::bus_addr_t addr = tx.getAddress();      //get the address
+            uint8_t       width = tx.getAccessByteWidth();
+            uint32_t       data = 0x0;                    
+            bool          ec_valid = 0x0;                   // end cycle valid
+
+            switch(width)
+            {
+                case 1:  data = (uint32_t) ( tx.getData8()); break;
+                case 2:  data = (uint32_t) (tx.getData16()); break;
+                default: data = (uint32_t) (tx.getData32()); break;
+            }
+
+            GNAND_TRACE(printf("Nand Write address  =  %x access_width = %x \n", (uint32_t)addr, tx.getAccessByteWidth()));
+
+            if (is_command(addr)) {
+                process_command_phase(addr, width, data);
+                return tx.writeComplete();
+            }
+
+            ec_valid   = GENERIC_NAND_ECVALID(addr);        // check to see if the end valid has been set
+            end_cmd    = GENERIC_NAND_END_CMD(addr);        // get the end_cmd
+            clear_cs   = GENERIC_NAND_CLEARCS(addr);
+            
+            switch(cur_state)
+            {
+                case STATE_CMD_PAGEPROG:
+                case STATE_CMD_RANDOM_PAGE_PROG:
+                    FlashWrite(data, width);   
+                    break;
+                default:
+                    GNAND_DBG(printf("wrong command in data phase \n"));
+                    GNAND_TRACE(cout<<"-process_data_phase\n");
+                    return tx.writeComplete();
+                    break;
+            }
+
+            if(ec_valid && clear_cs)
+            {
+                GNAND_TRACE(printf(" EC_VALID and CLEAR_CS are set \n"));
+                end_command();
+            }
+            
+            return tx.writeComplete();
+        }   
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }// end of device port
+
+    connection 
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+    }
+
+    behaviour process_command_phase(pv::bus_addr_t addr, uint8_t width, uint32_t data)
+    {
+        static uint8_t   shift = 0x0;                   // when the Nand addr phase happens over multiple cycles, we use this var to shift data to right place
+        bool          ec_valid = 0x0;                   // end cycle valid
+        uint64_t valid_data = 0x0ULL;
+
+        GNAND_TRACE(cout<<"+process_command_phase\n");
+
+        cycles     = GENERIC_NAND_CYCLES(addr);         // get the cycles encoded in the cycle
+        ec_valid   = GENERIC_NAND_ECVALID(addr);        // check to see if the end valid has been set
+        end_cmd    = GENERIC_NAND_END_CMD(addr);        // get the end_cmd
+        start_cmd  = GENERIC_NAND_START_CMD(addr);      // get the start_cmd
+
+        GNAND_TRACE(printf("cycles = %x ec_valid = %x end_cmd = %x start_cmd = %x \n", cycles, ec_valid, end_cmd, start_cmd));
+
+        // first decode the 32 bits address
+        if (cycles_remaining == 0)                      // Ahhh.. we have a new command or a command that does not need cycles
+        {
+            GNAND_TRACE(cout << "cycles_remaining = 0.. New command\n");
+            cmd_phase_data   = 0x0ULL;
+            cycles_remaining = cycles;
+            shift = 0x0;
+
+            //reset some stuff here  as we are shifting the command mode.
+            is_in_pageread      = 0x1;                  // keep this to the default.
+            page_buffer_index_r = 0x0;                  // reset the pointer to read in the buffer
+            page_buffer_index_w = 0x0;
+        }
+
+        //build a 64bit dword containing the address data
+        valid_data = data & ((1ULL << (cycles_remaining*8)) - 1 );             // the amount of valid data that we have in this write
+        cmd_phase_data = cmd_phase_data | ( valid_data << (shift*8) );         // shift it to right place cmd_phase_data, using shift calculate in previous write
+        shift = ((cycles_remaining - width)) > 0 ? (shift + width) :(shift + cycles_remaining); // if there are additional cycles, calculates its place.
+        cycles_remaining = ((cycles_remaining - width) > 0 ) ? (cycles_remaining - width): 0;   // calculate remaining cycles if any, or zero
+
+        if (cycles_remaining == 0)
+        {                    
+            start_command();
+        }
+
+        GNAND_TRACE(cout<<"-process_command_phase\n");
+    }
+
+    behavior init()     // initialization of the resources
+    {   
+        cycles_remaining = 0x0;
+        cycles  = 0x0;
+        start_cmd = 0x0; 
+        end_cmd = 0x0;    
+        valid_data_byte_lanes = 0x0;
+        End_CMD_valid  = 0;
+        clear_cs = 1;                                   //set for de-asserted
+
+        is_in_pageprogram = 0;                          //flag to show whether in the PageProgram, 1 set
+        is_in_blockerase  = 0;
+        is_in_pageread    = 1;                           //FLASH is initialized in the Read mode
+
+        //read / write from the very beginning of the flash
+        RowAddr = 0x0;
+        ColumnAddr = 0x0;     
+
+        // allocate virtually contiguous Flash_mem of total flash size including OOB, bytes
+        Flash_mem = new uint8_t[NAND_FLASH_SIZE];
+        memset(Flash_mem,0xFF,NAND_FLASH_SIZE);         // set the nand flash memory to FF
+
+        page_buffer = new uint8_t[NAND_PAGE_SIZE];      // A page_buffer contains the valid address area [0-2047] + the spare area [2048 -2111]
+        memset(page_buffer,0xFF,NAND_PAGE_SIZE);    
+
+        page_buffer_index_w = 0;
+        page_buffer_index_r = 0;    
+
+        FlashID[0] = DEVICE_1;
+        FlashID[1] = DEVICE_2;
+        FlashID[2] = DEVICE_3;
+        FlashID[3] = DEVICE_4;
+        IDIndex    = 0;                                 //index to FlashID[]
+
+        blk_size =  NAND_PAGE_COUNT_PER_BLOCK * NAND_PAGE_SIZE; //bytes
+
+        status_reg = 0xe0;                              //1110 0000 (Not protected & ready )
+        cur_state = STATE_READY; 
+        composition.init();
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+        GNAND_TRACE(printf("+reset\n"));
+        GNAND_TRACE(printf("   level = %x\n", level));
+
+        if( level>0 )                                    //this is a state normally done after issuing an end of command   
+        {
+            cur_state             = STATE_READY; 
+            cycles_remaining      = 0x0;
+            cycles                = 0x0;
+            start_cmd             = 0x0; 
+            end_cmd               = 0x0;    
+            valid_data_byte_lanes = 0x0;
+            End_CMD_valid         = 0x0;
+            clear_cs              = 0x1;                //set for de-asserted  
+
+            is_in_pageprogram     = 0x0;                //flag to show whether in the PageProgram, 1 set
+            is_in_blockerase      = 0x0;
+            is_in_pageread        = 0x1;                //FLASH is initialized in the Read mode
+            IDIndex =0 ;          
+        }
+
+        if( level>3 )                                   //high level reset (clear the whole flash)
+        {
+            GNAND_TRACE(printf("system reset\n"));
+
+            RowAddr    = 0x0;                           //read / write from the very beginning of the flash
+            ColumnAddr = 0x0;     
+
+            page_buffer_index_w = 0;
+            page_buffer_index_r = 0;    
+
+            memset(Flash_mem  ,0xFF,NAND_FLASH_SIZE);  //erase the whole flash chip -- setting every byte to 'FF'
+            memset(page_buffer,0xFF,NAND_PAGE_SIZE );              
+        }  
+        GNAND_TRACE(printf("-reset\n"));
+    }
+
+    behavior update_int(sg::Signal::State val)
+    {
+        if(irq.setValue.implemented())
+        {
+            irq.setValue(val);
+        }
+    }
+
+    behavior is_command(uint32_t addr) : bool    // Looking at the address is the job of the PL350 SMC.
+    {
+        return ((addr & 0x00080000) == 0 );      //if bit 19 is zero, it is a command
+    }
+
+    behavior decode_flash_address_1()     // any cycles except erase
+    {
+        RowAddr =0;      // decode the RowAddr, ColumnAddr depending on how many address cycles
+
+        if(NAND_PAGE_SIZE == 528)       //3 cycles
+        { 
+            ColumnAddr = cmd_phase_data & 0xffULL;              // 1st cycle is column_addr
+            RowAddr = (cmd_phase_data & 0xffff00ULL) >> 8;      // the rest bytes are for RowAddr
+
+        } else {                                                // NAND_PAGE_SIZE == 2112 5 cycles 
+            ColumnAddr = cmd_phase_data & 0x0fffULL;            // the first two bytes are for ColumnAddr
+            RowAddr    = (cmd_phase_data & 0x1ffff000ULL) >> 12;// the rest bytes are for RowAddr
+        }
+        if(RowAddr >= NAND_BLOCK_COUNT * NAND_PAGE_COUNT_PER_BLOCK )    
+            GNAND_DBG(printf(" Error : The Row address is out of boundary !! RowAddr = %x  \n ", RowAddr));  
+
+        if(ColumnAddr >=  NAND_PAGE_SIZE)    
+            GNAND_DBG(printf(" Error : The ColumnAddr address is out of boundary !! ColumnAddr = %x  \n ", ColumnAddr));             
+
+        GNAND_TRACE(printf("The decoded RowAddr(page no) is %x cmd_phase_data = %"PRIx64" \n", RowAddr, cmd_phase_data));
+        GNAND_TRACE(printf("The decoded Column address is  %x \n", ColumnAddr));
+    }   
+
+
+    behavior decode_flash_address_2() // decode block address only for erase   // all the address cycles are for Row address only in Erase
+    {
+        RowAddr =0;
+        RowAddr = cmd_phase_data & 0x1FFFF;
+
+        if(RowAddr >= NAND_BLOCK_COUNT * NAND_PAGE_COUNT_PER_BLOCK )    //RowAddr starts from 0
+            GNAND_DBG(printf(" Error : The Row address is out of boundary !! RowAddr = %x  \n ", RowAddr));  
+
+        GNAND_TRACE(printf("The decoded RowAddr(page no) is %x \n", RowAddr));
+
+    }
+
+    // return the contents of the flash buffer; move ahead if necessary
+    behavior FlashRead(uint8_t num_bytes) : uint32_t
+    {
+        GNAND_TRACE(printf("+FlashRead\n"));
+        uint32_t data = 0;
+
+        if (page_buffer_index_r + ColumnAddr + num_bytes > NAND_VALID_SIZE_PER_PAGE) // check if we are in limits
+        {
+            GNAND_DBG(printf("   FlashRead: exceeded the flash read register size\n"));
+            status_reg = 0xe3;    //1110 0011 (Not protected & ready & error in read)
+        }
+
+        memcpy(&data, page_buffer + ColumnAddr + page_buffer_index_r, num_bytes);   // move the data to the destination
+        page_buffer_index_r += num_bytes;                                           // increment the pointer    
+
+        if ((cur_state == STATE_CMD_READSTART) && (page_buffer_index_r == NAND_VALID_SIZE_PER_PAGE))
+        {
+            if ((RowAddr + 1) < (NAND_PAGE_COUNT_PER_BLOCK * NAND_BLOCK_COUNT))
+            {
+                RowAddr += 1;                   //increase the row number if not going to be out of boundary                            
+                load_page_buffer();
+            } 
+        }
+
+        GNAND_TRACE(printf("-FlashRead\n"));
+        return data;    
+    } // end of FlashRead()
+
+    behavior load_page_buffer()
+    {
+        memcpy(page_buffer,  Flash_mem + RowAddr * NAND_PAGE_SIZE , NAND_PAGE_SIZE);
+        page_buffer_index_r = 0;        // reset the page_buffer offsets
+        page_buffer_index_w = 0;
+    }
+
+
+    // write the given data into flash buffer, and update the flash data if required, move ahead if necessary.
+    behavior FlashWrite(uint32_t data, uint8_t num_bytes)
+    {
+        GNAND_TRACE(printf("+FlashWrite\n"));
+        GNAND_TRACE(printf("Write to Flash Bufer count = %x\n", count++);) 
+        GNAND_TRACE(printf("   data to write is %x\n", data));
+
+        uint8_t i=0;
+
+        if (ColumnAddr + page_buffer_index_w + num_bytes > NAND_PAGE_SIZE )  // check if we are within limits.
+        {
+            GNAND_DBG(printf("write_buf: too many input bytes\n"));
+            status_reg = 0xe3;   //1110 0011 (Not protected & ready & error in program)
+            return;
+        }
+
+        for(i=0; i < num_bytes; i++)   // write data
+        {
+            page_buffer[ColumnAddr + page_buffer_index_w] =page_buffer[ColumnAddr + page_buffer_index_w] & ((data >> (i*8)) & 0xff);
+            page_buffer_index_w++;
+        }
+        
+        if ( page_buffer_index_w ==  NAND_PAGE_SIZE || clear_cs) 
+        {
+            memcpy( Flash_mem + RowAddr * NAND_PAGE_SIZE , page_buffer, NAND_PAGE_SIZE);
+
+            if ( page_buffer_index_w == NAND_VALID_SIZE_PER_PAGE && cur_state == STATE_CMD_PAGEPROG)// still in the PAGEPROG state
+            {
+                if ((RowAddr + 1) < (NAND_PAGE_COUNT_PER_BLOCK * NAND_BLOCK_COUNT))
+                {
+                    RowAddr += 1;                       //increase the row number if not going to be out of boundary                            
+                    load_page_buffer();
+                }                      
+            }               
+
+        } 
+        GNAND_TRACE(printf("+FlashWrite\n"));
+    }
+
+    /*    1. Decode the cmdData to get the column and row address of the flash array, by calling decode_flash_address_x()
+     *    2. Change the status register to reflect current operation    
+     */
+    behavior start_command()//this is after the NAND/SMC decode the AXI address.This behavior just read out the flash addr (row/col) from the cmdData FIFO
+    {
+        GNAND_TRACE(printf("+starCommand\n"));
+
+        GNAND_TRACE(printf(" start_cmd =%x \n", start_cmd));
+        switch(start_cmd)       
+        {
+            case 0x00:                                  // page read     end by 30h
+                is_in_pageread = 1; 
+                decode_flash_address_1();                     // get the row and column
+                memcpy(page_buffer, Flash_mem + RowAddr * NAND_PAGE_SIZE , NAND_PAGE_SIZE);   // copy the whole thing to be page_buffer
+                GNAND_TRACE(printf(" memcpy of the data done \n"));
+                cur_state = STATE_CMD_READSTART;
+                status_reg = 0x80;                      // 1000 0000 (Not protected & busy)      //then wait until the read TX in the data phase to read
+                break;
+
+            case 0x05:                                  // random data read  end by E0h  MUST Happen in the middle of Page Read
+                if(is_in_pageread)
+                {
+                    ColumnAddr = cmd_phase_data & 0xfff;// read in new column address (two cycles)
+                    page_buffer_index_r = 0;            // reset 
+                    status_reg = 0x80;                  // 1000 0000 (Not protected & busy)   
+                    cur_state = STATE_CMD_RANDOM_READ;
+                } else
+                    GNAND_DBG(printf(" \n Error --- Not in Page Read mode, can not change to Random page read! "));
+                break;
+
+            case 0x90:                                  //read ID 
+                cur_state =STATE_CMD_READ_ID;
+                status_reg = 0x80;                      //1000 0000 (Not protected & busy)
+                break;
+
+            case 0x70:                                  //read status
+                cur_state = STATE_CMD_READ_STATUS;                
+                break;
+
+            case 0x80:                                  //program page
+                is_in_pageprogram = 1;
+                decode_flash_address_1();
+                memcpy(page_buffer, Flash_mem + RowAddr * NAND_PAGE_SIZE , NAND_PAGE_SIZE);
+                cur_state = STATE_CMD_PAGEPROG;
+                status_reg = 0x80;                      //1000 0000 (Not protected & busy)
+                break;
+
+            case 0x85:                                  //random data input -- similar to random read
+                if(is_in_pageprogram)
+                {
+                    ColumnAddr = cmd_phase_data & 0xfffULL;     //read in new column address (two cycles)
+                    page_buffer_index_w = 0;            //reset
+
+                    cur_state = STATE_CMD_RANDOM_PAGE_PROG;
+                    status_reg = 0x80;                  //1000 0000 (Not protected & busy)
+                } else
+                    GNAND_DBG(printf(" \n Error --- Not in Page Program mode, can not change to Random page input! "));
+                break;
+
+            case 0x60:                                  //block erase
+                is_in_blockerase = 1;
+                decode_flash_address_2();
+                cur_state = STATE_CMD_ERASE;                
+                status_reg = 0x80;                      //1000 0000 (Not protected & busy)
+                break;
+
+            case 0xFF:                                  //reset
+                GNAND_TRACE(printf("reset cur_state   = %x \n",cur_state);) 
+                cur_state = STATE_CMD_RESET;                
+                status_reg = 0xe0;                      //1110 0000 (Not protected & ready)
+                reset(5);
+                break;
+
+            default :
+                break;
+        }               
+    }
+
+    behavior end_command()
+    {
+        GNAND_TRACE(cout<<"+end_command \n");
+
+        GNAND_TRACE(printf("   end_cmd = %x\n", end_cmd);) 
+        switch(end_cmd)                                 //command set 
+        {
+            case 0x30:                                  //page read     end by 30h
+                status_reg = 0xe0;                      //1110 0000 (Not protected & ready & successful read)
+                GNAND_TRACE(printf("read::sending the interrupt \n"));
+                update_int(sg::Signal::Set);
+                int_set = 1;
+                break;
+
+            case 0xE0:                                  //random page read     end by E0h
+                status_reg = 0xe0;                      //1110 0000 (Not protected & ready & successful read)
+                update_int(sg::Signal::Set);
+                int_set = 1;
+                break;
+
+            case 0x10:                                  //page program 2nd command
+                status_reg          = 0xe0;             //1110 0000 (Not protected & ready & successful program)
+                GNAND_TRACE(printf("write::sending the interrupt \n"));
+                update_int(sg::Signal::Set);
+                int_set = 1;
+                break;                
+            case 0xD0:                                  //Block erase 2nd command
+                // The Erase Confirm command(D0h) following the block address loading initiates the 
+                // internal erasing process. 
+                // This two-step sequence of setup followed by execution command ensures 
+                // hat memory contents are not accidentally erased due to external noise conditions.
+                nand_erase_block( RowAddr/NAND_PAGE_COUNT_PER_BLOCK );           // erase this block  Note:  RowAddr is the page number
+                status_reg = 0xe0;                      //1110 0000 (Not protected & ready & successful erase)
+                update_int(sg::Signal::Set);
+                int_set = 1;
+                break;      
+            default :
+                GNAND_DBG(printf("not valid command \n"));                                       
+                break;
+        }           
+
+        GNAND_TRACE(cout<<"-end_command \n");
+    }
+
+    behavior nand_erase_block(uint32_t block_num)         // BlockNum start from 0
+    {
+        GNAND_TRACE(printf(" \n block_num to erase = %x " , block_num));  // 1 block is of :    NAND_PAGE_COUNT_PER_BLOCK * NAND_PAGE_SIZE bytes
+
+        if( block_num  < NAND_BLOCK_COUNT )
+            memset(Flash_mem + block_num*blk_size , 0xFF, (NAND_PAGE_COUNT_PER_BLOCK*NAND_PAGE_SIZE)); //erase that block
+        else
+        {
+            status_reg = 0xe3;                          //1110 0011 (Not protected & ready & error in program)
+            message(MSG_FATAL_ERROR, "The block number to erase is beyond the size of the flash! \n");
+        }
+    }
+}       //end of the component

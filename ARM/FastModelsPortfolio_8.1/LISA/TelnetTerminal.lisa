@@ -1,0 +1,30 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// A host interface onto a serial port: exposes the two way serial data
+// channel over a TCP/IP interface, and automatically opens a telnet
+// application connected to the network socket, unless a user application
+// connects first.
+
+extern component TelnetTerminal
+{
+    properties { 
+        version = "8.1.37";
+        component_type = "Other";
+        description = "A host interface onto a serial port: exposes the two way serial data channel over a TCP/IP interface, and automatically opens a telnet application connected to the network socket, unless a user application connects first.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    resources
+    {
+        PARAMETER { description("Terminal initialisation mode"), type(string), default("telnet") } mode;
+        PARAMETER { description("Start telnet no matter there is connection or not."), type(bool), default("true") } start_telnet;
+        PARAMETER { description("Telnet TCP start port."), type(uint32_t), default(5000) } start_port;
+    }
+    
+    slave port<SerialData> serial;
+}
+

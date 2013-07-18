@@ -1,0 +1,22 @@
+// Test PVBusSlave by trying to implement RAM
+
+component RAM_16MB
+{
+    properties {
+        version = "8.1.37";
+    }
+    slave port<PVBus> pvbus_s;
+    master port<PVBusSlaveControl> busslave_control;
+   
+    composition {
+        busslave : PVBusSlave(size=0x01000000);
+    }
+    connection {
+        self.pvbus_s => busslave.pvbus_s;
+        self.busslave_control => busslave.control;
+    }
+    behavior init() {
+        busslave_control.setAccess(0, 0x01000000, pv::RW, pv::MEMORY);
+        busslave.init();
+    }
+}

@@ -1,0 +1,32 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+// This protocol is used to control the behavior of the ClockTimer component.
+
+protocol TimerControl
+{
+    properties { 
+        version = "8.1.37";
+        description = "TimerControl Protocol";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    // Cancel the current countdown on the ClockTimer.
+    slave behavior cancel();
+
+    // Start the timer counting for the given number of ticks of its
+    // input clock.  When the timer reaches zero, the scheduler will
+    // invoke the 'signal' behaviour on its callback port (see
+    // TimerCallback.lisa).
+    slave behavior set(uint32_t ticks);
+
+    // Test whether the timer is currently actively counting.
+    slave behavior isSet() : bool;
+
+    // How many clock ticks are left until the timer's callback event
+    // will be signalled.
+    slave behavior remaining() : uint32_t;
+}

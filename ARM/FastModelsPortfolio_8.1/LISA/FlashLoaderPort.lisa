@@ -1,0 +1,23 @@
+/*
+ * Copyright 2006 - 2009 ARM Limited. All rights reserved.
+ */
+
+// Port type used to connect all the signals from a core module to the
+// Integrator base board.
+
+protocol FlashLoaderPort
+{
+    includes
+    {
+         #include "components/FlashLoader.h"
+    }
+
+  properties {
+    version = "8.1.37";
+    description = "FlashLoader protocol";
+    documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+  }
+
+    slave behavior loadFlashFile(FlashLoader *loader) : uint32_t;
+    slave behavior saveFlashFile(FlashLoader *loader) : uint32_t;
+}

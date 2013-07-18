@@ -1,0 +1,21 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+
+// 'Feature' protocol: Set features of components (cores etc)
+
+protocol Feature
+{
+    properties {
+        version = "8.1.37";
+        description = "Reserved. Set features of components.";
+    }
+
+    // set feature 'featureName' to 'valueStr'
+    // - encoding of valueStr is specific for each feature, but:
+    //   - for boolean features use 0/1
+    //   - for integer features accept any base in C syntax: 256, 0x100, 0400
+    // return true on success, false on error or feature not supported
+    slave behavior setFeature(const char *featureName, const char *valueStr): bool;
+}
+

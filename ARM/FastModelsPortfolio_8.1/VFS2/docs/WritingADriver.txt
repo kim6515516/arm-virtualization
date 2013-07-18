@@ -1,0 +1,355 @@
+--------------------------------------------------------------------------------
+
+Writing a VFS Driver
+
+Changelog
+---------
+
+1/4/2008
+
+    Initial version
+    
+This document gives a brief outline of the steps involved in writing a VFS 
+driver for a typical operating system, and the facilities provided by VFS.
+
+Overview of the VFS structure
+-----------------------------
+
+A typical system will use a standard layered approach, with each layer 
+communcating with it's peer and the layer above/below.
+
+                Target                              Host
+                
+          -------------------                --------------------
+5)          OS filesystem                       host filesystem
+          -------------------                --------------------
+4)            vfs driver                        vfs filesystem
+          -------------------                --------------------
+3)            vfs client                          vfs device 
+          -------------------                --------------------
+2)           message codec                       message codec
+          -------------------                --------------------
+1)         messagebox driver    <------->      messagebox device
+
+Layer 5 represents the target OS upper filing system layer, and the host filing
+system. The ultimate goal of the driver/device is to service target OS filing
+system calls by utilising the host OS filing system calls.  Typically these
+incoming calls will be semantically very similar to the user level filing system
+calls (e.g. open/close/read/write/stat/readdir on linux, or CreateFile/WriteFile
+ReadFile on windows) but sanity checked, canonicalised and rooted in a
+particular directory. These need to be abstracted a little, passed over the
+target/host boundary, and converted to native host OS calls.
+
+Layer 4 on the target side is the OS specific glue code that converts OS calls
+to vfs calls, enumerates and publishes mount points as necessary, and other
+driver specific tasks.
+
+Layer 3 provides a generic set of filing system operations for enumerating 
+mounts and directories, and for manipulating files, directories and metadata.
+These calls are designed to be blocking but thread safe. Typically the
+implementation of this layer will reuse the implementation from either the linux
+or bare metal examples. This layer uses the message codec helper classes in
+layer 2  to construct data packets (messages to pass back and forth across the
+target/host boundary)
+
+Layer 2 isn't strictly it's own layer but represents the construction and
+extraction of function arguments and return values to data blocks to exchange
+with the host side. Typically the implementation of this layer will reuse the
+implementation from either the linux or bare metal examples.
+
+Layer 1 is a more classic driver/device pair and uses a register/memory window
+to pass data between the target/host. The implementation of this layer can
+be quite simple or quite complex depending on the facilities provided by the
+target OS. See the MessageBox documentation for a more detailed description
+of the MessageBox device used to implement this layer.
+
+Ideally a driver writer should only need to write layer 4 and layer 1, reusing
+code from the linux example code (in C) or the bare metal example code (in 
+C++).
+
+It is up to the driver writer to meet any reentrancy and multithreading issues
+imposed by the OS filesystem layer. This can be achieved most simply in
+layer 1 by ensuring that all target OS threads use a semaphoer to gain access
+to the messagebox device.
+           
+Existing references
+-------------------
+
+- VFS device source code
+    This is the absolute reference for how VFS transactions will be processed.
+- Messagebox device source code
+    This provides all the register level api for sending/recieving messages
+- linux VFS driver
+    This is a known, working VFS driver implementation. Some understanding of
+    linux filingsystems and driver writing is required to fully understand how
+    it completely works but it is useful for seeing how VFS is configured and
+    invoked
+- bare metal tests in C++ or C
+    Whilst very basic these provide a simple to follow setup which can easily be
+    modified and recompiled, then stepped in a debugger. There are reusable
+    classes/function implementations for layer 3 and layer 2 and a simple
+    reference implementation for layer 1. These rely on some shared headers used
+    on both the target/host side.
+
+writing the messagebox layer (layer 1)
+----------------------------
+
+The messagebox layer should ideally implement the standard messagebox interface
+which will allow the reuse of layer 2/3 from the test examples. The messagebox
+layer should provide a blocking (but possibly reentrant) interface. Only one
+message can be sent over the device interface at a time and only one vfs
+transaction can be outstanding with the vfs device. 
+
+It is suggested that the test implementation is used as a starting reference and OS specific code for
+port mapping, barriers added as required.
+
+The messagebox currently restricts messages to around 8K.
+
+writing the vfs driver layer (layer 4)
+----------------------------
+
+This layer will necessarily be very OS specific.
+
+Ideally the driver should instantiate the generic layer 3 to provide a
+simple set of functions (in C) or a simple class interface (in C++) of vfs
+calls.
+
+vfs client operations
+---------------------
+
+The vfs interface can be divided into five groups of operations, on mount
+points, directory iterators, files, symbolic links, and general objects.
+
+Parameters
+----------
+
+VFS operations take a number of different parameter types:
+
+Most integer parameters are either int32_t or uint64_t. 
+
+Filenames are always passed as fully qualified paths (except when enumerating
+directory contents). These are of the form:
+
+MountPoint:/Dir/To/File
+
+Where moint point is one of the mount points returned by the vfs readmounts()
+function, and Dir, To and File are path elements returned by repeated use of
+the vfs readdir() function. Path separators are always '/' and relative path
+elements (..) and no leading '/' are not supported.
+
+Some vfs functions take a bitfield of parameters to pass, and a block of data
+containing/receiving those parameters. All parameters need to/will be passed
+in bitfield order and will be packed to the nearest 32bit word alignment
+
+Mount, directory iterator and file handles are all small integers.
+
+All filenames are passed as zero-terminated ascii C strings.
+
+All vfs operations return a VFSError code. If the operation succeeded, some
+operations also return data e.g. a file handle, or a file size.
+
+Mount points
+------------
+
+VFS allows for a number of separate mount points rooted at different locations
+within the host filing system. It is up to the model implementation how these
+are associated and managed. There are three functions associated with retrieving
+mount points:
+
+int openmounts()
+
+  retrieves a iterator handle for the list of available mounts which can be
+  used with readmounts() and closemounts()
+
+int readmounts(int32_t id, uint32_t attr, uint8_t* attrdata, uint32_t attrlen)
+
+  reads one entry from the mount iterator 'id'. attrdata and attrlen specify
+  a block of user memory to receive the mount information. attr is a bitfield
+  of VFSAttr entries describing the information to be returned. Currently only
+  the VFS_ATTR_NAME field is valid for use with readmounts.
+
+closemounts(int32_t id)
+
+  frees the iterator handle returned from openmounts
+
+
+mount points can be queried using the following pseudo sequence:
+
+int err = vfs.openmounts();
+if (err < 0)
+    return err;
+    
+int ih = err;
+do {
+    char mountname[128];
+    err = vfs.readmounts(ih, VFS_ATTR_NAME, mountname, 128);
+    if (err < 0)
+        break;
+        
+    // do something with the name
+      
+} while (1);        
+vfs.closemounts(ih);
+
+Directory iteration
+-------------------
+
+Directory iterators allow the retrieval of metadata for directory contents. Their
+usage is very much like mount iterators but allow for much more information to
+be retrieved.
+
+int opendir(const char* dirname);
+
+  retrieves an iterator handle for the directory given by the full path dirname.
+  
+int readdir(int id, uint32_t attr, uint8_t* attrdata, uint32_t attrlen);
+
+  reads the next entry from the directory iterator into the data block defined by
+  attrdata and attrlen. attr is a bitfield of VFSAttr options describing the
+  metadata to be retrieved. All returned metadata is packed into the attribute
+  block
+  
+int closedir(int id)
+
+  frees a directory iterator handle returned by opendir()
+
+directories can be queried using the following pseudo sequence:
+
+int err = vfs.openmounts("A:/Path/To/Dir");
+if (err < 0)
+    return err;
+    
+int ih = err;
+do {
+    uint8_t attrdata[2048];
+    uint64_t fsize;
+    uint32_t ftype;
+    const char* fname;
+    uint8_t attrp = attrdata;
+    
+    err = vfs.readdir(ih, VFS_ATTR_TYPE|VFS_ATTR_SIZE|VFS_ATTR_NAME, attrdata, 2048);
+    if (err < 0)
+        break;
+        
+    ftype = *(uint32_t*)attrp; attr += sizeof(uint32_t);
+    fsize = *(uint64_t*)attrp; attr += sizeof(uint64_t);
+    fname = attrp;
+        
+    // do something with the file metadata
+      
+} while (1);        
+vfs.closemounts(ih);
+
+The filename returned with VFS_ATTR_NAME is the leaf name of the file, not the
+fully qualified path. 
+
+Datestamps returned using VFS_ATTR_CTIME/MTIME/ATIME/RTIME are in ms since the
+vfs epoch of Jan 01 1970 00:00 UTC and are host datestamps, so may be in the future
+compared to the simulated OS date.
+
+Files
+-----
+
+File operations are much like posix file operations. VFS does not store a current
+file pointer for each file handle, the offset of the access must be passed in each
+call.
+
+int32_t openfile(const char* filename, uint32_t flags)
+
+  returns a handle to the file specified by the full path to filename, or an error
+  if the file could not be opened. flags is a combination of the flags defined
+  in VFSOpenFlags.
+
+int closefile(int32_t id)
+
+  frees a handle opened with openfile
+  
+int writefile(int32_t id, uint64_t offset, const void* data, int32_t len)
+
+  writes a block of data described in data and len to the offset within the file
+  specified by offset. This returns either a VFSError code or the number of bytes
+  successfully written to the file. If the write is past the current end of file,
+  the file will be extended.
+  
+int readfile(int32_t id, uint64_t offset, void* data, int32_t len)
+
+  reads a block of data described in data and len from the offset within the file
+  specified by offset. This returns either a VFSError code or the number of bytes
+  successfuly read from the file. If the read is at or past the end of the file then
+  0 will be returned.
+  
+int getfilesize(int32_t id, uint64_t* size)
+
+  returns the current size of a file, in bytes
+  
+int setfilesize(int32_t id, uint64_t size)
+
+  sets the current size of a file, in bytes, either truncating, or extending the
+  file by writing zeros.
+ 
+int filesync(int32_t id)
+
+  forces the host OS to flush all file data back to persistent storage.
+  
+Files are always treated as binary data.
+
+There is no support for locking semantics, files are always opened with shared
+access. It is undefined what happens if a file is deleted either by the target OS
+or the host OS when it is open.
+
+Filesystem operations
+---------------------
+
+int mkdir(const char* name)
+
+  creates a new directory with the full pathname name. The directories forming the
+  path to the leaf of name must already exist.
+  
+  Returns an error code if the directory creation failed.
+
+int rmdir(const char* name)
+
+  removes a directory with the full pathname name. If the directory is not empty
+  it will not be removed.
+  
+  Returns an error code if the directory removal failed.
+
+int remove(const char* name)
+
+  removes an object with the full pathname name from its parent directory. The
+  object may be a file, directory or symbolic link. If the object is a directory
+  this behaves like rmdir.
+  
+  Returns an error code if the object removal fails
+
+int rename(const char*oldname, const char* newname)
+
+  renames an object with the full pathname oldname to the new full pathname newname
+  possibly moving it within the host filing system. It is undefined whether this
+  operation moves the object atomically, deletes any existing object or uses copy
+  and delete.
+  
+  Returns an error code if the object rename fails
+
+int getattr(const char* name, uint32_t attr, uint8_t* attrdata, uint32_t attrlen)
+
+  Retrieves metadata on the object with the full pathname name. This operates
+  identically to readdir()
+
+int setattr(const char* filename, uint32_t attr, const void* attrdata,
+            uint32_t attrlen)
+            
+  Sets metadata ont he object with the full pathname filename. This operates much
+  like getattr.
+  
+  [ This operation is currently not supported ]
+
+Symbolic links
+--------------
+
+int symlink(const char* filename, const char* data)
+int readlink(const char* filename, char* data, int bufsiz)
+
+These operations are provided to support symbolic links in linux target OS. They
+are not currently implemented.
+

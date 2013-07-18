@@ -1,0 +1,81 @@
+/*
+ * Copyright 2012 ARM Limited. All rights reserved.
+ */
+
+
+component WarningMemory
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Memory that prints warnings, and RAZ/WIs or aborts";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    resources
+    {
+        PARAMETER { description("Warn on reads"), type(bool), default(true) } warn_on_reads;
+        PARAMETER { description("Warn on writes"), type(bool), default(true) } warn_on_writes;
+        PARAMETER { description("Abort on reads (read 0 if false)"), type(bool), default(false) } abort_on_reads;
+        PARAMETER { description("Abort on writes (ignore if false)"), type(bool), default(false) } abort_on_writes;
+        PARAMETER { description("Warning string"), type(string), default("Invalid access") } warning;
+    }
+
+    composition
+    {
+        busslave : PVBusSlave();
+    }
+
+    includes
+    {
+        #include "hostconf/zinttypes.h"
+    }
+
+    slave port<PVBus> pvbus;
+
+    internal slave port<PVDevice> device
+    {
+        behaviour read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            const char *action = abort_on_reads?"Aborting":"Returning 0";
+            if (warn_on_reads) {
+                message(MSG_WARNING, "%s: Read %d bytes from 0x%"PRIx64" %s.\n",
+                    warning.c_str(), tx.getAccessByteWidth(), tx.getAddress(), action);
+            }
+            return abort_on_reads?tx.generateSlaveAbort():tx.setReturnData32(0);
+        }
+        behaviour write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            const char *action = abort_on_writes?"Aborting":"Ignoring";
+            uint64_t data;
+            switch (tx.getAccessWidth())
+            {
+                case pv::ACCESS_8_BITS:  data = tx.getData8(); break;
+                case pv::ACCESS_16_BITS: data = tx.getData16(); break;
+                case pv::ACCESS_32_BITS: data = tx.getData32(); break;
+                default:                 data = tx.getData64();
+            }
+            if (warn_on_writes) {
+                message(MSG_WARNING, "%s: Write %d bytes 0x%"PRIx64" to 0x%"PRIx64". %s.\n",
+                    warning.c_str(), tx.getAccessByteWidth(), data, tx.getAddress(), action);
+            }
+            return abort_on_writes?tx.generateSlaveAbort():tx.writeComplete();
+        }
+
+        // Debug accesses are silent, otherwise debugger memory views will produce many warnings
+        behaviour debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return abort_on_reads?tx.generateSlaveAbort():tx.setReturnData32(0);
+        }
+        behaviour debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return abort_on_writes?tx.generateSlaveAbort():tx.writeComplete();
+        }
+    }
+
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+    }
+}

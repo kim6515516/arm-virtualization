@@ -1,0 +1,156 @@
+MessageBox
+----------
+
+11/4/08 - Initial version
+
+The MessageBox component is designed to operate as a subcomonent which, when
+used with a suitable driver, allows passing of blocks of data (messages) 
+between the driver and a parent device. It models no existing hardware and is 
+designed to operate efficiently within a SystemGenerator platform model.
+
+The current implementation is fairly generic but is primarily designed to 
+provide a transport layer for the Virtual Filesystem (VFS) component.
+
+The MessageBox device provides three ports:
+
+A PVBus slave port which should be connected to a bus decoder to provide memory
+mapped access to the messagebox registers and shared buffer. This requires
+64KB of address space to expose the memory mapped registers and buffer.
+
+A MessageBoxProtocol port for delivering messages to the parent component, and
+for receiving messages from the parent component for delivery to the target
+driver.
+
+An optional interrupt line which can be used to indicate availability of
+incoming message data. Alternatively the status register can be polled
+to check for incoming messages.
+
+Registers
+---------
+
+The Messagebox addressable memory provides seven memory mapped 32bit registers:
+
+Register    Offset  Access      Use
+ID          0x00    Read Only   Returns a user configurable id value
+DATA        0x04    Read/Write  Writing to the register writes to the buffer at
+                                the offset specified in the END register, and
+                                increments that register by 4
+                                Reading from the register reads from buffer at
+                                the offset specified int he START register, and
+                                increments that register by 4
+CONTROL     0x08    Read/Write  Issues commands to the device to control message
+                                passing (see below)
+STATUS      0x0c    Read Only   Returns status bits indicating whether more data
+                                can be transferred to/from the buffer and if
+                                there is a new incoming message available
+START       0x10    Read/Write  When using the DATA register, the offset of next
+                                word to read from the buffer. When accessing the
+                                buffer directly, for outgoing messages this
+                                should be programmed to the start of the message.
+                                For incoming messages it will indicate the start
+                                of the message. The offset is relative to the
+                                buffer start.
+END         0x14    Read/Write  When using the DATA register, the offset of the
+                                next word to write to the buffer. When accessing
+                                the buffer directly, for outgoing messages this
+                                should be programmed to 1 past the end of the
+                                message. For incoming messages it will indicate
+                                1 past the end of the message. The offset is 
+                                relative to the buffer start. 
+IRQMASK     0x18    Read/Write  Controls which of the status bits can cause the
+                                interrupt signal to be asserted.
+                                
+The CONTROL register can be programmed with one of two values
+
+1 - Causes the START/END registers to be reset to 0 and clears the RXREADY bit
+    in the STATUS register (this can be done directly by programming START/END
+    to 0
+2 - Causes the buffer memory between the START/END offsets to be sent to the 
+    parent component for processing. Typically the parent component will
+    perform some processing and at some stage cause an incoming packet to be
+    constructed in the buffer and the RXREADY signal to be set
+   
+All other values are reserved
+
+The STATUS signal has three defined bits.
+
+Bit
+   
+0   RXEMPTY     Set to 1 when START=END so no more receive data is available
+1   TXFULL      Set to 1 if END is incremented to the end of the buffer
+2   RXREADY     Set to 1 when an incoming packet is available for reading. This
+                is reset to 0 when the DATA, START or END registers are accessed
+
+Buffer
+------
+
+The data buffer is mapped starting at device offset 0x1000 and is currently 60KB
+in size, occupying the rest of the 64KB of device space. Devices/drivers are 
+free to use as much of this buffer as they need. It is suggested that the last 4 
+bytesare not used.
+
+Interrupts
+----------
+
+The interrupt line will be asserted (sg::Signal::Set) whenever STATUS & IRQMASK
+is non-zero.
+
+MessageBox Protocol
+-------------------
+
+The message port implements half of a protocol for communication with a parent
+device. When the CONTROL register is written with a value of 2, the data
+between the START and END offsets in the buffer are sent by reference to the
+parent device.
+
+Either during this call, or at a later stage, the parent device is free to
+invoke the other message behaviours to set up an incoming packet and set
+the RXREADY signal:
+
+behaviour begin_msg(void** buffer, uint32_t len)
+
+  Returns a pointer to the buffer for sending a message. len is ignored.
+
+behaviour end_msg(uint32_t len)
+
+  Sets the START/END registers to indicate the start and end of the message
+  in the buffer and sets the RXREADY signal
+  
+The parent device should implement the other half of the message protocol:
+
+behaviour message(const void* buffer, uint32_t len)
+
+  Indicates that a message has been received, the contents being in buffer with
+  a length of 'len' bytes
+
+Support Code
+------------
+
+There is a C header file MBoxTypes.h supplied which contains definitions of
+register offsets, control and status bits, and buffer sizes.
+
+There are example MessageBox driver implementations in the cpptest and linux
+folders. The cpptest version is a simple, polling implementation written in C++.
+The linux is written in C and demonstrates using interrupts.
+ 
+Possible Future changes
+-----------------------
+
+The current messagebox design does not allow for device initiated message
+sequences as there is no way to coordinate incoming/outgoing messages. Possibly
+there should be separate START/END pointers for each direction. 
+
+There should be an indication to the parent device that an incoming message has
+been fully received by a driver (e.g. when START=END, or by clearing RXREADY).
+
+The RXREADY signal would be better cleared by writing to the status register not
+by reading the START/END registers.
+
+The message interface should be changed so that begin_msg takes an offset
+for the start of the reply message in the buffer, and end_msg takes an offset
+for the end of the reply message, that way incoming and outgoing messages
+could be kept separate in the buffer.
+
+--
+                             
+

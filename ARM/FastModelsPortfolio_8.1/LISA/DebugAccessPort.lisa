@@ -1,0 +1,30 @@
+/*
+ *  \file   DebugAccessPort.lisa
+ *  \brief  Model for the debug access port for external debug connections.
+ *  \date   Copyright (c) 2011 ARM.  All rights reserved.
+ */
+
+extern component DebugAccessPort
+{
+    properties
+    {
+        version = "8.1.37";
+    }
+
+    resources
+    {
+        PARAMETER { description("ROM base address for AP0"), type(uint64_t), default(0), min(0), max(0xffffffffffffffff), runtime(false) } ap0_rom_base_address;
+        PARAMETER { description("ROM base address for AP1"), type(uint64_t), default(0), min(0), max(0xffffffffffffffff), runtime(false) } ap1_rom_base_address;
+
+        PARAMETER { description("Whether AP0 has a Debug ROM"), type(bool), default(false), runtime(false) } ap0_has_debug_rom;
+        PARAMETER { description("Whether AP1 has a Debug ROM"), type(bool), default(false), runtime(false) } ap1_has_debug_rom;
+
+        PARAMETER { description("Set paddrdbg31 signal during accesses on AP0"), type(bool), default(false) } ap0_set_paddrdbg31;
+        PARAMETER { description("Set paddrdbg31 signal during accesses on AP1"), type(bool), default(false) } ap1_set_paddrdbg31;
+    }
+
+    master port<PVBus> ap_pvbus_m[2];
+    slave port<ClockSignal> clock;
+
+    master port<Signal> paddrdbg31;
+}

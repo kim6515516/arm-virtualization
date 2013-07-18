@@ -1,0 +1,258 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ * 
+ * Based on
+ * SP804-Timer.cpp and SP804-Timer.h by Ben James, Copyright ARM Limited 2005
+ */
+
+// LISA Implementation of a SP804 timer
+
+component SP804_Timer
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "ARM Dual-Timer Module(SP804)";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    includes
+    {
+        #include "pv/PVBus.h"
+        #include <stdio.h>
+        #define SP804_TRACE if (!0) ; else printf
+    }
+    
+    composition
+    {
+        clk_div1 : ClockDivider();
+        clk_div0 : ClockDivider();
+        busslave : PVBusSlave(size = 0x1000);
+        
+        /*! Internal counters */
+        counter0 : CounterModule;
+        counter1 : CounterModule;        
+    }    
+
+
+    resources {
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x000) } Timer1Load;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x004) } Timer1Value;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x008) } Timer1Control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x00c) } Timer1IntClr;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x010) } Timer1RIS;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x014) } Timer1MIS;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x018) } Timer1BGLoad;
+
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x020) } Timer2Load;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x024) } Timer2Value;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x028) } Timer2Control;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x02c) } Timer2IntClr;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x030) } Timer2RIS;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x034) } Timer2MIS;
+        REGISTER { read_function(debug_read), write_function(debug_write), reg_number(0x038) } Timer2BGLoad;
+    }
+
+
+    master port<Signal> irq_out0;
+    master port<Signal> irq_out1;
+    slave port<ClockSignal> clock;
+    slave port<ClockRateControl> timer_en[2];
+    
+    // Memory-mapped register interface.
+    slave port<PVBus> pvbus;
+    
+    // Implement device I/O
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx)
+                    : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() > pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            return tx.setReturnData32(registerRead(tx.getAddress() & ~3));
+        }
+        
+        behavior write(pv::WriteTransaction tx)
+                    : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS || !tx.isAligned()) return tx.generateAbort();
+            registerWrite(tx.getAddress(),
+                          tx.getData32());
+            return tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+    
+    
+    connection
+    {
+        self.pvbus => busslave.pvbus_s;
+        busslave.device => self.device;
+        
+        counter0.intr_out => self.irq_out0;
+        counter1.intr_out => self.irq_out1;
+        self.clock => clk_div1.clk_in;
+        self.clock => clk_div0.clk_in;
+        clk_div0.clk_out => counter0.clk_in;
+        clk_div1.clk_out => counter1.clk_in;
+        self.timer_en[0] => clk_div0.rate;
+        self.timer_en[1] => clk_div1.rate;
+    }
+    
+    behavior registerRead(pv::bus_addr_t device_addr) : uint32_t
+    {
+        uint32_t ret;
+        switch (device_addr) 
+        {        
+        // Counter 1 data/control registers
+        case 0x000: ret=counter0.getLoadRegister();     // Load register
+                    break;
+        case 0x004: ret=counter0.getValueRegister();    // Value register
+                    break;
+        case 0x008: ret=counter0.getControlRegister();  // Control register
+                    break;
+        case 0x00c: ret=0xff;                           // Interrupt clear register -- WRITE-ONLY
+                    break;
+        case 0x010: ret=counter0.getRawIntStatus();     // Raw interrupt status register
+                    break;
+        case 0x014: ret=counter0.getMaskedIntStatus();  // Masked interrupt status register
+                    break;
+        case 0x018: ret=counter0.getBGLoadRegister();   // Background load register         
+                    break;
+        
+        // Counter 2 data/control registers       
+        case 0x020: ret=counter1.getLoadRegister();     // Load register
+                    break;
+        case 0x024: ret=counter1.getValueRegister();    // Value register
+                    break;
+        case 0x028: ret=counter1.getControlRegister();  // Control register
+                    break;
+        case 0x02c: ret=0xff;                           // Interrupt clear register -- WRITE-ONLY
+                    break;
+        case 0x030: ret=counter1.getRawIntStatus();     // Raw interrupt status register
+                    break;
+        case 0x034: ret=counter1.getMaskedIntStatus();  // Masked interrupt status register
+                    break;
+        case 0x038: ret=counter1.getBGLoadRegister();   // Background load register  
+                    break;
+        
+        // ID registers        
+        case 0xfe0:                                        // Timer ID register 0
+            ret=0x00000004;
+            break;
+        case 0xfe4:                                        // Timer ID register 1
+            ret=0x00000018;
+            break;
+        case 0xfe8:                                        // Timer ID register 2
+            ret=0x00000014;    
+            break;
+        case 0xfec:                                        // Timer ID register 3
+            ret=0x00000000;    
+            break;
+        case 0xff0:                                        // Primecell ID register 0
+            ret=0x0000000d;
+            break;
+        case 0xff4:                                        // Primecell ID register 1
+            ret=0x000000f0;
+            break;
+        case 0xff8:                                        // Primecell ID register 2
+            ret=0x00000005;
+            break;
+        case 0xffc:                                        // Primecell ID register 3
+            ret=0x000000b1;
+            break;
+                    
+        default: ret=0x00;                              // Undefined register.
+                 break;
+        }
+
+        SP804_TRACE("%s: Rd 0x%08x <- 0x%04x\n",
+                    getInstanceName().c_str(),
+                    ret, (uint32_t)device_addr);
+        return ret;
+    }
+
+    behavior registerWrite(pv::bus_addr_t device_addr, uint32_t data)
+    {
+        SP804_TRACE("%s: Wr 0x%08x -> 0x%04x\n",
+                    getInstanceName().c_str(),
+                    data, (uint32_t)device_addr);
+
+        switch (device_addr) 
+        {
+        
+        // Counter 1 data/control registers
+        case 0x000:                                         // Load register
+            counter0.setLoadRegister(data);
+            return;
+        case 0x004:                                         // Value register       (RO)
+            return;             
+        case 0x008:                                         // Control register
+            counter0.setControlRegister(data);
+            return;
+        case 0x00c:                                         // Interrupt clear register
+            counter0.clearInt();
+            return;
+        case 0x010:                                         // Raw interrupt status register    (RO)
+            return;
+        case 0x014:                                         // Masked interrupt status register (RO)
+            return;
+        case 0x018:                                         // Background load register
+            counter0.setBGLoadRegister(data);
+            return;
+            
+        // Counter 2 data/control registers        
+        case 0x020:                                         // Load register
+            counter1.setLoadRegister(data);
+            return;
+        case 0x024:                                         // Value register
+            return;
+        case 0x028:                                         // Control register
+            counter1.setControlRegister(data);
+            return;
+        case 0x02c:                                         // Interrupt clear register
+            counter1.clearInt();
+            return;
+        case 0x030:                                         // Raw interrupt status register    (RO)
+            return;
+        case 0x034:                                         // Masked interrupt status register (RO)
+            return;
+        case 0x038:                                         // Background load register
+            counter1.setBGLoadRegister(data);
+            return;
+            
+        default: return;
+        }
+    }        
+
+
+    // debugger register access support
+    behavior debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        *datap = registerRead(reg_id);
+
+        return ACCESS_FUNC_OK;
+    }
+
+    behavior debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        registerWrite(reg_id, (uint32_t)*datap);
+
+        return ACCESS_FUNC_OK;
+    }
+}

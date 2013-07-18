@@ -1,0 +1,89 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+/*  LISA Implementation of a PrimeCell Infrastructure AMBA 3 AXI TrustZone
+ *  Memory Adapter - BP141 .  The TZMA enables a single physical memory cell of
+ *  up to 2MB to be shared between a secure and non-secure storage area.  The
+ *  TZMA fixes the base address of the secure region to the base address of the
+ *  decode space.
+ */
+
+component BP141_TZMA
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "PrimeCell Infrastructure AMBA 3 AXI TrustZone Memory Adapter.";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    
+    resources
+    {
+        PARAMETER { description("Addressable range of device"), type(uint32_t), default(0x200000)   } TZMEMSIZE ;
+        PARAMETER { description("Segment size"), type(uint32_t),                default(0x1000)     } TZSEGSIZE ;
+        PARAMETER { description("Default secure size"), type(uint32_t),         default(0x200)      } TZSECROMSIZE ;
+    }    
+    
+    slave  port<Value>  R0Size           //  set in the TZPC
+    {
+        behavior setValue(uint32_t value)
+        {
+            setR0Size(value);
+        } 
+    }    
+        
+    slave port<PVBus> pvbus;   // come from the bus decoder   
+          
+    master port<PVBus> pv_output;
+    
+    composition
+    {
+        pvbusrange_0 : PVBusRange();
+       
+        tzswitch_0 : TZSwitch(normal = 3,secure = 1);
+        //   0 = ignore
+        //   1 = port A
+        //   2 = port B
+        //   3 = abort        
+    
+        // Allow TrustZone secure/normal bus signals to be routed separately.        
+        // Transactions received on the TZSwitch pvbus_input slave port will be routed
+        // according to a configuration that is set up using the control port.
+        // Separate rules can be given for secure and for normal transactions.
+        // Transactions can be routed to one of the two master ports 
+        // (pvbus_port_a or pvbus_port_b), or can be ignored, or can generate
+        // aborts.
+    }
+    
+   connection
+   {
+        pvbusrange_0.pvbus_port_a => tzswitch_0.pvbus_input;
+        
+        pvbusrange_0.pvbus_port_b => self.pv_output;
+              
+        tzswitch_0.pvbus_port_a => self.pv_output;
+        
+        self.pvbus => pvbusrange_0.pvbus_input;
+   }
+   
+   behavior init()
+   {
+        setR0Size(TZSECROMSIZE);
+        composition.init();
+   }
+
+   behaviour setR0Size(uint32_t value)
+   {
+       uint64_t range = ((uint64_t)value & 0x3ff)*TZSEGSIZE;
+ 
+       // bus range expects inclusive byte range.
+       if (range > 0)
+           --range;
+            
+       pvbusrange_0.control_64.setValue(range);  
+   }
+
+}  // end of TZMA component

@@ -1,0 +1,12 @@
+all: brot_ve_A.axf
+
+%.o: %.c
+	armcc -g -O2 -c -o $@ $<
+%.o: %.s
+	armasm -g -o $@ $^
+%_ve.axf: %.o
+	armlink --scatter ve.scat  -o $@ $^
+
+brot.o: brot.c
+brot_ve_A.axf: brot.o
+

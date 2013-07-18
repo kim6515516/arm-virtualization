@@ -1,0 +1,161 @@
+/*!
+ *  \file   RealtimeClockTimer_Windows.lisa
+ *  \brief  Host Time Based Timer Module for Generic Timers.
+ *  \date   Copyright ARM Limited 2013 All Rights Reserved.
+ *
+ *  This file implements a stub RealtimeClockTimer component
+ */
+
+component RealtimeClockTimer
+{
+    properties {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "Host Time Based Timer Module for Generic Timers";
+        documentation_file = "";
+    }
+
+    includes
+    {
+        #include "sg/SystemInclude.h"   // for Windows.h
+        #include "protocol_AsyncSignalControl.h"
+
+        static inline VOID CALLBACK timer_callback_fn( PVOID lpParameter, BOOLEAN TimerOrWaitFired)
+        {
+            protocol_AsyncSignalControl* handler = reinterpret_cast<protocol_AsyncSignalControl*>(lpParameter);
+            handler->signal();
+        }
+    }
+
+    composition
+    {
+        async_signal_handler : AsyncSignal();
+        // get back to the simulation thread from the host timer thread
+    }
+
+    connection
+    {
+        async_signal_handler.async_callback => self.async_callback;
+    }
+
+    resources
+    {
+        PARAMETER { name("frequency"), type(uint64_t), default(100000000), description("Frequency in Hz") } frequency;
+
+        bool host_timer_initialized;
+        HANDLE timerQueue;
+        HANDLE timerQueueTimer;
+
+        LONGLONG qpf_frequency;
+        LONGLONG ticks_timer_due;
+    }
+
+    behavior init()
+    {
+        composition.init();
+        host_timer_initialized = false;
+        ticks_timer_due = 0;
+    }
+
+    behavior init_host_timer()
+    {
+        timerQueue = CreateTimerQueue();
+
+        CreateTimerQueueTimer(&timerQueueTimer, timerQueue,
+                              timer_callback_fn, async_signal_handler.async_control.getAbstractInterface(),
+                              INFINITE, // DueTime. Don't call back yet - wait until we have been set at least once
+                              INFINITE, // Period. Don't automatically repeat, but go into a state where ChangeTimerQueueTimer works
+                              WT_EXECUTEINTIMERTHREAD );
+
+        LARGE_INTEGER qpf_frequency_struct;
+        QueryPerformanceFrequency(&qpf_frequency_struct);
+        qpf_frequency = qpf_frequency_struct.QuadPart;
+
+        host_timer_initialized = true;
+    }
+
+    behaviour terminate()
+    {
+        if (host_timer_initialized)
+        {
+            DeleteTimerQueueEx(timerQueue, INVALID_HANDLE_VALUE);   // cancel all pending timers and delete queue. Wait for in-progress callback functions to complete.
+        }
+        composition.terminate();
+    }
+
+    behavior reset(int level)
+    {
+        composition.reset(level);
+    }
+
+    master port<TimerCallback64> timer_callback;
+    // Invoked when a clock timer reaches zero.  If a non-zero value
+    // is returned, the clock will restart its countdown from the
+    // given value.
+
+    slave port<TimerControl64> timer_control
+    {
+        // Cancel the current countdown on the ClockTimer64.
+        behavior cancel()
+        {
+            ChangeTimerQueueTimer(timerQueue, timerQueueTimer, INFINITE, INFINITE);
+            ticks_timer_due = 0;
+        }
+
+        // Start the timer counting for the given number of ticks of its
+        // input clock.  When the timer reaches zero, the scheduler will
+        // invoke the 'signal' behaviour on its callback port (see
+        // TimerCallback64.lisa).
+        behavior set(uint64_t ticks)
+        {
+            if (!host_timer_initialized) init_host_timer();
+
+            LARGE_INTEGER qpf_timer_started;
+            QueryPerformanceCounter(&qpf_timer_started);
+
+            DWORD DueTime_ms = ticks * 1000 / frequency;
+
+            ChangeTimerQueueTimer(timerQueue, timerQueueTimer,
+                                  DueTime_ms,
+                                  INFINITE);    // period. Don't automatically call back, but stay active in case Change... is called again
+
+            ticks_timer_due = (qpf_timer_started.QuadPart * frequency / qpf_frequency) + ticks;
+        }
+
+        // Test whether the timer is currently actively counting.
+        behavior isSet() : bool
+        {
+            return ticks_timer_due != 0;
+        }
+
+        // How many clock ticks are left until the timer's callback event
+        // will be signalled.
+        behavior remaining() : uint64_t
+        {
+            LARGE_INTEGER qpf_now;
+            QueryPerformanceCounter(&qpf_now);
+
+            return ticks_timer_due - (qpf_now.QuadPart * frequency / qpf_frequency);
+        }
+    }
+
+    internal slave port<AsyncSignalCallback> async_callback
+    {
+        behavior signal()
+        {
+            if ( ticks_timer_due == 0) return;
+
+            ticks_timer_due = 0;
+
+            // call back to the requestor
+            uint64_t next_t_request = timer_callback.signal();
+            // a non-zero value is a request to call back again in that number of ticks
+
+            if (next_t_request != 0)
+                self.timer_control.set(next_t_request);
+        }
+    }
+}
+
+/* eof RealtimeClockTimer_Windows.lisa */
+

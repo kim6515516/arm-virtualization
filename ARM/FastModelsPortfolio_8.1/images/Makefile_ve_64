@@ -1,0 +1,12 @@
+all: brot_ve_64.axf
+
+%_64.o: %.c
+	armcc --cpu=8-A.64 -g -O2 -c -o $@ $<
+%_64.o: %.s
+	armasm --cpu=8-A.64 -g -o $@ $^
+%_ve_64.axf: %_64.o
+	armlink --entry __init_v8 --scatter ve.scat --cpu=8-A.64 -o $@ $^
+
+brot_64.o: brot.c
+init_v8_64.o: init_v8.s
+brot_ve_64.axf: brot_64.o init_v8_64.o

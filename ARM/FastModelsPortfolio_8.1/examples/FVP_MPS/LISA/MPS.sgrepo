@@ -1,0 +1,88 @@
+component "RemapDecoder"
+{
+        path = "../../Common/LISA/RemapDecoder.lisa";
+}
+component "IntelStrataFlashJ3"
+{
+        path = "../../Common/LISA/IntelStrataFlashJ3.lisa";
+}
+component "TSC2200"
+{
+        path = "../../FVP_EB/LISA/TSC2200.lisa";
+}
+
+component "FVP_MPS_Cortex_M3"
+{
+    path = "FVP_MPS_Cortex_M3.lisa";
+}
+component "MPSCortexM3CoreTile"
+{
+    path = "MPSCortexM3CoreTile.lisa";
+}
+component "FVP_MPS_Cortex_M4"
+{
+    path = "FVP_MPS_Cortex_M4.lisa";
+}
+component "MPSCortexM4CoreTile"
+{
+    path = "MPSCortexM4CoreTile.lisa";
+}
+component "MPS_DUT"
+{
+    path = "MPS_DUT.lisa";
+}
+component "MPS_SysRegs"
+{
+    path = "MPS_SysRegs.lisa";
+}
+component "MPS_DUTSysRegs"
+{
+    path = "MPS_DUTSysRegs.lisa";
+}
+component "MPSInterruptForwarder"
+{
+        path = "MPSInterruptForwarder.lisa";
+}
+component "MPSInterruptReceiver"
+{
+        path = "MPSInterruptReceiver.lisa";
+}
+component "MPS_I2C"
+{
+    path = "MPS_I2C.lisa";
+}
+component "MPS_LIN"
+{
+    path = "MPS_LIN.lisa";
+}
+component "MPS_CAN"
+{
+    path = "MPS_CAN.lisa";
+}
+component "MPS_FLEXRAY"
+{
+    path = "MPS_Flexray.lisa";
+}
+component "MPS_ETHERNET"
+{
+    path = "MPS_Ethernet.lisa";
+}
+component "MPS_USB"
+{
+    path = "MPS_USB.lisa";
+}
+component "MPS_CharacterLCD"
+{
+    path = "MPS_CharacterLCD.lisa";
+}
+component "MPSVisualisation"
+{
+    path = "MPSVisualisation.lisa";
+}
+
+files
+{
+    path = "$(PVLIB_HOME)/etc/sglib.sgrepo";
+    path = "../../Common/LISA/LCDLayoutInfoProtocol.lisa";
+    path = "MPS_CharacterLCDProtocol.lisa";
+}

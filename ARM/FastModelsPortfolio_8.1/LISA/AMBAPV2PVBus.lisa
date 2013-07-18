@@ -1,0 +1,463 @@
+/*
+ * AMBAPV2PVBus.lisa - AMBA-PV to PVBus protocol converter.
+ *
+ * Copyright 2007-2012 ARM Limited.
+ * All rights reserved.
+ */
+
+/* This version of the AMBAPV to PVBus bridge enables the ACP port to treat a
+ * transaction as coherent.
+ * It provides with an additional parameter to specify the default shared bit
+ * value for incoming AMBA-PV transactions.
+ * It also enables the shared bit to be specified by the "shareable"
+ * attribute of an AMBA-PV transaction using the amba_pv_attributes class.
+ * (Requires you to define the @c AMBA_PV_INCLUDE_ATTRIBUTES macro at compile
+ * time.)
+ *
+ * WARNING!     This version makes use of a private and undocumented API that
+ *              is not intended to be supported and will definitely change
+ *              in future releases. */
+
+component AMBAPV2PVBus
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "AMBA-PV to PVBus protocol converter.";
+        loadfile_extension = "";
+        has_cadi = 1;
+        executes_software = 0;
+        is_single_stepped = 0;
+        dso_safe = 0;
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #include <pv/PVBusMaster.h>
+        #include <deque>
+
+        /* WARNING! API not intended to be supported and will definitely
+         * change in future releases. */
+        #include <pv/PVMemoryAttributes.h>
+    }
+
+    composition
+    {
+        bus_master : PVBusMaster();
+    }
+
+    resources
+    {
+        // Controls address space accessible from SystemC
+        PARAMETER { description("Base address"), type(uint64_t), default(0x0) } base_addr;
+
+        // Controls "shareable" attribute default value for transactions from
+        // SystemC
+        PARAMETER { description("Shareable default"), type(bool), default(true) } shareable;
+
+        // Transaction generator queue
+        std::deque<pv::TransactionGenerator*> tx_gen_q;
+        
+        // Proxy to forward invalidateDirectMemPtr() callbacks from TransactionGenerator to this component
+        class InvalidateDirectMemPtrProxy: public pv::TransactionGenerator::CallbackInvalidateDirectMemPtr
+        {
+        public:
+            InvalidateDirectMemPtrProxy(Component__AMBAPV2PVBus *parent_): parent(parent_) {}
+            virtual ~InvalidateDirectMemPtrProxy() {}
+            virtual void invalidateDirectMemPtr(pv::bus_addr_range_t range)
+            {
+                parent->invalidateDirectMemPtr(range);
+            }
+        private:
+            Component__AMBAPV2PVBus *parent;
+        };
+        InvalidateDirectMemPtrProxy *invalidateDirectMemPtrProxy;
+    }
+    
+    // Initialise component
+    behavior init
+    {
+        composition.init();
+        
+        // Create proxy which receives all DMI invalidation requests.
+        invalidateDirectMemPtrProxy = new InvalidateDirectMemPtrProxy(this);
+    }
+    
+    // Deconstruct component
+    behavior terminate
+    {
+        composition.terminate();
+
+        // clear callbacks into this component (channels will be destryed after this terminate())
+        for (std::deque<pv::TransactionGenerator*>::iterator i = tx_gen_q.begin(); i != tx_gen_q.end(); i++)
+            (*i)->setCallbackInvalidateDirectMemPtr(0);
+
+        delete invalidateDirectMemPtrProxy;
+    }
+
+    // Master PVBus port out into SystemGenerator world
+    master port<PVBus> pvbus_m;
+
+    // Connection in from AMBAPV master
+    slave port<AMBAPV> amba_pv_s
+    {
+        /*
+         * Performs a debug transfer.
+         */
+        behaviour transport_dbg(int socket_id,
+                                amba_pv::amba_pv_transaction & trans): unsigned int
+        {
+            amba_pv::amba_pv_extension * ex = 0;
+            pv::TransactionGenerator * tx;
+            unsigned int access_width = pv::ACCESS_64_BITS;
+            unsigned int num_values = 0;
+            unsigned int mask = 0xf;
+
+            /* Retrieve AMBA-PV extension */
+            trans.get_extension(ex);
+            if (ex == 0)
+                return 0;
+            
+            /* Allocates transaction generator if necessary */
+            tx = obtain_tx_generator();
+            translate_transaction(tx, ex);
+
+            /* Compute access width of individual transfers */
+            do
+            {
+                if (! (trans.get_data_length() & mask))
+                    break;
+                mask >>= 1;
+                access_width --;
+            }
+            while (access_width != pv::ACCESS_8_BITS);
+
+            /* Compute address */
+            pv::bus_addr_t addr2 = trans.get_address()
+                                   + static_cast<pv::bus_addr_t>(base_addr);
+
+            /* Perform tranfers */
+            if (trans.is_read())
+            {
+
+                /* Perform read transfers */
+                while (num_values < trans.get_data_length())
+                {
+                    if (! tx->read(addr2 + num_values,
+                                   static_cast<pv::AccessWidth>(access_width),
+                                   reinterpret_cast<uint32_t *>(trans.get_data_ptr() + num_values),
+                                   /* is_debug */ true))
+                        break;
+                    num_values += 1 << access_width;
+                }
+            }
+            else if (trans.is_write())
+            {
+
+                /* Perform write transfers */
+                while (num_values < trans.get_data_length())
+                {
+                    if (! tx->write(addr2 + num_values,
+                                    static_cast<pv::AccessWidth>(access_width),
+                                    reinterpret_cast<const uint32_t *>(trans.get_data_ptr() + num_values),
+                                    /* is_debug */ true))
+                        break;
+                    num_values += 1 << access_width;
+                }
+            }
+            release_tx_generator(tx);
+            return num_values;
+        }
+
+        // Blocking transport
+        behavior b_transport(int socket_id,
+                             amba_pv::amba_pv_transaction & trans,
+                             sc_core::sc_time & t)
+        {
+            // Retrieve AMBA-PV extension
+            amba_pv::amba_pv_extension* ex = 0;
+
+            trans.get_extension(ex);
+            if (ex == 0)
+            {
+                trans.set_response_status(tlm::TLM_GENERIC_ERROR_RESPONSE);
+                return;
+            }
+
+            if (trans.is_read() || trans.is_write())
+            {
+                // ensure no byte enable!
+                if (trans.get_byte_enable_ptr() != 0)
+                {
+                    ex->set_slverr();
+                    trans.set_response_status(tlm::TLM_BYTE_ENABLE_ERROR_RESPONSE);
+                    return;
+                }
+
+                // Ensure as many bytes in the transaction as required!
+                if (trans.get_data_length() < (ex->get_size() * ex->get_length()))
+                {
+                    ex->set_slverr();
+                    trans.set_response_status(tlm::TLM_BURST_ERROR_RESPONSE);
+                    return;
+                }
+
+                translate_transaction_(trans, ex);
+            }
+            else
+            {
+                // TLM_IGNORE_COMMAND => ignored
+                ex->set_okay();
+            }
+
+            // Convert AMBA-PV response into TLM status
+            trans.set_response_status(amba_pv::amba_pv_resp_to_tlm(ex->get_resp()));
+        }
+
+        // Request a DMI access
+        behaviour get_direct_mem_ptr(int socket_id,
+                                     amba_pv::amba_pv_transaction & trans,
+                                     tlm::tlm_dmi & dmi_data) : bool
+        {
+            pv::MemoryAttributes        attr;
+            pv::TransactionAttributes   tx_attr;
+            pv::ACERequest              ace_request;
+            
+            // Retrieve AMBA-PV extension
+            amba_pv::amba_pv_extension* ex = 0;
+            trans.get_extension(ex);
+            if (ex == 0)
+            {
+                dmi_data.allow_read_write();
+                dmi_data.set_start_address(0x0);
+                dmi_data.set_end_address(sc_dt::uint64(-1));
+                return false;
+            }
+            
+            // Get AxID
+            attr.setMasterID(ex->get_id());
+
+            // Get AxCACHE
+            attr.setInnerBufferable(ex->is_bufferable());
+            attr.setInnerCacheable(ex->is_modifiable());
+            attr.setInnerReadAllocatable(ex->is_read_allocate());
+            attr.setInnerWriteAllocatable(ex->is_write_allocate());
+            
+            attr.setOuterBufferable(ex->is_bufferable());
+            attr.setOuterCacheable(ex->is_modifiable());
+            attr.setOuterReadAllocatable(ex->is_read_allocate());
+            attr.setOuterWriteAllocatable(ex->is_write_allocate());
+
+            // Get AxPROT
+            attr.setPrivileged(ex->is_privileged());
+            attr.setInstruction(ex->is_instruction());
+            attr.setNormalWorld(ex->is_non_secure());
+
+            // Get AxUSER
+            attr.setUserFlags(ex->get_user());
+            
+            // Get AxLOCK
+            tx_attr.setExclusive(ex->is_exclusive());
+
+            /* Enables ACP port to treat transaction as coherent.
+             *
+             * WARNING! This is not intended to be supported and will
+             * definitely change in future releases. */
+            bool tx_shareable = shareable;
+
+#if defined(AMBA_PV_INCLUDE_ATTRIBUTES)
+            ex->get_attribute("shareable", tx_shareable);
+#endif  /* defined(AMBA_PV_INCLUDE_ATTRIBUTES) */
+
+            attr.setShareability(tx_shareable ? ACE::adomain_outer_shared : ACE::adomain_non_shared);
+
+            tx_attr = attr;
+
+            ace_request.set_ace_operation(ACE::Default);
+            ace_request.set_abar(ACE::abar_respect_barriers);            
+
+            // use a new TransactionGenerator for every recursive transaction
+            // (this is unlikely yet not completely impossible for DMI)
+            pv::TransactionGenerator* tx_gen = obtain_tx_generator(); 
+            tx_gen->setCallbackInvalidateDirectMemPtr(invalidateDirectMemPtrProxy);
+
+            // issue DMI request using the TransactionGenerator
+            pv::DirectMemPtrData inner_dmi_data;
+            bool ret = tx_gen->getDirectMemPtr(trans.is_read(), &tx_attr, &ace_request, pv::bus_addr_t(trans.get_address()), &inner_dmi_data);
+            
+            // release transaction generator once the inner transactioncompleted
+            release_tx_generator(tx_gen);
+            
+            // convert the results
+            dmi_data.set_granted_access((tlm::tlm_dmi::dmi_access_e)inner_dmi_data.granted_access);
+            dmi_data.set_dmi_ptr((unsigned char *)inner_dmi_data.dmi_ptr);
+            dmi_data.set_start_address((sc_dt::uint64)inner_dmi_data.range.begin);
+            dmi_data.set_end_address((sc_dt::uint64)inner_dmi_data.range.end_incl);
+            return ret;
+        }
+    }
+
+    // callback from PVBusMaster/TransactionGenerator
+    behavior invalidateDirectMemPtr(pv::bus_addr_range_t range)
+    {
+        amba_pv_s.invalidate_direct_mem_ptr(0, (sc_dt::uint64)range.begin, (sc_dt::uint64)range.end_incl);
+    }
+
+    // Obtain a transaction generator from the free pool
+    behaviour obtain_tx_generator() : pv::TransactionGenerator*
+    {
+        pv::TransactionGenerator*  tx_gen;
+
+        if (!tx_gen_q.empty())
+        {
+            tx_gen = tx_gen_q.front();
+            tx_gen_q.pop_front();
+        }
+        else
+        {
+            tx_gen = bus_master.control.createTransactionGenerator();
+        }
+
+        return tx_gen;
+    }
+
+    // Put transaction generator back in the free pool
+    behaviour release_tx_generator(pv::TransactionGenerator* tx_gen)
+    {
+        tx_gen_q.push_back(tx_gen);
+    }
+
+    // Translate TLM transaction into a PVBus2 transaction
+    behaviour translate_transaction(pv::TransactionGenerator*  tx,
+                                    const amba_pv::amba_pv_control*  ex)
+    {
+        pv::MemoryAttributes        attr;
+
+        // Get AxID
+        attr.setMasterID(ex->get_id());
+
+        // Get AxCACHE
+        attr.setInnerBufferable(ex->is_bufferable());
+        attr.setInnerCacheable(ex->is_modifiable());
+        attr.setInnerReadAllocatable(ex->is_read_allocate());
+        attr.setInnerWriteAllocatable(ex->is_write_allocate());
+
+        attr.setOuterBufferable(ex->is_bufferable());
+        attr.setOuterCacheable(ex->is_modifiable());
+        attr.setOuterReadAllocatable(ex->is_read_allocate());
+        attr.setOuterWriteAllocatable(ex->is_write_allocate());
+
+        // Get AxPROT
+        attr.setPrivileged(ex->is_privileged());
+        attr.setInstruction(ex->is_instruction());
+        attr.setNormalWorld(ex->is_non_secure());
+
+        // Get AxUSER
+        attr.setUserFlags(ex->get_user());
+
+        // Get AxLOCK
+        tx->setExclusive(ex->is_exclusive());
+        tx->setLocked(ex->is_locked());
+
+
+        /* Enables ACP port to treat transaction as coherent.
+         *
+         * WARNING! This is not intended to be supported and will
+         * definitely change in future releases. */
+        bool tx_shareable = shareable;
+
+#if defined(AMBA_PV_INCLUDE_ATTRIBUTES)
+        ex->get_attribute("shareable", tx_shareable);
+#endif  /* defined(AMBA_PV_INCLUDE_ATTRIBUTES) */
+
+        attr.setShareability(tx_shareable ? ACE::adomain_outer_shared : ACE::adomain_non_shared);
+
+        tx->setMemoryAttributes(& attr);
+    }
+
+    behaviour translate_transaction_(amba_pv::amba_pv_transaction& trans,
+                                     amba_pv::amba_pv_extension*   ex)
+    {
+        bool ok = true;
+
+        for(unsigned int n = 0; n < ex->get_length(); n++)
+        {
+            // Compute address 
+            sc_dt::uint64 addr =
+                amba_pv::amba_pv_address(trans.get_address(),
+                                         ex->get_length(),
+                                         ex->get_size(),
+                                         ex->get_burst(),
+                                         n);
+
+            // Compute & align address
+            sc_dt::uint64 addr2 = (addr + base_addr) & ~sc_dt::uint64(ex->get_size() - 1);
+
+            unsigned char* data = trans.get_data_ptr() + (ex->get_size() * n);
+
+            pv::TransactionGenerator* gen = obtain_tx_generator();
+
+            translate_transaction(gen, ex);
+
+            if (trans.is_read())
+            {
+                switch (ex->get_size()) {
+                case 1:
+                    ok = ok && gen->read8(addr2, data);
+                    break;
+                case 2:
+                    ok = ok && gen->read16(addr2, reinterpret_cast<uint16_t *>(data));
+                    break;
+                case 4:
+                    ok = ok && gen->read32(addr2, reinterpret_cast<uint32_t *>(data));
+                    break;
+                case 8:
+                    ok = ok && gen->read64(addr2, reinterpret_cast<uint64_t *>(data));
+                    break;
+                }
+             }
+             else
+             {
+                switch (ex->get_size()) {
+                case 1:
+                    ok = ok && gen->write8(addr2, data);
+                    break;
+                case 2:
+                    ok = ok && gen->write16(addr2, reinterpret_cast<uint16_t *>(data));
+                    break;
+                case 4:
+                    ok = ok && gen->write32(addr2, reinterpret_cast<uint32_t *>(data));
+                    break;
+                case 8:
+                    ok = ok && gen->write64(addr2, reinterpret_cast<uint64_t *>(data));
+                    break;
+                }
+            }
+            
+            // retrieve DMI hint for first access only
+            if (n == 0)
+                trans.set_dmi_allowed(ok && gen->getPrefetchHint());
+
+            release_tx_generator(gen);
+        }
+
+        if (ok)
+        {
+            if (ex->is_exclusive())
+                ex->set_exokay();
+            else
+                ex->set_okay();
+        }
+        else
+        {
+            ex->set_slverr();
+        }
+    }
+
+    connection
+    {
+        bus_master.pvbus_m => self.pvbus_m;
+    }
+}

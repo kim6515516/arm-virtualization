@@ -1,0 +1,214 @@
+/*
+ * Copyright 2006-2008, 2013 ARM Limited. All rights reserved.
+ */
+
+// Allow TrustZone secure/normal bus signals to be routed separately.
+//
+// Transactions received on the pvbus_input slave port will be routed
+// according to a configuration that is set up using parameters and/or
+// the control port. Separate rules can be given for secure and for
+// normal transactions. Transactions can be routed to one of the two
+// master ports (pvbus_port_a or pvbus_port_b), can be ignored, or
+// can generate aborts.
+//
+// The control port behaviour routeAccesses() takes two arguments...
+//
+// 'input' selects which types of signals will be reconfigured:
+//     TZINPUT_SECURE  : change the routing for secure transactions
+//     TZINPUT_NORMAL  : change the routing for normal transactions
+//     TZINPUT_ANY     : change the routing for all transactions
+//
+// 'destination' selects how the chosen transactions will be routed:
+//     TZROUTE_IGNORE    : transactions will be ignored (reads return 0)
+//     TZROUTE_TO_PORT_A : route transactions to pvbus_port_a
+//     TZROUTE_TO_PORT_B : route transactions to pvbus_port_b
+//     TZROUTE_ABORT     : cause transactions to generate an abort
+//
+// Initial routing is configured using parameters "secure" and "normal"
+// based on the following values:
+//
+//     0 = ignore
+//     1 = port A
+//     2 = port B
+//     3 = abort
+//
+// Both default and explicit parameter values will be overidden by
+// any runtime calls to routAccesses() on the control port.
+
+
+protocol TZSwitchControl
+{
+    properties
+    {
+        version = "8.1.37";
+        description = "Control protocol for TZSwitch";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        enum TZSwitch_RouteOption
+        {
+            TZROUTE_IGNORE    = 0,
+            TZROUTE_TO_PORT_A = 1,
+            TZROUTE_TO_PORT_B = 2,
+            TZROUTE_ABORT     = 3
+        };
+
+        enum TZSwitch_InputFilter
+        {
+            TZINPUT_SECURE,
+            TZINPUT_NORMAL,
+            TZINPUT_ANY
+        };
+    }
+
+    slave behavior routeAccesses(TZSwitch_InputFilter input,
+                                 TZSwitch_RouteOption destination) : void;
+}
+
+
+component TZSwitch
+{
+    properties
+    { 
+        version = "8.1.37";
+        component_type = "Bus";
+        description = "Allow TrustZone secure/normal bus signals to be routed separately";
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+
+    includes
+    {
+        #include "pv/PVBusMapper.h"
+
+        #include <cassert>
+    }
+
+    resources
+    {
+        PARAMETER { description("Secure Port"), type(uint32_t), default(1), runtime(true) } secure;
+        PARAMETER { description("Normal Port"), type(uint32_t), default(2), runtime(true) } normal;
+
+        // Use a struct so that state can be initialised at component construction
+        struct Route
+        {
+            unsigned secure;
+            unsigned normal;
+
+            Route() : secure(TZROUTE_TO_PORT_A), normal(TZROUTE_TO_PORT_B) {}
+        };
+
+        Route  route;
+
+        enum
+        {
+            PORT_A = 0,
+            PORT_B = 1
+        };
+    }
+
+    slave port<PVBus>    pvbus_input;
+    master port<PVBus>   pvbus_port_a;
+    master port<PVBus>   pvbus_port_b;
+
+    slave port<TZSwitchControl> control
+    {
+        behaviour routeAccesses(TZSwitch_InputFilter input, TZSwitch_RouteOption destination) : void
+        {
+            // Translate TZSwitch destination to a PVBusMapper route
+            unsigned new_route;
+
+            switch(destination)
+            {
+            case TZROUTE_IGNORE:    new_route = PVBUSMAPPER_IGNORE; break;
+            case TZROUTE_TO_PORT_A: new_route = PORT_A;             break;
+            case TZROUTE_TO_PORT_B: new_route = PORT_B;             break;
+            case TZROUTE_ABORT:     new_route = PVBUSMAPPER_ABORT;  break;
+
+            default:
+                assert(!"Argument destination invalid");
+                new_route = PVBUSMAPPER_IGNORE;
+                break;
+            }
+
+            bool routing_changed = false;
+
+            if ((input == TZINPUT_SECURE) || (input == TZINPUT_ANY))
+            {
+                if (route.secure != new_route)
+                {
+                    route.secure = new_route;
+                    routing_changed = true;
+                }
+
+                // Sometimes routeAccesses() is "ilegally" called before init()
+                secure = destination;
+            }
+            else
+            {
+                assert(input == TZINPUT_NORMAL);
+            }
+
+            if ((input == TZINPUT_NORMAL) || (input == TZINPUT_ANY))
+            {
+                if (route.normal != new_route)
+                {
+                    route.normal = new_route;
+                    routing_changed = true;
+                }
+
+                // Sometimes routeAccesses() is "ilegally" called before init()
+                normal = destination;
+            }
+            else
+            {
+                assert(input == TZINPUT_SECURE);
+            }
+
+            if (routing_changed)
+            {
+                // Revoke all previous routing decisions
+                self.mapper_control.allBusMapChanging();
+            }
+        }
+    }
+
+    composition
+    {
+        pvbus_mapper : PVBusMapper();
+    }
+
+    connection
+    {
+        self.pvbus_input => pvbus_mapper.pvbus_s;
+        pvbus_mapper.control => self.mapper_control;
+        pvbus_mapper.pvbus_m[0] => self.pvbus_port_a;  // PORT_A
+        pvbus_mapper.pvbus_m[1] => self.pvbus_port_b;  // PORT_B
+    }
+
+    behaviour init()
+    {
+        composition.init();
+
+        // Ensure documented interface for parameter values
+        assert(TZROUTE_IGNORE    == 0);
+        assert(TZROUTE_TO_PORT_A == 1);
+        assert(TZROUTE_TO_PORT_B == 2);
+        assert(TZROUTE_ABORT     == 3);
+
+        // Set initial routing from parameters
+        self.control.routeAccesses(TZINPUT_SECURE, TZSwitch_RouteOption(secure));
+        self.control.routeAccesses(TZINPUT_NORMAL, TZSwitch_RouteOption(normal));
+    }
+
+    internal slave port<PVBusMapperControl>  mapper_control
+    {
+        behaviour remap(pv::RemapRequest& req) : unsigned
+        {
+            return req.getTransactionAttributes()->isNormalWorld() ? route.normal
+                                                                   : route.secure;
+        }
+    }
+}
+

@@ -1,0 +1,1317 @@
+/*
+ * Copyright 2011 ARM Limited. All rights reserved.
+ */
+
+// LISA Implementation of CCI Registers
+
+component CCIRegisters
+{
+
+    properties {
+        version = "8.1.37";
+        component_type = "Other";
+        description = "Programmer-visible memory mapped registers for use by CCI400";
+        documentation_file = "../Docs/DUI0423I_fast_model_portfolio_rm.pdf";
+        hidden = true;
+    }
+
+    includes
+    {
+        // debugging support
+        #define TRACE_REG printf
+
+        #include "sg/SGComponentTrace.h"
+        #include "pv/PVCache.h"
+        #include <vector>
+
+#define LOG(LEVEL) if (!((LEVEL) < log_enabled)) ; else std::cerr << getHierarchicalName() << ": "
+
+//===================================================================================
+// Stream access convenience function cribebd from "FsManip.h"
+// which is not external. Automatically pads to size of type using 0s with 0x prefix
+//
+// std::cout << Ox(3424) << ...;
+
+        #include <iostream>
+        #include <iomanip>
+
+        namespace details
+        {
+            // ----------------------------------------------------------------------
+            /// Helper class for Ox() handlers
+            // ----------------------------------------------------------------------
+            template< typename T, bool ox_prefix = true >
+            struct Ox_t {
+                T t;
+                Ox_t( T const& t_ ) : t(t_) {}
+            };
+
+            /// Specialise this trait class to teach Ox() about the width of user-defined types.
+            template< typename T > struct width_of_Ox_representation {
+                static unsigned const width = sizeof(T) * 2;
+            };
+
+            template<typename T, bool ox_prefix>
+            std::ostream& operator << (std::ostream& os, Ox_t<T,ox_prefix> const& tt)
+            {
+               std::ostream::fmtflags   saved_flags = os.flags();
+               std::streamsize          saved_width = os.width();
+               char                     saved_fill  = os.fill();
+               unsigned                 width       = width_of_Ox_representation<T>::width;
+
+               if (ox_prefix)
+               {
+                   os << "0x" << std::right << std::hex << std::setw(width) << std::setfill('0') << tt.t;
+               }
+               else
+               {
+                   os << std::right << std::hex << std::setw(width) << std::setfill('0') << tt.t;
+               }
+
+               os.fill ( saved_fill  );
+               os.width( saved_width );
+               os.flags( saved_flags );
+
+               return os;
+            }
+        }
+
+// Print 0x<value-in-hex-padded-with-zeros>
+        template< typename T > inline details::Ox_t<T,true>  Ox(T const& t) { return details::Ox_t<T,true>(t); }
+
+//===================================================================================
+
+    }
+
+
+    composition
+    {
+        clocktimer : ClockTimer();
+        clockdivider : ClockDivider();
+        busslave : PVBusSlave(size = 0x10000);  // PVBusSlave with a size of 64kb
+    }
+
+    /// This port allows us to grab the control interface from the
+    /// CCIInterconnect.  The control interface allows us to read/write various
+    /// configuration options that the determine where snoops should be sent,
+    /// etc.
+    master port<CCIInterconnectControl>   cciinterconnect_control;
+
+    slave  port<PVBus> pvbus_s;                 // PVBus slave port
+
+    slave port<EventBus> event_bus_s // C++ Port definition in PVCache.h
+    {
+        // register event sources with the CCIRegister component
+        behavior publishEventSource(uint32_t index, sg::EventSourceBase *src)
+        {
+            event_source_array[index] = src;
+
+            src->nextHitZeroMasterValue();
+            src->Update();  // will make event source active
+            cadi__ ->RegisterTraceSource(src);
+        }
+    }
+
+    internal port<PMUEvent> event_callback
+    {
+
+        behavior fire()
+        {
+            printf("Debug: event_callback.fire() called. an event counter has hit zero.\n");
+        }
+    }
+
+    // Handle event notifications from the timer.
+    slave port<TimerCallback> timer_callback_handler
+    {
+        // Handle a signal from the timer.
+        behavior signal() : uint32_t
+        {
+            if ( cycle_counter_enabled ) {
+                return handleTimerSignal();
+            } else {
+                return 1;
+            }
+        }
+    }
+
+
+    resources
+    {
+        sg::EventSource2<uint32_t, uint32_t>* write_trace;
+        sg::EventSource2<uint32_t, uint32_t>* read_trace;
+
+        // debugger visible registers
+        //
+        // Control and ID Registers
+        REGISTER { description("Control Override Register"),           read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0000) } ControlOverride;
+        REGISTER { description("Speculation Control Register"),        read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0004) } SpeculationControl;
+        REGISTER { description("Secure Access Register"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0008) } SecureAccess;
+        REGISTER { description("Status Register"),                     read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x000C) } Status;
+        REGISTER { description("Imprecise Error Register"),            read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0010) } ImpreciseError;
+        REGISTER { description("Performance Monitor Control Register"),read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0100) } PerformanceMonitorControl;
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FD0) } PeripheralID4;
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FD4) } PeripheralID5; //reserved
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FD8) } PeripheralID6; //reserved
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FDC) } PeripheralID7; //reserved
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FE0) } PeripheralID0;
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FE4) } PeripheralID1;
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FE8) } PeripheralID2;
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FEC) } PeripheralID3;
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FF0) } ComponentID0;
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FF4) } ComponentID1;
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FF8) } ComponentID2;
+        REGISTER { description("Peripheral ID Registers"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x0FFC) } ComponentID3;
+
+
+        // Slave Interface 0 Registers
+        REGISTER { description("Snoop Control Register"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x1000) } SnoopControl0;
+        REGISTER { description("Shareable Override Register"),         read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x1004) } ShareableOverride0;
+        REGISTER { description("Read Channel QoS Value Override"),     read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x1100) } ReadChannelQoSValueOverride0;
+        REGISTER { description("Write Channel QoS Value Overrride"),   read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x1104) } WriteChannelQoSValueOverride0;
+        REGISTER { description("QoS Control Register"),                read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x110C) } QoSControl0;
+        REGISTER { description("Max OT Register"),                     read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x1110) } MaxOT0;
+        REGISTER { description("Target Latency Register"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x1130) } TargetLatency0;
+        REGISTER { description("Latency Regulation Register"),         read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x1134) } LatencyRegulation0;
+        REGISTER { description("QoS Range Register"),                  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x1138) } QoSRange0;
+
+        // Slave Interface 1 Registers
+        REGISTER { description("Snoop Control Register"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x2000) } SnoopControl1;
+        REGISTER { description("Shareable Override Register"),         read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x2004) } ShareableOverride1;
+        REGISTER { description("Read Channel QoS Value Override"),     read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x2100) } ReadChannelQoSValueOverride1;
+        REGISTER { description("Write Channel QoS Value Overrride"),   read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x2104) } WriteChannelQoSValueOverride1;
+        REGISTER { description("QoS Control Register"),                read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x210C) } QoSControl1;
+        REGISTER { description("Max OT Register"),                     read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x2110) } MaxOT1;
+        REGISTER { description("Target Latency Register"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x2130) } TargetLatency1;
+        REGISTER { description("Latency Regulation Register"),         read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x2134) } LatencyRegulation1;
+        REGISTER { description("QoS Range Register"),                  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x2138) } QoSRange1;
+
+
+        // Slave Interface 2 Registers
+        REGISTER { description("Snoop Control Register"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x3000) } SnoopControl2;
+        REGISTER { description("Shareable Override Register"),         read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x3004) } ShareableOverride2;
+        REGISTER { description("Read Channel QoS Value Override"),     read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x3100) } ReadChannelQoSValueOverride2;
+        REGISTER { description("Write Channel QoS Value Overrride"),   read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x3104) } WriteChannelQoSValueOverride2;
+        REGISTER { description("QoS Control Register"),                read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x310C) } QoSControl2;
+        REGISTER { description("Max OT Register"),                     read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x3110) } MaxOT2;
+        REGISTER { description("Target Latency Register"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x3130) } TargetLatency2;
+        REGISTER { description("Latency Regulation Register"),         read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x3134) } LatencyRegulation2;
+        REGISTER { description("QoS Range Register"),                  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x3138) } QoSRange2;
+
+
+        // Slave Interface 3 Registers
+        REGISTER { description("Snoop Control Register"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x4000) } SnoopControl3;
+        REGISTER { description("Read Channel QoS Value Override"),     read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x4100) } ReadChannelQoSValueOverride3;
+        REGISTER { description("Write Channel QoS Value Overrride"),   read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x4104) } WriteChannelQoSValueOverride3;
+        REGISTER { description("QoS Control Register"),                read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x410C) } QoSControl3;
+        REGISTER { description("Target Latency Register"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x4130) } TargetLatency3;
+        REGISTER { description("Latency Regulation Register"),         read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x4134) } LatencyRegulation3;
+        REGISTER { description("QoS Range Register"),                  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x4138) } QoSRange3;
+
+        // Slave Interface 4 Registers
+        REGISTER { description("Snoop Control Register"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x5000) } SnoopControl4;
+        REGISTER { description("Read Channel QoS Value Override"),     read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x5100) } ReadChannelQoSValueOverride4;
+        REGISTER { description("Write Channel QoS Value Overrride"),   read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x5104) } WriteChannelQoSValueOverride4;
+        REGISTER { description("QoS Control Register"),                read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x510C) } QoSControl4;
+        REGISTER { description("Target Latency Register"),             read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x5130) } TargetLatency4;
+        REGISTER { description("Latency Regulation Register"),         read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x5134) } LatencyRegulation4;
+        REGISTER { description("QoS Range Register"),                  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x5138) } QoSRange4;
+
+        // Cycle counter registers
+        REGISTER { description("Cycle Counter"),                       read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x9004) } CycleCounter;
+        REGISTER { description("Cycle Counter Control"),               read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x9008) } CycleCounterControl;
+        REGISTER { description("Cycle Counter Overflow flag Status"),  read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0x900C) } CycleCounterOverflowFlagStatus;
+
+        // Performance Counter 0 Registers
+        REGISTER { description("Event Select Register"),               read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xA000) } EventSelect0;
+        REGISTER { description("Count Register"),                      read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xA004) } Count0;
+        REGISTER { description("Count Control Register"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xA008) } CountControl0;
+        REGISTER { description("Overflow Flag Status Register"),       read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xA00C) } OverflowFlagStatus0;
+
+        // Performance Counter 1 Registers
+        REGISTER { description("Event Select Register"),               read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xB000) } EventSelect1;
+        REGISTER { description("Count Register"),                      read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xB004) } Count1;
+        REGISTER { description("Count Control Register"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xB008) } CountControl1;
+        REGISTER { description("Overflow Flag Status Register"),       read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xB00C) } OverflowFlagStatus1;
+
+        // Performance Counter 2 Registers
+        REGISTER { description("Event Select Register"),               read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC000) } EventSelect2;
+        REGISTER { description("Count Register"),                      read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC004) } Count2;
+        REGISTER { description("Count Control Register"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC008) } CountControl2;
+        REGISTER { description("Overflow Flag Status Register"),       read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xC00C) } OverflowFlagStatus2;
+
+        // Performance Counter 3 Registers
+        REGISTER { description("Event Select Register"),               read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xD000) } EventSelect3;
+        REGISTER { description("Count Register"),                      read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xD004) } Count3;
+        REGISTER { description("Count Control Register"),              read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xD008) } CountControl3;
+        REGISTER { description("Overflow Flag Status Register"),       read_function(debug_read), write_function(debug_write), display_format("hex"), reg_number(0xD00C) } OverflowFlagStatus3;
+
+
+        CCIInterconnect::control_if*    control;
+
+        // local variables
+        // 1. Control and ID registers
+        uint32_t control_override;
+        uint32_t speculation_control;
+        uint32_t secure_access;
+        uint32_t status;
+        uint32_t imprecise_error;
+        uint32_t performance_monitor_control;
+        uint32_t component_id[4];
+        uint32_t peripheral_id[5];
+
+        // slave interface registers
+        uint32_t slave_interface_registers[5][9];
+
+        // cycle counter registers
+        uint32_t cycle_counter_registers[3];
+        bool cycle_counter_enabled;
+
+        //Performace counter registers
+        class MyEventCounter :  public sg::EventCounter {
+        public:
+            MyEventCounter(protocol_PMUEvent *pin)
+                : sg::EventCounter(), ptr(pin)
+            {
+                init_registers();
+            }
+
+            MyEventCounter(uint32_t value, uint32_t offset, sg::EventSourceBase* es, bool enabled, protocol_PMUEvent *pin)
+                : sg::EventCounter(value, offset, es, enabled), ptr(pin)
+            {
+                init_registers();
+            }
+
+
+            virtual void onHitZero() {
+                overflow_flag_status_register = 1;
+                if ( ptr ) {
+                    ptr->fire();
+                }
+            }
+        private:
+            void init_registers()
+            {
+                event_select_register = 0;         // default to no selection
+                count_control_register = 1;         // enabled;
+                overflow_flag_status_register = 0;  // no overflow
+            }
+
+        public:  // making public so that behavior can change its value
+            protocol_PMUEvent *ptr;
+            uint32_t event_select_register;
+            uint32_t count_control_register;
+            uint32_t overflow_flag_status_register;
+        };
+
+        std::vector<MyEventCounter *> my_event_counters;
+        std::vector<sg::EventSourceBase*> event_source_array;
+        sg::EventSourceBase* my_event_source;
+        //sg::EventSource1<uint32_t> my_event_source;
+
+        // Control the amount of log information using this parameter
+        PARAMETER {
+                name("log_enabled"),
+                description("Enable log messages from the CCI register file.  Log level 0 means do not print anything, 1 means print only access violations, 2 means also print writes, 3 means print reads as well."),
+                type(int),
+                runtime(false),
+                default(true)
+        } log_enabled;
+        PARAMETER {
+                name("revision"),
+                description("Revision number of the CCI400"),
+                type(string),
+                default("r0p0")
+        } revision_string;
+    }
+
+    connection
+    {
+        self.pvbus_s => busslave.pvbus_s;
+        busslave.device => self.device;
+        self.clk => clockdivider.clk_in;
+        clockdivider.clk_out => clocktimer.clk_in;
+        clocktimer.timer_callback => self.timer_callback_handler;
+    }
+
+    behavior init()
+    {
+        composition.init();
+
+        write_trace = new sg::EventSource2<uint32_t, uint32_t>();
+
+        write_trace->setName( "CCI_REGISTER_WRITE" );
+        write_trace->setDescription( "A valid write to the register file.  (Access violations are not traced)" );
+        write_trace->AddField( "Offset", "Offset into the register block",
+                               MTI::EventFieldType::MTI_UNSIGNED_INT, sizeof(uint32_t) );
+        write_trace->AddField( "Value", "Value written",
+                               MTI::EventFieldType::MTI_UNSIGNED_INT, sizeof(uint32_t) );
+
+        addTraceSource( write_trace ); // we don't have to delete
+
+        read_trace = new sg::EventSource2<uint32_t, uint32_t>();
+
+        read_trace->setName( "CCI_REGISTER_READ" );
+        read_trace->setDescription( "A valid read from the register file. (Access violations are not traced.)" );
+        read_trace->AddField( "Offset", "Offset into the register block",
+                              MTI::EventFieldType::MTI_UNSIGNED_INT, sizeof(uint32_t) );
+        read_trace->AddField( "Value", "Value read",
+                              MTI::EventFieldType::MTI_UNSIGNED_INT, sizeof(uint32_t) );
+
+        addTraceSource( read_trace ); // we don't have to delete
+
+        my_event_counters.resize(4);
+
+        my_event_counters[0] = new MyEventCounter(0, 0, 0, true, event_callback.getAbstractInterface());
+        my_event_counters[1] = new MyEventCounter(0, 0, 0, true, event_callback.getAbstractInterface());
+        my_event_counters[2] = new MyEventCounter(0, 0, 0, true, event_callback.getAbstractInterface());
+        my_event_counters[3] = new MyEventCounter(0, 0, 0, true, event_callback.getAbstractInterface());
+
+        event_source_array.resize(256);
+
+        common_reset();
+    }
+
+    behaviour common_reset()
+    {
+
+        for ( unsigned i = 0; i != event_source_array.size(); i++ )
+        {
+            event_source_array[i] = NULL;
+        }
+        initAllRegisters();
+        cycle_counter_enabled = false;
+        clocktimer.timer_control.set(1);
+
+    }
+
+    behavior initAllRegisters()
+    {
+        // Control and ID registers
+        control_override = 0;
+        speculation_control = 0;
+        // default to enbale non-secure access to CCI registers
+        secure_access = 0;
+        status = 0;
+        imprecise_error = 0;
+        performance_monitor_control = 0;
+
+        // Magic numbers from CCI spec
+        component_id[0] = 0x0D;
+        component_id[1] = 0xF0;
+        component_id[2] = 0x05;
+        component_id[3] = 0xB1;
+
+        // Magic numbers from CCI spec
+        peripheral_id[0] = 0x20;
+        peripheral_id[1] = 0xB4;
+        peripheral_id[2] = (0x1 << 3) | (0x3 << 0);
+        peripheral_id[3] = 0x00;
+        peripheral_id[4] = 0x44;
+
+        // r0p0 has pid2[7:4]=0, r1p1 has pid2[7:4]=6
+        if (revision_string == "r1p1") { peripheral_id[2] |= 0x60; }
+        else if (revision_string != "r0p0")
+        {
+            LOG(0) << "Unknown revision string, treating as r0p0 for ID register\n";
+        }
+
+        // slave interface registers
+        for ( int i = 0; i < 5; i++ ) {
+            for ( int j = 0; j < 9; j++ ) {
+                slave_interface_registers[i][j] = 0;
+            }
+        }
+
+        // cycle counter registers
+        cycle_counter_registers[0] = 0;
+        cycle_counter_registers[1] = 0;
+        cycle_counter_registers[2] = 0;
+    }
+
+    behavior reset( int level_ )
+    {
+        composition.reset( level_ );
+
+        // At reset time then ask the CCIInterconnect for its control interface.
+        if (cciinterconnect_control.getControlIf.implemented())
+        {
+            control = cciinterconnect_control.getControlIf();
+        }
+        else
+        {
+            // Not connected -- should we whinge?
+            control = 0;
+        }
+    }
+
+    slave port<Signal> reset_in
+    {
+        behavior setValue(sg::Signal::State signal_)
+        {
+            // We operate off the rising edge.
+            if (signal_ == sg::Signal::Set)
+            {
+                common_reset();
+            }
+        }
+    }
+
+    behavior terminate
+    {
+        for ( int i = 0; i < 4; i++ ) {
+            delete my_event_counters[i];
+        }
+        composition.terminate();
+    }
+
+    internal slave port<PVDevice> device
+    {
+        // Pass on read/write requests to registerRead()/registerWrite().
+        behavior read(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            /*if (tx.isPrivileged())
+                privilege_mode = true;
+            else
+                privilege_mode = false;
+            */
+            if (tx.getAccessByteWidth() > 4)
+            {
+                LOG(0) << "Larger than word reads to CCI register file generates aborts.\n"
+                    << "     " << tx << "\n";
+                return tx.generateDecodeAbort();
+            }
+
+            if (!tx.isAligned())
+            {
+                LOG(0) << "Unaligned reads to CCI register file generates aborts.\n"
+                    << "     " << tx << "\n";
+                return tx.generateDecodeAbort();
+            }
+
+            if (tx.getBurstLength() != 1)
+            {
+                LOG(0) << "Multi-beat reads are not supported to the CCI register file.\n";
+                return tx.generateDecodeAbort();
+            }
+
+            if ( ! ( tx.getMemoryAttributes()->isInnerDVSO()
+                     || tx.getMemoryAttributes()->isOuterDVSO() ) )
+            {
+                LOG(0) << "CCI register file reads should be addressed with device or strongly ordered transactions.  We expect both the inner and outer attributes to be DV/SO.  Abort generated.\n";
+                return tx.generateDecodeAbort();
+            }
+
+            // Always do an aligned 32-bit read and let the bus extract the appropriate data
+            std::pair<uint32_t, bool> p = registerRead(
+                tx.getAddress() & ~3, /*is_debug_*/false, tx.isNonSecure()
+                );
+
+            if (p.second)
+            {
+                // Access violation
+                LOG(0) << "Access violation for read from CCI register at offset " << Ox(0xFFFF & tx.getAddress()) << "\n";
+                return tx.generateDecodeAbort();
+            }
+            else
+            {
+                // Note that if this is sub-word and unaligned then
+                // setReturnData32() takes care of it.
+                read_trace->fire( tx.getAddress(), p.first );
+                return tx.setReturnData32(p.first);
+            }
+        }
+
+        behavior write(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            if (tx.getAccessWidth() != pv::ACCESS_32_BITS)
+            {
+                LOG(0) << "Non-word writes to CCI register file are not supported by the model.\n";
+                return tx.generateAbort();
+            }
+
+            if (tx.getBurstLength() != 1)
+            {
+                LOG(0) << "Multi-beat write are not supported to the CCI register file.\n";
+                return tx.generateDecodeAbort();
+            }
+
+            if ( ! ( tx.getMemoryAttributes()->isInnerDVSO()
+                     || tx.getMemoryAttributes()->isOuterDVSO() ) )
+            {
+                LOG(0) << "CCI register file writes should be addressed with device or strongly ordered transactions.  We expect both the inner and outer attributes to be DV/SO.  Abort generated.\n";
+                return tx.generateDecodeAbort();
+            }
+
+            bool const access_violation = registerWrite(
+                tx.getAddress(), tx.getData32(), tx.isNonSecure()
+                );
+
+            if (access_violation)
+            {
+                LOG(0) << "Access violation for write to CCI register at offset " << Ox(0xFFFF & tx.getAddress()) << "\n";
+            }
+            else
+            {
+                write_trace->fire( tx.getAddress(), tx.getData32() );
+            }
+            return access_violation
+                ? tx.generateDecodeAbort()
+                : tx.writeComplete();
+        }
+
+        behavior debugRead(pv::ReadTransaction tx) : pv::Tx_Result
+        {
+            return device.read(tx);
+        }
+
+        behavior debugWrite(pv::WriteTransaction tx) : pv::Tx_Result
+        {
+            return device.write(tx);
+        }        
+    }
+
+
+    /**************************************************
+    * pvbus access
+    * ************************************************/
+    behavior registerRead(uint32_t addr, bool is_debug_, bool is_non_secure_) : std::pair<uint32_t,bool>
+    {
+        std::pair<uint32_t,bool> data = std::make_pair(0, false);
+
+        //if (protection == 0x1 && !privilege_mode)
+        //    return data;
+
+        // Find out which block does the address belongs to.
+        uint32_t reg_block = ( addr >> 12 )  & 0x0000000F;
+
+        switch(reg_block) {
+            case 0x0:
+                data = readControlAndIdRegisters(addr, is_debug_, is_non_secure_);
+                break;
+            case 0x1:
+            case 0x2:
+            case 0x3:
+            case 0x4:
+            case 0x5:
+                data = readSlaveInterfaceRegisters(addr, reg_block, is_non_secure_);
+                break;
+            case 0x9:
+                data = readCycleCounterRegisters(addr);
+                break;
+            case 0xA:
+            case 0xB:
+            case 0xC:
+            case 0xD:
+                data = readPerformanceCounterRegisters(addr, reg_block);
+                break;
+            default:
+                printf("Reserved\n");
+
+        }
+
+        // for testing purpose only to fire an event source
+        // fire_event_source(data);
+
+        return data;
+    }
+
+    behavior fire_event_source(uint32_t data)
+    {
+        // in reality, we fire event source based on data. Here we hard-coded to 253
+        uint32_t index = 253;
+
+        if ( event_source_array[index] ) {
+            event_source_array[index]->IncrementCounters();
+            event_source_array[index]->sendEventCounterHitZero();
+        } else {
+            printf("No event source registered\n");
+        }
+
+        /*
+        if ( event_source_array[index] != NULL ) {
+            sg::EventSourceBase* event_source = event_source_array[index];
+            event_source->IncrementCounters();
+            event_source->sendEventCounterHitZero();
+            /*
+            uint8_t source_counter = event_source_array[index]->getSourceCounter();
+            switch ( source_counter ) {
+                case 1:
+                    EventSource1 *src1 = dynamic_cast<EventSource1*> (event_source_array[index]);
+                    if ( src1 ) {
+                        src1->fire(data);
+                    }
+                    break;
+
+                case 2:
+                    EventSource2 *src2 = dynamic_cast<EventSource2*> (event_source_array[index]);
+                    if ( src2 ) {
+                        src2->fire(data);
+                    }
+                    break;
+
+                default:
+
+            }
+
+        }*/
+    }
+
+    behavior allow_ns_accesses() : bool
+    {
+        return (secure_access & 1) != 0;
+    }
+
+    behavior readPeripheralIdRegisters(uint32_t addr_offset) : uint32_t
+    {
+        uint32_t data = 0;
+
+        switch ( addr_offset) {
+            case 0xFD0:
+                data = peripheral_id[4];
+                break;
+            case 0xFE0:
+                data = peripheral_id[0];
+                break;
+            case 0xFE4:
+                data = peripheral_id[1];
+                break;
+            case 0xFE8:
+                data = peripheral_id[2];
+                break;
+            case 0xFEC:
+                data = peripheral_id[3];
+                break;
+            case 0xFF0:
+                data = component_id[0];
+                break;
+            case 0xFF4:
+                data = component_id[1];
+                break;
+            case 0xFF8:
+                data = component_id[2];
+                break;
+            case 0xFFC:
+                data = component_id[3];
+                break;
+        }
+        return data;
+    }
+
+    behavior readControlAndIdRegisters(uint32_t addr, bool is_debug_, bool is_non_secure_) : std::pair<uint32_t,bool>
+    {
+        // The default accesses permissions are to prevent NS accesses.
+        bool     access_violation = allow_ns_accesses() ? false : is_non_secure_;
+        uint32_t data             = 0;
+        uint32_t addr_offset = addr & 0x00000FFF;  // get last 12 (3 x 4) bits
+        if ( addr_offset >= 0xFD0 && addr_offset <= 0xFFC ) {
+            data = readPeripheralIdRegisters(addr_offset);
+            LOG(2) << "read Control and ID - Peripheral ID Registers : offset = " << Ox(addr_offset) << " : " << Ox(data) << "\n";
+        } else {
+            switch ( addr_offset ) {
+                case 0x000:
+                    // Control Override Register is _only_ accessible to _secure_ transactions
+                    // independent of the Secure Access Register.  This has a more strict
+                    // interpretation of security accesses.
+                    if (is_non_secure_)
+                    {
+                        LOG(0) << "read Control and ID - Control Override registers : ACCESS VIOLATION\n";
+                        access_violation = true;
+                        break;
+                    }
+                    data
+                        = (uint32_t(control->get_terminate_all_barrier_transactions())
+                           << 3)
+                        | (uint32_t(control->get_disable_speculative_fetches())
+                           << 2)
+                        | (uint32_t(control->get_dvm_message_disable())
+                           << 1)
+                        | (uint32_t(control->get_snoop_disable())
+                           << 0);
+                    LOG(2) << "read Control and ID - Control Override registers : " << Ox(data) << "\n";
+                    break;
+                case 0x004:
+                    data
+                        = (uint32_t(control->get_disable_speculative_fetches_from_master_interface(2))
+                           << 2)
+                        | (uint32_t(control->get_disable_speculative_fetches_from_master_interface(1))
+                           << 1)
+                        | (uint32_t(control->get_disable_speculative_fetches_from_master_interface(0))
+                           << 0);
+                    LOG(1) << "read Control and ID - Speculation Control register : " << Ox(data) << "\n";
+                    break;
+                case 0x008:
+                    LOG(2) << "read Control and ID - Secure Access registers : " << Ox(data) << "\n";
+                    data = secure_access;
+                    break;
+                case 0x00C:
+                    data = (uint32_t(control->get_pending_snoop_or_dvm_enables(is_debug_))
+                            << 0);
+                    LOG(2) << "read Control and ID - Status register : " << Ox(data) << "\n";
+                    break;
+                case 0x010:
+                    data
+                        = (uint32_t(control->get_imprecise_error_for_slave_interface(4))
+                           << 20)
+                        | (uint32_t(control->get_imprecise_error_for_slave_interface(3))
+                           << 19)
+                        | (uint32_t(control->get_imprecise_error_for_slave_interface(2))
+                           << 18)
+                        | (uint32_t(control->get_imprecise_error_for_slave_interface(1))
+                           << 17)
+                        | (uint32_t(control->get_imprecise_error_for_slave_interface(0))
+                           << 16)
+                        | (uint32_t(control->get_imprecise_error_for_master_interface(2))
+                           << 2)
+                        | (uint32_t(control->get_imprecise_error_for_master_interface(1))
+                           << 1)
+                        | (uint32_t(control->get_imprecise_error_for_master_interface(0))
+                           << 0)
+                        ;
+                    LOG(2) << "read Control and ID - Imprecise Error registers : " << Ox(data) << "\n";
+                    break;
+                case 0x100:
+                    data = performance_monitor_control;
+                    LOG(2) << "read Control and ID - Performance Monitor Control registers : " << Ox(data) << "\n";
+                    break;
+                default:
+                    LOG(2) << "Control and ID - Reserved\n";
+            }
+        }
+
+        return std::make_pair(data,access_violation);
+    }
+
+    behavior readSlaveInterfaceRegisters(uint32_t addr, uint32_t block, bool is_non_secure_) : std::pair<uint32_t,bool>
+    {
+        bool     access_violation = allow_ns_accesses() ? false : is_non_secure_;
+        uint32_t data = 0;
+
+        uint32_t addr_offset = addr & 0x00000FFF;  // get last 12 (3 x 4) bits
+        uint32_t block_offset = block - 0x1; // slave interface block starting from 1.
+
+        unsigned si = block_offset; // (s)lave (i)nterface  number
+
+        switch (addr_offset) {
+            case 0x000:
+                data
+                    = (uint32_t(control->get_slave_interface_supports_dvm_messages(si))
+                       << 31)
+                    | (uint32_t(control->get_slave_interface_supports_snoops(si))
+                       << 30)
+                    | (uint32_t(control->get_enable_issuing_of_dvm_message(si))
+                       << 1)
+                    | (uint32_t(control->get_enable_issuing_of_snoops(si))
+                       << 0);
+                LOG(2) << "read Slave interface " << si << " - Snoop Control Register : " << Ox(data) << "\n";
+                break;
+            case 0x004:
+                if ( block_offset <= 0x2 ) { // S0, S1, S2 only
+                    data = control->get_shareability_override_for_upstream_port(si);
+                    LOG(2) << "read Slave interface " << si << " - Shareable Override Register Register : " << Ox(data) << "\n";
+                }
+                break;
+            case 0x100:
+                data = slave_interface_registers[block_offset][2];
+                LOG(2) << "read Slave interface " << si << " - Read Channel QoS Value Override : " << Ox(data) << "\n";
+                break;
+            case 0x104:
+                data = slave_interface_registers[block_offset][3];
+                LOG(2) << "read Slave interface " << si << " - Write Channel QoS Value Override : " << Ox(data) << "\n";
+                break;
+            case 0x10C:
+                data = slave_interface_registers[block_offset][4];
+                LOG(2) << "read Slave interface " << si << " - QoS Control Register : " << Ox(data) << "\n";
+                break;
+            case 0x110:
+                if ( block_offset <= 0x2 ) { // S0, S1, S2 only
+                    data = slave_interface_registers[block_offset][5];
+                    LOG(2) << "read Slave interface " << si << " - Max OT Register : " << Ox(data) << "\n";
+                }
+                else
+                {
+                    LOG(2) << "read Slave interface " << si << " - Max OT Register : INVALID SLAVE\n";
+                }
+                break;
+            case 0x130:
+                data = slave_interface_registers[block_offset][6];
+                LOG(2) << "read Slave interface " << si << " - Target Latency Register : " << Ox(data) << "\n";
+                break;
+            case 0x134:
+                data = slave_interface_registers[block_offset][7];
+                LOG(2) << "read Slave interface " << si << " - Latency Regulation Register : " << Ox(data) << "\n";
+                break;
+            case 0x138:
+                data = slave_interface_registers[block_offset][8];
+                LOG(2) << "read Slave interface " << si << " - QoS Range Register : " << Ox(data) << "\n";
+                break;
+            default:
+                data = 0; // RAZ
+                LOG(2) << "read Slave interface %d - Reserved : " << Ox(data) << "\n";
+        }
+
+        return std::make_pair(data,access_violation);
+    }
+
+    behavior readCycleCounterRegisters(uint32_t addr) : std::pair<uint32_t,bool>
+    {
+        uint32_t data = 0;
+        uint32_t addr_offset = addr & 0x00000FFF;  // get last 12 (3 x 4) bits
+
+        switch (addr_offset) {
+            case 0x004:
+                data = cycle_counter_registers[0];
+                LOG(2) << "read Cycle Counter Registers - Count Register : " << Ox(data) << "\n";
+                break;
+            case 0x008:
+                data = cycle_counter_registers[1];
+                LOG(2) << "read Cycle Counter Registers - Count Control Register : " << Ox(data) << "\n";
+                break;
+            case 0x00C:
+                data = cycle_counter_registers[2];
+                LOG(2) << "read Cycle Counter Registers - Overflow Flag Status Register : " << Ox(data) << "\n";
+                break;
+            default:
+                LOG(2) << "read Cycle Counter Registers - Reserved\n";
+        }
+
+        return std::make_pair(data, false);
+    }
+
+    behavior readPerformanceCounterRegisters(uint32_t addr, uint32_t block) : std::pair<uint32_t,bool>
+    {
+        uint32_t data = 0;
+
+        uint32_t addr_offset = addr & 0x00000FFF;  // get last 12 (3 x 4) bits
+        uint32_t block_offset = block - 0xA; // slave interface block starting from 10.
+
+        switch (addr_offset) {
+            case 0x000:
+                //data = perforamce_counter_registers[block_offset][0];
+                data = my_event_counters[block_offset]->event_select_register;
+                LOG(2) << "read Performance Counter " << block_offset << " - Event Select Register : " << Ox(data) << "\n";
+                break;
+            case 0x004:
+                data = my_event_counters[block_offset]->getValue();
+                LOG(2) << "read Performance Counter " << block_offset << " - Count Register : " << Ox(data) << "\n";
+                break;
+            case 0x008:
+                data = my_event_counters[block_offset]->count_control_register;
+                LOG(2) << "read Performance Counter " << block_offset << " - Count Control Register : " << Ox(data) << "\n";
+                break;
+            case 0x00C:
+                data = my_event_counters[block_offset]->overflow_flag_status_register;
+                LOG(2) << "read Performance Counter " << block_offset << " - Overflow Flag Status Register : " << Ox(data) << "\n";
+                break;
+            default:
+                LOG(2) << "read Performance Counter " << block_offset << " - Reserved\n";
+        }
+
+        return std::make_pair(data, false);
+    }
+
+    behavior registerWrite(uint32_t addr, uint32_t data, bool is_non_secure_) : bool
+    {
+        //if (protection == 0x1 && !privilege_mode)
+        //    return;
+        bool access_violation = false; // WI
+
+        // Find out which block does the address belongs to.
+        uint32_t reg_block = ( addr >> 12 )  & 0x0000000F;
+
+        switch(reg_block)  {
+            case 0x0:
+                access_violation = writeControlAndIdRegisters(addr, data, is_non_secure_);
+                break;
+            case 0x1:
+            case 0x2:
+            case 0x3:
+            case 0x4:
+            case 0x5:
+                access_violation = writeSlaveInterfaceRegisters(addr, data, reg_block, is_non_secure_);
+                break;
+            case 0x9:
+                writeCycleCounterRegisters(addr, data);
+                break;
+            case 0xA:
+            case 0xB:
+            case 0xC:
+            case 0xD:
+                writePerformanceCounterRegisters(addr, data, reg_block);
+                break;
+            default:
+                LOG(1) << "write to Reserved region\n";
+
+        }
+        // for testing purpose only to fire an event source
+        // fire_event_source(data);
+
+        return access_violation;
+    }
+
+    behavior writePeripheralIdRegisters(uint32_t addr_offset, uint32_t data) : bool
+    {
+        return false; // Write Ignore
+#if 0
+        switch ( addr_offset) { // only least significant 8 bits are used from CCI specification
+            case 0xFD0:
+                peripheral_id[4] = data & 0x0000000F;
+                break;
+            case 0xFE0:
+                peripheral_id[0] = data & 0x0000000F;
+                break;
+            case 0xFE4:
+                peripheral_id[1] = data & 0x0000000F;
+                break;
+            case 0xFE8:
+                peripheral_id[2] = data & 0x0000000F;
+                break;
+            case 0xFEC:
+                peripheral_id[3] = data & 0x0000000F;
+                break;
+            case 0xFF0:
+                component_id[0] = data & 0x0000000F;
+                break;
+            case 0xFF4:
+                component_id[1] = data & 0x0000000F;
+                break;
+            case 0xFF8:
+                component_id[2] = data & 0x0000000F;
+                break;
+            case 0xFFC:
+                component_id[3] = data & 0x0000000F;
+                break;
+        }
+#endif
+    }
+
+
+    behavior writeControlAndIdRegisters(uint32_t addr, uint32_t data, bool is_non_secure_) : bool
+    {
+        bool     access_violation = allow_ns_accesses() ? false : is_non_secure_;
+
+        if (access_violation)
+            return access_violation;
+
+        uint32_t addr_offset = addr & 0x00000FFF;  // get last 12 (3 x 4) bits
+
+        if ( addr_offset >= 0xFD0 && addr_offset <= 0xFFC ) {
+            LOG(0) << "write Control and ID - Peripheral ID Registers : WRITE IGNORED\n";
+            writePeripheralIdRegisters( addr_offset, data);
+        } else {
+            switch ( addr_offset ) {
+                case 0x000:
+                    LOG(1) << "write Control and ID - Control Override registers : " << Ox(data) << "\n";
+                    control->set_terminate_all_barrier_transactions( (data & (1u << 3)) != 0 );
+                    control->set_disable_speculative_fetches( (data & (1u << 2)) != 0 );
+                    control->set_dvm_message_disable( (data & (1u << 1)) != 0 );
+                    control->set_snoop_disable( (data & (1u << 0)) != 0 );
+                    break;
+                case 0x004:
+                    LOG(1) << "write Control and ID - Speculation Control registers : " << Ox(data) << "\n";
+                    control->set_disable_speculative_fetches_from_master_interface( 2, (data & (1u << 2)) != 0 );
+                    control->set_disable_speculative_fetches_from_master_interface( 1, (data & (1u << 1)) != 0 );
+                    control->set_disable_speculative_fetches_from_master_interface( 0, (data & (1u << 0)) != 0 );
+                    break;
+                case 0x008:
+                    LOG(1) << "write Control and ID - Secure Access registers : " << Ox(data) << "\n";
+                    secure_access = data & 1;
+                    break;
+                case 0x00C:
+                    LOG(1) << "write Control and ID - Status register : " << Ox(data) << " WRITE IGNORED\n";
+                    break;
+                case 0x010:
+                    LOG(1) << "write Control and ID - Imprecise Error registers : " << Ox(data) << "\n";
+                    if ((data & (1u << 20)) != 0)
+                        control->clear_imprecise_error_for_slave_interface(4);
+                    if ((data & (1u << 19)) != 0)
+                        control->clear_imprecise_error_for_slave_interface(3);
+                    if ((data & (1u << 18)) != 0)
+                        control->clear_imprecise_error_for_slave_interface(2);
+                    if ((data & (1u << 17)) != 0)
+                        control->clear_imprecise_error_for_slave_interface(1);
+                    if ((data & (1u << 16)) != 0)
+                        control->clear_imprecise_error_for_slave_interface(0);
+                    if ((data & (1u << 2)) != 0)
+                        control->clear_imprecise_error_for_master_interface(2);
+                    if ((data & (1u << 1)) != 0)
+                        control->clear_imprecise_error_for_master_interface(1);
+                    if ((data & (1u << 0)) != 0)
+                        control->clear_imprecise_error_for_master_interface(0);
+                    break;
+                case 0x100:
+                    LOG(1) << "write Control and ID - Performance Monitor Control registers : " << Ox(data) << "\n";
+
+                    if ( (performance_monitor_control & 0x1) != ( data & 0x1) ) {
+                        enableAllCounters(data);        // enable/disable all counters
+                    }
+
+                    if ( (performance_monitor_control & 0x2) != (data & 0x2) )  {
+                        resetAllEventCounters(data);    // reset all performance counters
+                    }
+
+                    if ( (performance_monitor_control & 0x4) != (data & 0x4) )  {
+                        resetCycleCounters(data);    // reset cycle counters
+                    }
+
+                    // cycle count divider
+                    if ( ( performance_monitor_control & 0x8 ) != (data & 0x8) ) {
+                        if ( (data & 0x8) == 0x8 ) {
+                            clockdivider.rate.set(64, 1);
+                        } else {
+                            clockdivider.rate.set(1, 1);
+                        }
+                    }
+
+                    // update register value
+                    performance_monitor_control = data;
+                    break;
+
+                default:
+                    LOG(1) << "write Control and ID - Reserved\n";
+            }
+        }
+
+        return access_violation;
+    }
+
+    behavior resetAllEventCounters(uint32_t data)
+    {
+        if ( (0x2 & data) == 0x2) {
+            for ( int i = 0; i < 256; i++ ) {
+                if ( event_source_array[i] ) {
+                    event_source_array[i]->setMasterEventCounterValue(0);
+                }
+            }
+        }
+
+    }
+
+    behavior resetCycleCounters(uint32_t data)
+    {
+        if ( ( 0x4 & data )== 0x4) {
+            cycle_counter_registers[1] = 0;
+        }
+    }
+
+    behavior enableAllCounters(uint32_t data)
+    {
+        bool enable_all_counters = false;
+
+        enable_all_counters = (0x1 & data) == 1 ? true : false;
+        for ( int i = 0; i < 4; i++ ) {
+            my_event_counters[i]->setEnabled(enable_all_counters);
+        }
+        for ( int i = 0; i < 256; i++ ) {
+            if ( event_source_array[i] ) {
+                event_source_array[i]->setMasterEventCounterStatus(enable_all_counters);
+            }
+        }
+        // enable/disable cycle counters
+        cycle_counter_enabled = enable_all_counters;
+    }
+
+
+    behavior writeSlaveInterfaceRegisters(uint32_t addr, uint32_t data, uint32_t block, bool is_non_secure_) : bool
+    {
+        bool     access_violation = allow_ns_accesses() ? false : is_non_secure_;
+
+        if (access_violation)
+            return access_violation;
+
+        uint32_t addr_offset = addr & 0x00000FFF;  // get last 12 (3 x 4) bits
+        uint32_t block_offset = block - 0x1; // slave interface block starting from 1.
+
+        unsigned const si = block_offset;
+
+        switch (addr_offset) {
+            case 0x000:
+                LOG(1) << "write Slave interface " << si << " - Snoop Control Register : " << Ox(data) << "\n";
+                control->set_enable_issuing_of_dvm_message( si, (data & (1u << 1)) != 0 );
+                control->set_enable_issuing_of_snoops( si, (data & (1u << 0)) != 0 );
+                break;
+            case 0x004:
+                if ( block_offset <= 0x2 ) { // S0, S1, S2 only
+                    LOG(1) << "write Slave interface " << si << " - Shareable Override Register : " << Ox(data) << "\n";
+                    control->set_shareability_override_for_upstream_port(
+                        si, CCIInterconnect::control_if::shareable_override_t( (data >> 0) & 3u)
+                        );
+                }
+                else
+                {
+                    LOG(1) << "write Slave interface " << si << " - Shareable Override Register : NON-EXISTENT\n";
+                }
+                break;
+            case 0x100:
+                LOG(1) << "write Slave interface " << si << " - Read Channel QoS Value Override : " << Ox(data) << "\n";
+                slave_interface_registers[block_offset][2] = data & 0xF;
+                break;
+            case 0x104:
+                LOG(1) << "write Slave interface " << si << " - Write Channel QoS Value Override : " << Ox(data) << "\n";
+                slave_interface_registers[block_offset][3] = data & 0xF;
+                break;
+            case 0x10C:
+                LOG(1) << "write Slave interface " << si << " - QoS Control Register : " << Ox(data) << "\n";
+                slave_interface_registers[block_offset][4] = data & 0xF;
+                break;
+            case 0x110:
+                if ( block_offset <= 0x2 )
+                {
+                    // S0, S1, S2 only
+                    LOG(1) << "write Slave interface " << si << " - Max OT Register : " << Ox(data) << "\n";
+                    slave_interface_registers[block_offset][5] = data & ((0x1f << 16) | (0x3FFF << 0));
+                }
+                else
+                {
+                    LOG(1) << "write Slave interface " << si << " - Max OT Register : INVALID SLAVE\n";
+                }
+                break;
+            case 0x130:
+                slave_interface_registers[block_offset][6] = data & ((0xFFF << 16) | (0xFFF << 0));
+                LOG(1) << "write Slave interface " << si << " - Target Latency Register : " << Ox(data) << "\n";
+                break;
+            case 0x134:
+                LOG(1) << "write Slave interface " << si << " - Latency Regulation Register : " << Ox(data) << "\n";
+                slave_interface_registers[block_offset][7] = data & ((0x7 << 8) | (0x7 << 0));
+                break;
+            case 0x138:
+                LOG(1) << "write Slave interface " << si << " - QoS Range Register : " << Ox(data) << "\n";
+                slave_interface_registers[block_offset][8] = data & ((0xF << 24) | (0xF << 16) | (0xF << 8) | (0xF << 0));
+                break;
+            default:
+                LOG(1) << "write Slave interface " << si << " - Reserved : " << Ox(data) << "\n";
+        }
+        return access_violation;
+    }
+
+    behavior writeCycleCounterRegisters(uint32_t addr, uint32_t data)
+    {
+        uint32_t addr_offset = addr & 0x00000FFF;  // get last 12 (3 x 4) bits
+
+        switch (addr_offset) {
+            case 0x004:
+                LOG(1) << "write Cycle Counter Registers - Count Register : " << Ox(data) << "\n";
+                cycle_counter_registers[0] = data;
+                break;
+            case 0x008:
+                LOG(1) << "write Cycle Counter Registers - Count Control Register : " << Ox(data) << "\n";
+                cycle_counter_registers[1] = data;
+                if ( ( data & 0x1 ) == 0x1 ) {
+                    cycle_counter_enabled = true;
+                } else {
+                    cycle_counter_enabled = false;
+                }
+                break;
+            case 0x00C:
+                LOG(1) << "write Cycle Counter Registers - Overflow Flag Status Register : " << Ox(data) << "\n";
+                if ( (0x1 & data) == 1 ) { // clear overflow flag
+                    cycle_counter_registers[2] = 0;
+                }
+
+                break;
+            default:
+                LOG(1) << "write Cycle Counter Registers - Reserved\n";
+        }
+    }
+
+    behavior writePerformanceCounterRegisters(uint32_t addr, uint32_t data, uint32_t block)
+    {
+        uint32_t addr_offset = addr & 0x00000FFF;  // get last 12 (3 x 4) bits
+        uint32_t block_offset = block - 0xA; // performace counter block starting from 10.
+        uint32_t old_select = 0, new_select = 0;
+        uint32_t counter_enabled = 0, old_enabled = 0;
+
+        switch (addr_offset) {
+            case 0x000:
+                LOG(1) << "write Performance Counter " << (block_offset) << " - Event Select Register : " << Ox(data) << "\n";
+                old_select = my_event_counters[block_offset]->event_select_register;
+                new_select = data & 0x000000FF;
+                // only register when selection changed
+                if ( old_select != new_select ) {
+                    my_event_counters[block_offset]->event_select_register = new_select;
+                    if ( my_event_counters[block_offset]->event_source ) {
+                        // already registered with an event source, unregister first
+                        my_event_counters[block_offset]->event_source->UnregisterEventCounter( my_event_counters[block_offset] );
+                    }
+
+                    // only register if the event source is valid
+                    if ( event_source_array[new_select] ) {
+                        event_source_array[new_select]->RegisterEventCounter( my_event_counters[block_offset] );
+                        my_event_counters[block_offset]->event_source = event_source_array[new_select];
+                        my_event_counters[block_offset]->setMasterStartValue(event_source_array[new_select]->getMasterEventCounterValue());
+
+                        event_source_array[new_select]->nextHitZeroMasterValue();
+                        event_source_array[new_select]->Update();  // will make event source active
+                    }
+                }
+                break;
+            case 0x004:
+                LOG(1) << "write Performance Counter " << (block_offset) << " - Count Register : " << Ox(data) << "\n";
+                if ( my_event_counters[block_offset]->event_source ) {
+                    my_event_counters[block_offset]->setOffset(data);
+                    my_event_counters[block_offset]->setMasterStartValue(
+                            my_event_counters[block_offset]->event_source->getMasterEventCounterValue());
+                    // refresh the next master value of a counter hitting zero
+                    my_event_counters[block_offset]->event_source->nextHitZeroMasterValue();
+                }
+
+                break;
+            case 0x008:
+                LOG(1) << "write Performance Counter " << (block_offset) << " - Count Control Register : " << Ox(data) << "\n";
+                old_enabled = my_event_counters[block_offset]->count_control_register;
+                counter_enabled = 0x1 & data;
+                if ( old_enabled != counter_enabled ) {
+                    my_event_counters[block_offset]->count_control_register = counter_enabled;
+                    my_event_counters[block_offset]->setEnabled(counter_enabled == 1 ? true : false);
+                    // enabled changed, we need to refresh event source
+                    if ( my_event_counters[block_offset]->event_source )
+                        my_event_counters[block_offset]->event_source->nextHitZeroMasterValue();
+                }
+                break;
+            case 0x00C:
+                LOG(1) << "write Performance Counter " << (block_offset) << " - Overflow Flag Status Register : " << Ox(data) << "\n";
+                if ( (0x1 & data) == 1 ) { // clear overflow flag
+                    my_event_counters[block_offset]->overflow_flag_status_register = 0;
+                }
+                break;
+            default:
+                LOG(1) << "write Performance Counter " << (block_offset) << " - Reserved\n";
+        }
+
+    }
+
+    // debugger support - slightly more complicated than normal because of the way that register arrays are handled
+    behavior debug_read(uint32_t reg_id, uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        // Pretend to be a secure-side access so that we have full privileges.
+        *datap = registerRead(reg_id, /*is_debug_*/ true, /*is_non_secure_*/ false).first;
+
+        return ACCESS_FUNC_OK;
+    }
+
+    behavior debug_write(uint32_t reg_id, const uint64_t* datap, bool side_effects) : AccessFuncResult
+    {
+        // Pretend to be a secure-side access so that we have full privileges.
+        registerWrite(reg_id, (uint32_t)*datap, /*is_non_secure_*/false);
+
+        return ACCESS_FUNC_OK;
+    }
+    slave port<ClockSignal> clk;
+
+   // Timer callback handler, called when the scheduled amount of time has elapsed.
+    behavior handleTimerSignal() : uint32_t {
+        cycle_counter_registers[1]++;
+
+        if (cycle_counter_registers[1] == 0) {
+            cycle_counter_registers[2] = 0x1;
+        }
+
+        return 1; // 1 means handler still enabled
+    }
+
+}
+
+protocol PMUEvent
+{
+    behavior fire();
+}

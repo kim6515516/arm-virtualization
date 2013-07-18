@@ -1,0 +1,41 @@
+/*
+ * Copyright 2010 ARM Limited. All rights reserved.
+ */
+
+component FVP_VE_Cortex_A15x4_A7x4
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Top level component of the Cortex A15x4 A7x4 Versatile Express inspired model";
+    }
+
+    composition
+    {
+        coretile      : ARM_Cortex_A15x4_A7x4_CT();
+        motherboard   : VEMotherBoard(proc_id0.default=0x14000000,"daughter_led_count"=8,"daughter_user_switch_count"=8);
+        daughterboard : VEDaughterBoard();
+    }
+
+    connection
+    {
+        motherboard.masterclk  => daughterboard.clk_in;
+        motherboard.interrupts => daughterboard.interrupts;
+        motherboard.clcd_pvbus => daughterboard.clcd_pvbus;
+        motherboard.CB[0]      => daughterboard.CB;
+
+        daughterboard.smb_cs   => motherboard.smb_cs;
+        daughterboard.mmb      => motherboard.mmb_db1;
+
+        daughterboard.cpu_clk  => coretile.clk_in;
+        daughterboard.cpu_irqs => coretile.irqs;
+
+        coretile.pvbus_m       => daughterboard.cpu_pvbus;
+
+        coretile.cluster0_ticks => motherboard.cluster0_ticks;
+        coretile.cluster1_ticks => motherboard.cluster1_ticks;
+        coretile.leds           => motherboard.daughter_leds;
+        coretile.user_switches  => motherboard.daughter_switches;
+    }
+}

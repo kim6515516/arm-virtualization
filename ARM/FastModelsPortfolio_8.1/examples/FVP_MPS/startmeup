@@ -1,0 +1,24 @@
+#! /bin/bash
+
+echo "Make sure that the release version of the model has been build before starting this script!"
+echo "On the BootMonitor command line you may enter: "
+
+echo "   flash"
+echo "   list images"
+echo "   run selftest_mpb_ESL"
+echo 
+
+echo "Press return to continue ..."
+read
+
+
+model_shell --model ./Build_Cortex-M3/Linux-Release-GCC-4.1/cadi_system_Linux-Release-GCC-4.1.so \
+    --parameter "coretile.core.semihosting-cmd_line="\
+    --parameter "coretile.fname=mps_flash.bin" \
+    --parameter "coretile.mps_sysregs.user_switches_value=4" \
+    --parameter "coretile.mps_sysregs.memcfg_value=0" \
+    --parameter "mpsvisualisation.disable-visualisation=false" \
+    --parameter "mpsvisualisation.rate_limit-enable=0"
+
+
+    

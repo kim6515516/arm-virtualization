@@ -1,0 +1,124 @@
+/*
+ * Copyright 2006 ARM Limited. All rights reserved.
+ * Copyright 2007 ARM Limited. All rights reserved.
+ * Copyright 2008 ARM Limited. All rights reserved.
+ */
+
+component BP135_AXI2APB
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "Peripheral";
+        description = "AXI to APB bridge. ";
+        loadfile_extension = "";
+        has_cadi = 1;
+        executes_software = 0;
+        is_single_stepped = 0;
+        documentation_file = "../Docs/DUI0423O_fast_model_rm.pdf";
+    }
+    slave port<PVBus> AXI;
+    master port<PVBus> P0;
+    master port<PVBus> P1;
+    master port<PVBus> P10;
+    master port<PVBus> P11;
+    master port<PVBus> P12;
+    master port<PVBus> P13;
+    master port<PVBus> P14;
+    master port<PVBus> P15;
+    master port<PVBus> P2;
+    master port<PVBus> P3;
+    master port<PVBus> P4;
+    master port<PVBus> P5;
+    master port<PVBus> P6;
+    master port<PVBus> P7;
+    master port<PVBus> P8;
+    master port<PVBus> P9;
+    slave port<Value> TZPROT0;
+    slave port<Value> TZPROT1;
+    composition
+    {
+        bp135tzswitchcontrol_0 : BP135TZSwitchControl;
+        pvbusdecoder_0 : PVBusDecoder;
+        tzswitch_0 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_1 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_10 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_11 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_12 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_13 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_14 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_15 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_2 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_3 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_4 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_5 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_6 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_7 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_8 : TZSwitch(normal = 2,secure = 1);
+        tzswitch_9 : TZSwitch(normal = 2,secure = 1);
+    }
+    connection
+    {
+        bp135tzswitchcontrol_0.controlSignal[0] => tzswitch_0.control;
+        bp135tzswitchcontrol_0.controlSignal[10] => tzswitch_10.control;
+        bp135tzswitchcontrol_0.controlSignal[11] => tzswitch_11.control;
+        bp135tzswitchcontrol_0.controlSignal[12] => tzswitch_12.control;
+        bp135tzswitchcontrol_0.controlSignal[13] => tzswitch_13.control;
+        bp135tzswitchcontrol_0.controlSignal[14] => tzswitch_14.control;
+        bp135tzswitchcontrol_0.controlSignal[15] => tzswitch_15.control;
+        bp135tzswitchcontrol_0.controlSignal[1] => tzswitch_1.control;
+        bp135tzswitchcontrol_0.controlSignal[2] => tzswitch_2.control;
+        bp135tzswitchcontrol_0.controlSignal[3] => tzswitch_3.control;
+        bp135tzswitchcontrol_0.controlSignal[4] => tzswitch_4.control;
+        bp135tzswitchcontrol_0.controlSignal[5] => tzswitch_5.control;
+        bp135tzswitchcontrol_0.controlSignal[6] => tzswitch_6.control;
+        bp135tzswitchcontrol_0.controlSignal[7] => tzswitch_7.control;
+        bp135tzswitchcontrol_0.controlSignal[8] => tzswitch_8.control;
+        bp135tzswitchcontrol_0.controlSignal[9] => tzswitch_9.control;
+        pvbusdecoder_0.pvbus_m_range[0x0..0xfff] => tzswitch_0.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0x1000..0x1fff] => tzswitch_1.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0x2000..0x2fff] => tzswitch_2.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0x3000..0x3fff] => tzswitch_3.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0x4000..0x4fff] => tzswitch_4.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0x5000..0x5fff] => tzswitch_5.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0x6000..0x6fff] => tzswitch_6.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0x7000..0x7fff] => tzswitch_7.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0x8000..0x8fff] => tzswitch_8.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0x9000..0x9fff] => tzswitch_9.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0xa000..0xafff] => tzswitch_10.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0xb000..0xbfff] => tzswitch_11.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0xc000..0xcfff] => tzswitch_12.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0xd000..0xdfff] => tzswitch_13.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0xe000..0xefff] => tzswitch_14.pvbus_input;
+        pvbusdecoder_0.pvbus_m_range[0xf000..0xffff] => tzswitch_15.pvbus_input;
+        self.AXI => pvbusdecoder_0.pvbus_s;
+        self.TZPROT0 => bp135tzswitchcontrol_0.tzprot0Rx;
+        self.TZPROT1 => bp135tzswitchcontrol_0.tzprot1Rx;
+        tzswitch_0.pvbus_port_a => self.P0;
+        tzswitch_1.pvbus_port_a => self.P1;
+        tzswitch_10.pvbus_port_a => self.P10;
+        tzswitch_11.pvbus_port_a => self.P11;
+        tzswitch_12.pvbus_port_a => self.P12;
+        tzswitch_13.pvbus_port_a => self.P13;
+        tzswitch_14.pvbus_port_a => self.P14;
+        tzswitch_15.pvbus_port_a => self.P15;
+        tzswitch_2.pvbus_port_a => self.P2;
+        tzswitch_3.pvbus_port_a => self.P3;
+        tzswitch_4.pvbus_port_a => self.P4;
+        tzswitch_5.pvbus_port_a => self.P5;
+        tzswitch_6.pvbus_port_a => self.P6;
+        tzswitch_7.pvbus_port_a => self.P7;
+        tzswitch_8.pvbus_port_a => self.P8;
+        tzswitch_9.pvbus_port_a => self.P9;
+    }
+    
+    behavior init()
+    {
+        composition.init();
+    }
+    
+    behavior reset(int level)
+    {
+        composition.reset(level);
+    }
+}

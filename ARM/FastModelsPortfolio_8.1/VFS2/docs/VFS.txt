@@ -1,0 +1,106 @@
+
+VFS
+---
+
+Changelog
+---------
+
+4/6/2008
+
+    Added VFS_ATTR_FAT to allow setting/getting attributes in FAT format
+
+20/5/2008
+
+    Added VFS_OPEN_TRUNCATE/VFS_OPEN_NEW flags
+    Made open respect the VFS_OPEN_CREATE flag (was always assumed set)
+
+14/5/2008
+
+    Fixed getAttr not returning error on file not found
+    Fixed rename using non-canonical paths
+    Added DISKSIZE/DISKFREE attributes to readmounts
+    Fixed RXREADY not generating interrupts
+    Added MTIME/ATIME/CTIME timestamp support
+    Added RTIME attribute to return 'real' host time
+    Fixed Windows ReadFile at end of file
+
+10/4/2008
+
+    Added a memory mapped buffer to the messagebox device
+    Added backgrounded vfs operations
+    Cleaned up messagebox register interface
+    Added shared device/driver register defines
+
+3/4/2008
+
+    Added C++ example (converted C test code).
+    Added WritingADriver doc
+
+20/3/2008
+
+    Fixed crash when opening files on linux target
+    cleaned up error handling on host side
+    cleaned up error handling on linux target
+    added windows host support
+
+14/3/2008
+
+    Initial version
+    
+The Virtual Filesystem (VFS) component is a virtual device which provides access
+to parts of the underlying host filesystem via a target OS specific driver. As 
+the component is virtual, OS distributions will not have a driver so example
+drivers are provided for bare metal (in C++) and linux OS (C). Much of the
+driver code can be reused for porting to other OS. The linux OS driver is
+included in the Fast Models TPIP package which can be downloaded separately from
+ARM. It is dual licensed under the GNU GENERAL PUBLIC LICENSE v2.0.
+
+
+Ports
+-----
+
+The VFS component provides two ports, implemented by an underlying MessageBox
+component (see documentation on the MessageBox for more information):
+
+A PVBus slave port which should be connected to a bus decoder to provide memory
+mapped access to the VFS device. This requires 64KB of address space.
+
+An optional interrupt line which can be used to indicate availability of
+incoming vfs data. Alternatively MessageBox registers can be used to poll for
+incoming vfs data.
+
+Parameters
+----------
+
+The VFS model has one parameter 'mount' which specifies the path to the host
+folder which will be accessible within the target OS when mounted. The model
+can easily be extended to support more 'mounts'
+
+Usage
+-----
+
+The vfs device implementation consists of:
+
+A VFS lisa component   - coordinates device activity
+A MessageBox component - handles bus activity and interrupts
+MBoxTypes.h            - defines types shared between target and OS
+VFS.cpp/h              - implements the VFS class/function interface
+VFSFileSystem.cpp/h    - provides a host filesystem absraction layer
+MessageCodec.h         - provides utility classes for (un)packing messages
+VFSOps.h               - defines the vfs operations
+VFSTypes.h             - defines types shared between target and OS
+
+To use the VFS component in a platform, add the vfs.sgrepo to the project. In order
+for the lisa components to find the C++ header files, the path to the
+C++ header files must also be added to the project.
+
+There are twp usage cases for the VFS component:
+
+Using the provided linux kernel patch to add the supplied VFS driver to linux
+
+- see the ReadMe.txt in the linux folder
+
+Writing a driver for a different OS
+
+- see the WritingADriver.txt
+

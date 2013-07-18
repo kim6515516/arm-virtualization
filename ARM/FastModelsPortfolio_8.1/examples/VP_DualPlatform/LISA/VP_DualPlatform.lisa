@@ -1,0 +1,68 @@
+/*
+ * Copyright 2007-2010 ARM Limited. All rights reserved.
+ */
+
+component VP_DualPlatform
+{
+    properties
+    {
+        version = "8.1.37";
+        component_type = "System";
+        description = "Top level component of Cortex-A8 EB model.";
+    }
+    composition
+    {
+        virtualethernethub3 : VirtualEthernetHub3();
+        hostbridge : HostBridge();
+        clk50hz : ClockDivider(mul=50);
+        visualisation : EBVisualisation();
+        terminal_0 : TelnetTerminal();
+        terminal_1 : TelnetTerminal();
+        terminal_2 : TelnetTerminal();
+        terminal_3 : TelnetTerminal();
+        terminal0_0 : TelnetTerminal();
+        terminal0_1 : TelnetTerminal();
+        terminal0_2 : TelnetTerminal();
+        terminal0_3 : TelnetTerminal();
+        audioout : AudioOut_SDL();
+        audioout_0 : AudioOut_SDL();
+        coretile : EBCortexA8CoreTile();
+        baseboard : EmulationBaseboard(proc_id_tile_site1 = 0x0E000000, proc_id_tile_site2 = 0xFF000000,
+                                       tile1 = 1, tile2 = 0);
+        coretile_0 : EBCortexA8CoreTile();
+        baseboard_0 : EmulationBaseboard(proc_id_tile_site1 = 0x0E000000, proc_id_tile_site2 = 0xFF000000,
+                                       tile1 = 1, tile2 = 0);
+        tick : MasterClock();
+    }
+    connection
+    {
+        tick.clk_out => baseboard.clk_in_master;
+        tick.clk_out => baseboard_0.clk_in_master;
+        baseboard.display => visualisation.lcd;
+        baseboard.aaci_audio_out => audioout.audio;
+        baseboard_0.aaci_audio_out => audioout_0.audio;
+        baseboard.terminal[0] => terminal_0.serial;
+        baseboard.terminal[1] => terminal_1.serial;
+        baseboard.terminal[2] => terminal_2.serial;
+        baseboard.terminal[3] => terminal_3.serial;
+        baseboard_0.terminal[0] => terminal0_0.serial;
+        baseboard_0.terminal[1] => terminal0_1.serial;
+        baseboard_0.terminal[2] => terminal0_2.serial;
+        baseboard_0.terminal[3] => terminal0_3.serial;
+        coretile.hdr => baseboard.hdr;
+        coretile_0.hdr => baseboard_0.hdr;
+        coretile.ticks => visualisation.ticks;
+        visualisation.mouse => baseboard.mouse;
+        visualisation.keyboard => baseboard.keyboard;
+        visualisation.lcd_layout => baseboard.lcd_layout;
+        baseboard.leds => visualisation.leds;
+        baseboard.user_switches => visualisation.user_switches;
+        baseboard.boot_switch => visualisation.boot_switch;
+        tick.clk_out => clk50hz.clk_in;
+        clk50hz.clk_out => visualisation.clock_50Hz;
+        visualisation.touch_screen => baseboard.touch_screen;
+        hostbridge.eth => virtualethernethub3.deva;
+        baseboard.ethernet => virtualethernethub3.devb;
+        baseboard_0.ethernet => virtualethernethub3.devc;
+    }
+}
